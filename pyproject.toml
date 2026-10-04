@@ -1,0 +1,77 @@
+[project]
+name = "warden"
+dynamic = ["version"]
+description = "warden: the Nightgate repo-control CLI — repo.yaml policy in, gated review + evidence artifacts out"
+license = { text = "PolyForm-Shield-1.0.0" }
+requires-python = ">=3.11"
+dependencies = [
+    "jsonschema>=4.21",
+    "pyyaml>=6",
+]
+
+[project.scripts]
+warden = "warden.cli:main"
+cage = "cage.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.version]
+path = "warden/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["warden", "cage"]
+artifacts = ["warden/certification/*.yaml", "warden/guardrails/*.yaml"]
+
+[tool.uv]
+# The version lives in warden/__init__.py, so a change there must rebuild the
+# editable install's metadata. Setting cache-keys replaces uv's defaults, so
+# pyproject.toml stays listed.
+cache-keys = [{ file = "pyproject.toml" }, { file = "warden/__init__.py" }]
+
+[dependency-groups]
+dev = ["pytest>=8", "pytest-xdist>=3.6"]
+
+# What THIS repo's own test suite shells out to, beyond the Python packages
+# above. `tests/test_init.py` enrolls a fixture repo per
+# language and RUNS the verify scope `warden init` wrote for it, so the suite
+# executes every binary `warden.enroll.verify_commands` can emit — today `uv`,
+# `go` and `npm`. Nothing declared that until now: CI was green because the
+# GitHub-hosted image happens to preinstall Go and Node, and a fresh laptop got
+# five `exit 127` cells whose only explanation was `assert 1 == 0`.
+#
+# This list is POLICY, not documentation. Four things enforce it, all in
+# tests/test_toolchain.py, and each is a test that can go red:
+#   - it must COVER what `enroll.verify_commands` emits, derived rather than
+#     retyped and probed across every branch that function has, so a fourth
+#     language in `enroll.LANGUAGES` reddens here instead of costing someone
+#     an afternoon;
+#   - EVERY CI JOB THAT RUNS THE SUITE must install every entry with a
+#     SHA-pinned action, before the suite runs — derived from the workflow
+#     rather than a named job list, so the runner image stops being the
+#     undeclared dependency in the GATING job as well as the matrix one;
+#   - an AST guard holds every DIRECT `_warden(..., "verify", ...)` call in
+#     tests/test_init.py to the `_verify` helper that calls `require()`, with
+#     a carve-out list keyed on the function AND the one scope it may run.
+#     That is the arm's exact reach and it is worth stating, because round 1
+#     refused this as a convention and round 2 refused the first fix's claim
+#     as wider than its enforcement: it does NOT see a call splatted from a
+#     variable, a helper wrapping `_warden`, a bare `subprocess.run` to a
+#     toolchain, or any other file. Every toolchain-running site in this suite
+#     has the covered shape today, and a new one in another shape is caught by
+#     review rather than by this;
+#   - and `require()` itself must behave: a NAMED skip on a machine that
+#     promised nothing, a NAMED failure where one was promised
+#     (NIGHTGATE_REQUIRE_TOOLCHAIN, which CI and repo.yaml's gate scope set),
+#     never a bare 127 — driven against a PATH that really lacks the binary.
+#
+# Not listed: `git`, and Python itself. Those are not a toolchain this project
+# chose — nothing here runs without them, including the checkout that got you
+# the file, so an absence has no failure mode left to name.
+[tool.nightgate.toolchain]
+require = ["uv", "go", "npm"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]

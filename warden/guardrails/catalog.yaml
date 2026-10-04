@@ -1,0 +1,740 @@
+# Nightgate guardrail catalog — candidate rules a repo might be missing.
+#
+# Grounded in published lists, never in taste. Three sources, verified at
+# source when this file was authored (2026-08-25):
+#
+#   - CWE Top 25 Most Dangerous Software Weaknesses, 2024 edition, derived
+#     from 31,770 CVE records.
+#   - OWASP Top 10:2025.
+#   - Google engineering practices, "what to look for in a code review".
+#
+# Every entry cites at least one of them; `warden catalog check --online`
+# fetches each URL, and the offline pass says plainly that it did not.
+#
+# Coverage is partial by decision, not by accident. All ten OWASP items carry
+# an entry. 12 of the 25 CWE ranks do — the memory-safety ranks fold into
+# out-of-bounds-memory-access, the rest are untriaged. 10 of the 12 reviewer
+# lenses do: the cited page also lists Every Line and Good Things, which
+# describe how to conduct a review rather than a class of defect a guardrail
+# could name. All three sets are pinned in tests/test_catalog.py, so adding
+# or dropping one is a deliberate change.
+#
+# `engine: not-a-rule` is load-bearing. Insecure design cannot be a regex,
+# and a catalog that quietly invented one for tidiness would be a checklist
+# of things that technically pass. Those entries carry `instead:`.
+#
+# A catalog entry is a CANDIDATE. Nothing here is enforced until a repo
+# copies a starter into .warden/rules/ and a human merges it.
+version: 1
+
+# The dated sources' editions, as data. A citation URL
+# resolving is not the same as its edition being current — an archived edition
+# is SUPPOSED to keep resolving after a newer one ships. Each dated source
+# names the edition it cites and a probe URL for where the NEXT edition would
+# live; `warden catalog check --online` reports CURRENT / SUPERSEDED per source
+# and the retro gathers it, so currency is reviewed on a cadence instead of
+# when someone happens to wonder. Each `cited_url` is a URL the catalog's own
+# entries cite, and each next-edition URL advances the year in that same
+# scheme — CWE's <year>_top25_list.html under archive/<year>/, OWASP's
+# /Top10/<year>/ — so the probe is derivable from the citation, not invented. It is still a
+# heuristic: a probe that never resolves may mean the source is current OR
+# that the URL scheme moved, which the currency check cannot tell apart, so a
+# never-flipping probe is itself a thing the retro re-triages (and an
+# inconclusive probe reports UNKNOWN, never a confident CURRENT). Google's
+# "code review" guidance is undated and carries no edition here.
+editions:
+  - source: cwe-top-25
+    edition: "2024"
+    cited_url: https://cwe.mitre.org/top25/archive/2024/2024_top25_list.html
+    next_edition: "2025"
+    next_probe_url: https://cwe.mitre.org/top25/archive/2025/2025_top25_list.html
+  - source: owasp-top-10
+    edition: "2025"
+    cited_url: https://owasp.org/Top10/2025/
+    next_edition: "2029"
+    next_probe_url: https://owasp.org/Top10/2029/
+
+entries:
+
+  # ---------------------------------------------------------------- CWE ---
+
+  - id: sql-injection
+    taxonomy: CWE-89
+    name: SQL injection
+    guards: >-
+      Queries assembled from untrusted text, which lets a caller rewrite the
+      query instead of only filling in its values.
+    engine: declarative
+    applies_when: >-
+      the repo issues SQL — an ORM escape hatch, a raw cursor, or any string
+      handed to a database driver
+    false_positive_cost: >-
+      Real, and in two classes. A line-based regex cannot tell which ARGUMENT
+      an operator belongs to, nor whether it sits inside the query STRING, so
+      correct parameterized code is flagged in both shapes:
+      execute("... LIMIT %s", (n + 1,)) and execute(SQL, {"pct": n % 100})
+      put the operator in a later argument, while
+      execute("update t set c = coalesce(c, 0) + %s where id = %s", (a, b))
+      and execute("... like %s", (prefix + "%",)) put it in the SQL text or in
+      a bound parameter. Both spellings occur in real, correct psycopg code —
+      the second pair is taken from a repo running this platform. A constant
+      query built with an f-string is flagged too. Each costs a dismissal, and
+      the reviewer still learns where raw SQL lives. Deciding which argument
+      holds the query, and whether an operator is inside a literal, needs real
+      parsing rather than a pattern; until then this entry keeps the false
+      positives rather than buying silence with a false negative.
+    sources:
+      - title: "CWE-89: Improper Neutralization of Special Elements used in an SQL Command"
+        url: https://cwe.mitre.org/data/definitions/89.html
+      - title: "2024 CWE Top 25 (rank 3)"
+        url: https://cwe.mitre.org/top25/archive/2024/2024_top25_list.html
+    starter:
+      checks:
+        - id: sql-fstring
+          pattern: 'execute(many|script)?\s*\(\s*f'
+          message: "SQL built with an f-string — pass parameters, not text"
+        - id: sql-concat
+          pattern: 'execute(many|script)?\s*\(.*(\+|%\s|\.format\()'
+          message: "SQL text built by interpolation — pass parameters, not text"
+
+  - id: os-command-injection
+    taxonomy: CWE-78
+    name: OS command injection
+    guards: >-
+      Shell strings built from untrusted input, where a semicolon in a
+      filename becomes a second command.
+    engine: declarative
+    applies_when: the repo shells out at all
+    false_positive_cost: >-
+      A constant command run through the shell is flagged; the author either
+      switches to an argv list or dismisses it in one line.
+    sources:
+      - title: "CWE-78: Improper Neutralization of Special Elements used in an OS Command"
+        url: https://cwe.mitre.org/data/definitions/78.html
+      - title: "2024 CWE Top 25 (rank 7)"
+        url: https://cwe.mitre.org/top25/archive/2024/2024_top25_list.html
+    starter:
+      checks:
+        - id: shell-true
+          pattern: '\bshell\s*=\s*True'
+          message: "subprocess with shell=True — pass an argv list instead"
+        - id: os-system
+          pattern: '\b(os\.(system|popen)|subprocess\.get(status)?output|commands\.getoutput)\('
+          message: "command string runs via /bin/sh — pass an argv list"
+
+  - id: unsafe-deserialization
+    taxonomy: CWE-502
+    name: Deserialization of untrusted data
+    guards: >-
+      Formats that reconstruct arbitrary objects, where parsing input is
+      indistinguishable from executing it.
+    engine: declarative
+    applies_when: >-
+      the repo reads pickles, unrestricted YAML, or any format that can
+      instantiate types named in the payload
+    false_positive_cost: >-
+      Deserializing a file the repo itself wrote is safe and still flagged;
+      the dismissal is one line and the reviewer learns where the trust
+      boundary is.
+    sources:
+      - title: "CWE-502: Deserialization of Untrusted Data"
+        url: https://cwe.mitre.org/data/definitions/502.html
+      - title: "2024 CWE Top 25 (rank 16)"
+        url: https://cwe.mitre.org/top25/archive/2024/2024_top25_list.html
+    starter:
+      checks:
+        - id: pickle-loads
+          pattern: '\b(pickle|marshal)\.loads?\('
+          message: "deserializing untrusted bytes executes whatever they name — use json"
+        - id: yaml-unsafe-load
+          pattern: 'yaml\.(unsafe_|full_)?load(_all)?\('
+          message: "unsafe YAML load can construct arbitrary types — use safe_load"
+
+  - id: xss-unescaped-output
+    taxonomy: CWE-79
+    name: Cross-site scripting
+    guards: >-
+      Untrusted text reaching a page as markup rather than as content, so the
+      visitor's browser runs it.
+    engine: declarative
+    applies_when: the repo renders HTML — a template, a component, or a DOM write
+    false_positive_cost: >-
+      Assigning constant markup is flagged; the author either moves to a text
+      assignment or dismisses it, and the escape hatches stay visible in
+      review.
+    sources:
+      - title: "CWE-79: Improper Neutralization of Input During Web Page Generation"
+        url: https://cwe.mitre.org/data/definitions/79.html
+      - title: "2024 CWE Top 25 (rank 1)"
+        url: https://cwe.mitre.org/top25/archive/2024/2024_top25_list.html
+    starter:
+      checks:
+        - id: dangerously-set-inner-html
+          pattern: 'dangerouslySetInnerHTML'
+          message: "raw markup injected into the DOM — render text, or sanitize"
+        - id: inner-html-assignment
+          pattern: '(\.(inner|outer)HTML\s*\+?=(?!=)|insertAdjacentHTML\(|document\.write\()'
+          message: "value written to the DOM as markup — escape it or use a text API"
+
+  - id: hardcoded-credentials
+    taxonomy: CWE-798
+    name: Hard-coded credentials
+    guards: >-
+      Keys, tokens, and passwords committed as source, which stay valid in
+      history long after the line is deleted.
+    engine: python
+    applies_when: always — every repo has a diff, and every diff can carry a key
+    false_positive_cost: >-
+      A fixture that looks like a key blocks a PR at HIGH severity, so the
+      checker needs a placeholder carve-out and per-rule excludes for the
+      files that quote the patterns themselves.
+    sources:
+      - title: "CWE-798: Use of Hard-coded Credentials"
+        url: https://cwe.mitre.org/data/definitions/798.html
+      - title: "2024 CWE Top 25 (rank 22)"
+        url: https://cwe.mitre.org/top25/archive/2024/2024_top25_list.html
+    starter:
+      sketch: >-
+        Scan ADDED lines only. Run a battery of vendor-shaped patterns
+        (provider key prefixes, cloud access-key ids, JWT triples, DSNs with
+        an embedded password) plus one generic
+        `secret|token|password|api_key = "<16+ chars>"` assignment. Test the
+        placeholder allowlist against the MATCHED SUBSTRING, never the whole
+        line, or one `example.com` anywhere on a line whitelists a real key.
+        Ship with a per-rule exclude for the rule and catalog files, which
+        quote the very patterns they hunt.
+
+  - id: path-traversal
+    taxonomy: CWE-22
+    name: Path traversal
+    guards: >-
+      Paths built from untrusted input that resolve outside the directory
+      they were meant to stay inside.
+    engine: python
+    applies_when: >-
+      the repo opens, serves, or extracts files whose names come from a
+      request, an archive, or a config
+    false_positive_cost: >-
+      A join on a constant path is flagged as unresolved; a purely textual
+      check produces enough of these that it teaches people to ignore the
+      gate, which is why this is a checker and not a pattern.
+    sources:
+      - title: "CWE-22: Improper Limitation of a Pathname to a Restricted Directory"
+        url: https://cwe.mitre.org/data/definitions/22.html
+      - title: "2024 CWE Top 25 (rank 5)"
+        url: https://cwe.mitre.org/top25/archive/2024/2024_top25_list.html
+    starter:
+      sketch: >-
+        Find joins whose right-hand operand is not a literal, then require a
+        containment assertion on the RESOLVED path in the same function —
+        `Path(root).resolve()` compared against `candidate.resolve()`, not a
+        `startswith` on the unresolved string, which `..` defeats. Flag
+        archive extraction that does not check member names before writing.
+
+  - id: missing-authorization
+    taxonomy: CWE-862
+    name: Missing authorization
+    guards: >-
+      An endpoint or handler that authenticates the caller and then never
+      asks whether that caller may touch this particular object.
+    engine: claude
+    applies_when: the repo has per-object permissions, tenants, or roles
+    false_positive_cost: >-
+      A judgment rule that misreads a decorator argues with the author in the
+      PR comment; costly in trust, so the rule must quote the handler it
+      means.
+    sources:
+      - title: "CWE-862: Missing Authorization"
+        url: https://cwe.mitre.org/data/definitions/862.html
+      - title: "2024 CWE Top 25 (rank 9)"
+        url: https://cwe.mitre.org/top25/archive/2024/2024_top25_list.html
+
+  - id: csrf-protection
+    taxonomy: CWE-352
+    name: Cross-site request forgery
+    guards: >-
+      State-changing requests a third-party page can cause the visitor's
+      browser to send with their credentials attached.
+    engine: claude
+    applies_when: >-
+      the repo serves browser-facing, cookie-authenticated, state-changing
+      routes
+    false_positive_cost: >-
+      Framework-level protection is easy to miss from a diff, so a wrong
+      firing reads as the gate not understanding the framework.
+    sources:
+      - title: "CWE-352: Cross-Site Request Forgery (CSRF)"
+        url: https://cwe.mitre.org/data/definitions/352.html
+      - title: "2024 CWE Top 25 (rank 4)"
+        url: https://cwe.mitre.org/top25/archive/2024/2024_top25_list.html
+
+  - id: ssrf
+    taxonomy: CWE-918
+    name: Server-side request forgery
+    guards: >-
+      The server fetching a URL the caller chose, which turns it into a proxy
+      into networks the caller cannot reach.
+    engine: claude
+    applies_when: the repo fetches URLs supplied by a request, a webhook, or a config
+    false_positive_cost: >-
+      A fetch of a constant internal URL looks identical in a diff to a fetch
+      of an attacker-chosen one; the rule must name where the URL came from.
+    sources:
+      - title: "CWE-918: Server-Side Request Forgery (SSRF)"
+        url: https://cwe.mitre.org/data/definitions/918.html
+      - title: "2024 CWE Top 25 (rank 19)"
+        url: https://cwe.mitre.org/top25/archive/2024/2024_top25_list.html
+
+  - id: unbounded-resource-use
+    taxonomy: CWE-400
+    name: Uncontrolled resource consumption
+    guards: >-
+      Work whose size the caller controls — unpaginated reads, unbounded
+      retries, unlimited upload sizes — which one request can turn into an
+      outage.
+    engine: claude
+    applies_when: the repo serves requests or processes input it did not size itself
+    false_positive_cost: >-
+      Batch jobs legitimately read everything; a rule that cannot tell a job
+      from a request handler fires on the wrong half of the repo.
+    sources:
+      - title: "CWE-400: Uncontrolled Resource Consumption"
+        url: https://cwe.mitre.org/data/definitions/400.html
+      - title: "2024 CWE Top 25 (rank 24)"
+        url: https://cwe.mitre.org/top25/archive/2024/2024_top25_list.html
+
+  - id: improper-input-validation
+    taxonomy: CWE-20
+    name: Improper input validation
+    guards: >-
+      The class covering every way untrusted input is accepted without being
+      checked — too broad to be one rule, and named here so nobody writes one.
+    engine: not-a-rule
+    applies_when: always, which is exactly why it cannot be a single check
+    false_positive_cost: >-
+      A rule this broad fires on nearly every diff, and a gate that fires on
+      every diff is one people learn to click past — damage that is not local
+      to the rule.
+    instead: >-
+      Adopt the specific entries this class decomposes into — sql-injection,
+      os-command-injection, path-traversal, unsafe-deserialization,
+      xss-unescaped-output — and enforce a parse-at-the-boundary convention
+      (a schema or typed model at each entry point) through review, not regex.
+    sources:
+      - title: "CWE-20: Improper Input Validation"
+        url: https://cwe.mitre.org/data/definitions/20.html
+      - title: "2024 CWE Top 25 (rank 12)"
+        url: https://cwe.mitre.org/top25/archive/2024/2024_top25_list.html
+
+  - id: out-of-bounds-memory-access
+    taxonomy: CWE-787
+    name: Out-of-bounds write and read
+    guards: >-
+      Reads and writes past the end of a buffer — rank 2 and rank 6 on the
+      2024 list, and invisible to any diff-shaped check.
+    engine: not-a-rule
+    applies_when: the repo contains memory-unsafe code (C, C++, unsafe Rust, FFI)
+    false_positive_cost: >-
+      A pattern purporting to find memory errors in a diff would be wrong
+      often enough to be worse than nothing, and it would advertise a
+      guarantee the project does not have.
+    instead: >-
+      Enforce this in the build rather than the diff: sanitizers
+      (AddressSanitizer, UndefinedBehaviorSanitizer) on the test job, a
+      fuzzing target for every parser, and a verify scope that fails the gate
+      when they do. That IS a warden rule — a `verify:` scope, not a review
+      rule.
+    sources:
+      - title: "CWE-787: Out-of-bounds Write"
+        url: https://cwe.mitre.org/data/definitions/787.html
+      - title: "2024 CWE Top 25 (ranks 2 and 6)"
+        url: https://cwe.mitre.org/top25/archive/2024/2024_top25_list.html
+
+  # -------------------------------------------------------------- OWASP ---
+
+  - id: broken-access-control
+    taxonomy: A01:2025
+    name: Broken access control
+    guards: >-
+      Enforcement of who may do what, when the answer is decided anywhere
+      other than the server that performs the action.
+    engine: claude
+    applies_when: the repo has more than one class of user
+    false_positive_cost: >-
+      The rule reads a diff, not the whole authorization model, so it will
+      sometimes flag a handler whose caller already checked; each wrong
+      firing spends reviewer patience.
+    sources:
+      - title: "OWASP Top 10:2025 — A01 Broken Access Control"
+        url: https://owasp.org/Top10/2025/
+
+  - id: security-misconfiguration
+    taxonomy: A02:2025
+    name: Security misconfiguration
+    guards: >-
+      Development conveniences reaching production — debug modes and
+      disabled certificate verification. Wildcard hosts and permissive CORS
+      are the same class but are NOT checked by this starter: they have no
+      single-line spelling a regex can find without flagging every allowlist.
+    engine: declarative
+    applies_when: the repo carries deployable configuration
+    false_positive_cost: >-
+      Test fixtures legitimately disable verification; without an exclude for
+      the test tree this rule fires constantly, which is the failure mode
+      that teaches people to ignore the gate.
+    sources:
+      - title: "OWASP Top 10:2025 — A02 Security Misconfiguration"
+        url: https://owasp.org/Top10/2025/
+    starter:
+      checks:
+        - id: debug-enabled
+          pattern: 'DEBUG\s*=\s*(True|1)\b'
+          message: "debug mode enabled — verify this cannot reach production"
+        - id: tls-verification-off
+          pattern: '\b(verify|check_hostname|ssl_verify)\s*=\s*(False|0)\b'
+          message: "TLS peer validation turned off — leave the default on"
+
+  - id: supply-chain-pinning
+    taxonomy: A03:2025
+    name: Software supply chain failures
+    guards: >-
+      Dependencies that can change under you between builds — floating
+      versions, unpinned actions, images tagged latest.
+    engine: python
+    applies_when: the repo declares dependencies or uses third-party CI actions
+    false_positive_cost: >-
+      A first-party internal package is flagged as unpinned; the fix is an
+      allowlist parameter in the rule file, not a code change.
+    sources:
+      - title: "OWASP Top 10:2025 — A03 Software Supply Chain Failures"
+        url: https://owasp.org/Top10/2025/
+    starter:
+      sketch: >-
+        Parse the repo's manifests (requirements/pyproject/lockfiles,
+        package.json, workflow `uses:` lines) and flag any requirement with
+        no exact version or digest. Pin CI actions to a commit SHA rather
+        than a tag — a tag is mutable, so pinning to one records provenance
+        that can be rewritten. Keep first-party prefixes in a rule-file
+        parameter so repo facts stay in the policy layer, never in code.
+
+  - id: weak-cryptography
+    taxonomy: A04:2025
+    name: Cryptographic failures
+    guards: >-
+      Broken primitives and predictable randomness used where the security of
+      the system depends on them.
+    engine: declarative
+    applies_when: the repo hashes, signs, encrypts, or generates tokens
+    false_positive_cost: >-
+      MD5 as a cache key or a content digest is fine and will be flagged; the
+      rule needs a body that tells the author how to say so, or the gate
+      argues about non-security hashing forever.
+    sources:
+      - title: "OWASP Top 10:2025 — A04 Cryptographic Failures"
+        url: https://owasp.org/Top10/2025/
+    starter:
+      checks:
+        - id: broken-hash
+          pattern: '(\b(md5|sha1)\s*\(|hashlib\.(new\(\s*)?["'']?(md5|sha1)\b|pbkdf2_hmac\(\s*["''](md5|sha1)["''])'
+          message: "MD5/SHA-1 — broken as a digest, legacy inside HMAC/PBKDF2; use SHA-256"
+          flags: [i]
+        - id: predictable-token-source
+          pattern: 'random\.(random|randint|choices?|randrange|randbytes|getrandbits)\('
+          message: "non-cryptographic randomness — use secrets/os.urandom for tokens"
+
+  - id: injection-umbrella
+    taxonomy: A05:2025
+    name: Injection
+    guards: >-
+      The OWASP category spanning SQL, OS command, code, and markup
+      injection — a heading over several rules rather than a rule.
+    engine: not-a-rule
+    applies_when: >-
+      always as a category; the enforceable pieces apply per the entries it
+      covers
+    false_positive_cost: >-
+      One rule trying to cover every injection surface matches so broadly
+      that its findings stop carrying information.
+    instead: >-
+      Adopt the concrete entries instead — sql-injection,
+      os-command-injection, xss-unescaped-output, unsafe-deserialization —
+      each of which has a starter and its own applicability.
+    sources:
+      - title: "OWASP Top 10:2025 — A05 Injection"
+        url: https://owasp.org/Top10/2025/
+
+  - id: insecure-design
+    taxonomy: A06:2025
+    name: Insecure design
+    guards: >-
+      Flaws that are correct as written and wrong as designed — a missing
+      threat model, a trust boundary in the wrong place, a flow that cannot
+      be made safe by fixing any single line.
+    engine: not-a-rule
+    applies_when: any change that introduces or moves a trust boundary
+    false_positive_cost: >-
+      Any pattern claiming to detect insecure design would be a check that
+      looks like a check and is not, which is worse than the absence it
+      replaces.
+    instead: >-
+      Put it in the human layer where it can work: a threat-modelling step in
+      the design stage for changes that move a trust boundary, and a review
+      charter lens that asks the reviewer the question directly. Declare it
+      in `.warden/skills-policy.md`, not in `.warden/rules/`.
+    sources:
+      - title: "OWASP Top 10:2025 — A06 Insecure Design"
+        url: https://owasp.org/Top10/2025/
+
+  - id: authentication-failures
+    taxonomy: A07:2025
+    name: Authentication failures
+    guards: >-
+      Identity establishment that can be bypassed, replayed, or brute-forced
+      — session fixation, missing rate limits, tokens that never expire.
+    engine: claude
+    applies_when: the repo authenticates anyone
+    false_positive_cost: >-
+      Auth code is dense and often framework-supplied; a wrong finding here
+      reads as the gate not knowing the framework, and it is expensive to
+      argue down.
+    sources:
+      - title: "OWASP Top 10:2025 — A07 Authentication Failures"
+        url: https://owasp.org/Top10/2025/
+
+  - id: data-integrity-failures
+    taxonomy: A08:2025
+    name: Software or data integrity failures
+    guards: >-
+      Code and data accepted without verifying where it came from — unsigned
+      updates, unverified downloads, deserialized state trusted as fact.
+    engine: claude
+    applies_when: the repo consumes artifacts, updates, or state it did not produce
+    false_positive_cost: >-
+      Internal artifacts fetched over an authenticated channel look the same
+      in a diff as unverified ones; the rule must ask where provenance is
+      established rather than assert its absence.
+    sources:
+      - title: "OWASP Top 10:2025 — A08 Software or Data Integrity Failures"
+        url: https://owasp.org/Top10/2025/
+
+  - id: logging-and-alerting-gaps
+    taxonomy: A09:2025
+    name: Security logging and alerting failures
+    guards: >-
+      Security-relevant events that leave no trace — and log lines that leave
+      too much of one, carrying secrets into a log aggregator.
+    engine: claude
+    applies_when: the repo has authentication, authorization, or money paths
+    false_positive_cost: >-
+      "Add a log line here" is easy advice to give wrongly and cheap to
+      comply with badly, so this rule tends to produce noise that looks like
+      progress.
+    sources:
+      - title: "OWASP Top 10:2025 — A09 Security Logging and Alerting Failures"
+        url: https://owasp.org/Top10/2025/
+
+  - id: swallowed-exceptions
+    corpus_classes: [fail-open]
+    taxonomy: A10:2025
+    name: Mishandling of exceptional conditions
+    guards: >-
+      Failures caught and discarded, so a check that errored is
+      indistinguishable from a check that passed.
+    engine: declarative
+    applies_when: always — every language has a way to ignore an error
+    false_positive_cost: >-
+      A genuinely optional cleanup step is flagged; the author adds a comment
+      or a narrower except clause, which is usually an improvement anyway.
+      Note the scope:file check reports pre-existing swallows in any touched
+      file, not only added ones.
+    sources:
+      - title: "OWASP Top 10:2025 — A10 Mishandling of Exceptional Conditions"
+        url: https://owasp.org/Top10/2025/
+    starter:
+      checks:
+        - id: except-pass
+          pattern: 'except[^:\n]*:[ \t]*(?:#[^\n]*)?(?:\n[ \t]*(?:#[^\n]*\n[ \t]*)*)?pass\b'
+          message: "exception swallowed — an errored check must not look like a pass"
+          scope: file
+          flags: [m]
+
+  # ------------------------------------------------------- review lenses ---
+
+  - id: review-lens-design
+    taxonomy: review-lens:design
+    name: Design
+    guards: >-
+      Whether the change belongs in the system at all, and whether its
+      interactions with the rest of the code make sense.
+    engine: not-a-rule
+    applies_when: any change large enough to have a design
+    false_positive_cost: >-
+      There is no pattern for "this is the wrong design"; a rule pretending
+      otherwise would fire on shape rather than substance.
+    instead: >-
+      Keep it a human gate. Require a design stage for changes above a size
+      or risk threshold, and record the decision as an artifact the PR links
+      to, so the question is answered before the code exists rather than
+      argued about after.
+    sources:
+      - title: "Google eng-practices — What to look for in a code review: Design"
+        url: https://google.github.io/eng-practices/review/reviewer/looking-for.html
+
+  - id: review-lens-functionality
+    taxonomy: review-lens:functionality
+    name: Functionality
+    guards: >-
+      Whether the change does what its author intended, for both end users
+      and the next developer who reads it.
+    engine: claude
+    applies_when: always
+    false_positive_cost: >-
+      Judging intent from a diff without the issue text produces confident
+      wrong readings; the rule should quote the intent it is judging against.
+    sources:
+      - title: "Google eng-practices — What to look for in a code review: Functionality"
+        url: https://google.github.io/eng-practices/review/reviewer/looking-for.html
+
+  - id: review-lens-complexity
+    taxonomy: review-lens:complexity
+    name: Complexity
+    guards: >-
+      Code more complex than it needs to be — the form of over-engineering a
+      reviewer can measure rather than argue about.
+    engine: python
+    applies_when: always
+    false_positive_cost: >-
+      A threshold set too low turns into a nagging bot; set it from the
+      repo's own distribution and put the number in the rule file, not the
+      checker.
+    sources:
+      - title: "Google eng-practices — What to look for in a code review: Complexity"
+        url: https://google.github.io/eng-practices/review/reviewer/looking-for.html
+    starter:
+      sketch: >-
+        Compute a per-function size and branch count for functions the diff
+        ADDED or MODIFIED — never the whole file, or every touch of a legacy
+        module reports the same backlog. Take the thresholds from rule-file
+        params so the policy layer owns the number, and report the function
+        name and the measured value as evidence.
+
+  - id: review-lens-tests
+    corpus_classes: [test-cannot-fail]
+    taxonomy: review-lens:tests
+    name: Tests
+    guards: >-
+      Whether the change carries the tests it needs, and whether those tests
+      would actually fail if the behaviour regressed.
+    engine: claude
+    applies_when: always
+    false_positive_cost: >-
+      Flagging a pure refactor with existing coverage annoys the author; the
+      rule body must exclude refactors and config-only diffs explicitly.
+    sources:
+      - title: "Google eng-practices — What to look for in a code review: Tests"
+        url: https://google.github.io/eng-practices/review/reviewer/looking-for.html
+
+  - id: review-lens-naming
+    taxonomy: review-lens:naming
+    name: Naming
+    guards: >-
+      Whether names communicate what a thing is for, without becoming
+      sentences.
+    engine: claude
+    applies_when: always
+    false_positive_cost: >-
+      Naming findings are the easiest kind to generate and the least valuable
+      in bulk; a rule that produces several per PR trains people to skim the
+      whole report.
+    sources:
+      - title: "Google eng-practices — What to look for in a code review: Naming"
+        url: https://google.github.io/eng-practices/review/reviewer/looking-for.html
+
+  - id: review-lens-comments
+    taxonomy: review-lens:comments
+    name: Comments
+    guards: >-
+      Whether comments explain why the code exists rather than restating what
+      it does.
+    engine: claude
+    applies_when: always
+    false_positive_cost: >-
+      Asking for more comments is easy to comply with badly; the rule should
+      ask about missing WHY on non-obvious code, never about comment density.
+    sources:
+      - title: "Google eng-practices — What to look for in a code review: Comments"
+        url: https://google.github.io/eng-practices/review/reviewer/looking-for.html
+
+  - id: review-lens-style
+    taxonomy: review-lens:style
+    name: Style
+    guards: >-
+      Conformance to the language's style guide — the part of review that
+      should never consume a human's attention.
+    engine: python
+    applies_when: the repo has a linter or formatter available
+    false_positive_cost: >-
+      Near zero if it delegates, and high if it reimplements: a
+      hand-rolled style rule disagreeing with the repo's formatter produces
+      unfixable findings.
+    sources:
+      - title: "Google eng-practices — What to look for in a code review: Style"
+        url: https://google.github.io/eng-practices/review/reviewer/looking-for.html
+    starter:
+      sketch: >-
+        Do not implement style checks. Shell out to the repo's own formatter
+        and linter in a `verify:` scope and let the gate fail on their exit
+        code, so there is exactly one definition of the repo's style and it
+        is the one developers run locally.
+
+  - id: review-lens-consistency
+    taxonomy: review-lens:consistency
+    name: Consistency
+    guards: >-
+      Whether new code follows the patterns already in the codebase, or
+      quietly starts a second way of doing the same thing.
+    engine: claude
+    applies_when: always
+    false_positive_cost: >-
+      A deliberate departure from a bad existing pattern looks identical to
+      an accidental one; the rule must ask, not assert.
+    sources:
+      - title: "Google eng-practices — What to look for in a code review: Consistency"
+        url: https://google.github.io/eng-practices/review/reviewer/looking-for.html
+
+  - id: review-lens-documentation
+    corpus_classes: [docs-drift]
+    taxonomy: review-lens:documentation
+    name: Documentation
+    guards: >-
+      Whether the docs that describe this behaviour changed when the
+      behaviour did.
+    engine: claude
+    applies_when: the repo ships documentation anyone reads to use it
+    false_positive_cost: >-
+      Flagging internal-only changes as needing docs is common; scope the
+      rule to the surfaces a reader actually enrolls or integrates from.
+    sources:
+      - title: "Google eng-practices — What to look for in a code review: Documentation"
+        url: https://google.github.io/eng-practices/review/reviewer/looking-for.html
+
+  - id: review-lens-context
+    taxonomy: review-lens:context
+    name: Context
+    guards: >-
+      Whether the change degrades the health of the system as a whole, which
+      a diff viewed on its own cannot show.
+    engine: not-a-rule
+    applies_when: always, and least visible exactly when it matters most
+    false_positive_cost: >-
+      A rule scoped to a diff cannot see the system, so any finding it
+      produced about system health would be a guess wearing a rule's
+      authority.
+    instead: >-
+      Give the reviewer the context instead of asking a rule for it: a task
+      packet with the surrounding files and the priors from review memory,
+      and a review charter lens that asks about blast radius on shipped
+      contracts.
+    sources:
+      - title: "Google eng-practices — What to look for in a code review: Context"
+        url: https://google.github.io/eng-practices/review/reviewer/looking-for.html

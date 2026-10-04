@@ -1,0 +1,41 @@
+# hello-svc enrollment: the smallest honest repo.yaml. This file is the single
+# source of truth for repo facts — components, risk tiers, verify commands,
+# review settings. warden schema-validates it on every load and fails closed.
+version: 1
+repo: hello-svc
+
+# The platform release this repo's gate is built on. Verdicts are only
+# comparable to other verdicts judged under the same release. Real consumers
+# pin an immutable SHA in their shim and the semantic version here; the two
+# must agree or warden fails closed. Bumped together with the platform's own
+# version at release time (see the tagged GitHub release's notes).
+platform:
+  pin: v2.3.0
+
+components:
+  app:   {path: hello_svc/, lang: python, description: "stdlib HTTP JSON service (/health, /greet)"}
+  tests: {path: tests/,     lang: python, description: "pytest-compatible plain-assert tests"}
+
+# First glob match wins, top to bottom; anything unmatched defaults to LOW.
+risk_tiers:
+  - {glob: "hello_svc/app.py", tier: HIGH, reason: "the entire service surface: routing + input validation of untrusted query data"}
+  - {glob: "**",               tier: LOW}
+
+# Deterministic gates. Commands live here, not in CI YAML or code.
+# cwd defaults to the repo root (the directory holding this file).
+# `runner: pytest` puts pytest's counts on `warden verify`'s summary line. It
+# needs v2.3.0 or later; v2.2.0's schema refuses the key, so on that pin
+# delete it and the step runs the same, printing no counts.
+verify:
+  app:
+    - {run: "python3 -m hello_svc.app --selfcheck"}
+    - {run: "uv run --with pytest==9.1.1 python -m pytest tests -q", runner: pytest}
+
+# Repair rounds a delivery may run before it reverts: 1 to the platform cap
+# of 2. Required for certification Level 3.
+repair:
+  budget: 2
+
+review:
+  rules_dir: .warden/rules
+  blocking_severities: [HIGH]

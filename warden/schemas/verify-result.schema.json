@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "warden verify-result artifact",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["scope", "passed", "results"],
+  "properties": {
+    "scope": {"type": "string", "minLength": 1},
+    "passed": {"type": "boolean"},
+    "head_sha": {
+      "type": "string",
+      "description": "git HEAD when the scope ran; \"unknown\" outside a git repo, or when HEAD moved while the commands ran (its value or its reflog differed between the start and the end of the run). Optional: artifacts written before this field existed carry no SHA and are treated as unpairable."
+    },
+    "pr_head_sha": {
+      "type": "string",
+      "description": "the pull-request head commit this run reports about, when the CI event supplies one. Present when head_sha is a merge ref built by the CI checkout."
+    },
+    "dirty": {
+      "type": "boolean",
+      "description": "the working tree carried uncommitted content when the scope ran — measured before the first command and after the last, and true if either says so — so the commands judged more (or less) than head_sha. Absent means not recorded, never clean."
+    },
+    "results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["cmd", "cwd", "exit_code", "duration_s"],
+        "properties": {
+          "cmd": {"type": "string"},
+          "cwd": {"type": "string"},
+          "exit_code": {"type": "integer"},
+          "duration_s": {"type": "number", "minimum": 0},
+          "output_tail": {"type": "string"},
+          "runner": {
+            "enum": ["pytest"],
+            "description": "the runner repo.yaml declares for this step. Present only on a declared step; the summary line's pytest counts are read from these steps alone."
+          },
+          "diagnosis": {
+            "type": "string",
+            "description": "why this step failed, when the reason is that it never ran — the binary it invokes is not on PATH, or the shell answered 127. Present only on such a step. It DIAGNOSES without EXCUSING: the step is still failed and the scope is still red, because a command that never ran proved nothing."
+          }
+        }
+      }
+    }
+  }
+}

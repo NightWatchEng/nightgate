@@ -1,0 +1,80 @@
+# Answers to the guardrail gap.
+#
+# `warden rules recommend` reports catalog entries this repo does not enforce.
+# Until this file existed there was no way to ANSWER one: a class deliberately
+# considered and declined reappeared in every run, indistinguishable from a
+# class nobody had ever looked at. A report that cannot tell those apart
+# degrades into advice nobody acts on, which is the failure this file
+# exists to prevent.
+#
+# An answer is not an exemption from thinking — it is a RECORD that thinking
+# happened, with the reason attached, so the next reader inherits the argument
+# instead of re-deriving it. Entries with no answer stay in UNANSWERED and
+# keep recurring, which is the point.
+#
+# verdict:
+#   not-applicable  the class cannot occur in this repo as it stands. Say what
+#                   would make it applicable again — these flip.
+#   deferred        applicable and real, but not being adopted yet. Needs a
+#                   `bead:` so the deferral is tracked rather than forgotten.
+#                   NOTE, and weigh it: a deferral is never CONTRADICTED —
+#                   only `not-applicable` is, because a deferral already
+#                   concedes the class applies. That makes `deferred` the
+#                   cheaper verdict to leave standing, and nothing here
+#                   verifies the bead names an OPEN tracker. The starter is
+#                   still measured and its hit count shown on the row, so a
+#                   deferral that has grown is visible — but it is visible,
+#                   not enforced. Re-read the deferrals at every retro.
+#
+# NOT a verdict: "too noisy" or "we disagree". Adopt it at a lower severity, or
+# argue with the catalog entry itself. Declining a class you agree with is how
+# this file would become the thing it was built to prevent.
+version: 1
+
+# The gap ceiling. `warden rules recommend` exits 1 when the
+# UNANSWERED count exceeds max_unanswered — with no flag needed, so CI runs
+# the bare command, this block is the single source of truth, and no count
+# is re-typed into a workflow file. A broken declaration here is exit 2,
+# never silently "no ceiling". tests/test_gap_answers.py::
+# test_this_repos_ceiling_is_declared_and_holds makes the same obligation
+# red locally. Ratcheting DOWN after answering an entry is a deliberate
+# human edit; treat edits here as HIGH by hand, like the grandfather list
+# in certification.yaml.
+ceiling:
+  max_unanswered: 14
+  rationale: >-
+    Must-not-grow, set 2026-08-27 when the gap stood at 14 —
+    every row a prior-art recommendation with no local evidence, zero
+    evidence-based rows, enumerated in that day's rule-recommendations
+    artifact. 14 is not an endorsement of 14: it freezes the gap so that a
+    new catalog entry, a flipped deferral, or a catalog widening goes red
+    and must be answered rather than absorbed. Lower it when entries are
+    answered; raising it requires recording why the new entries cannot be
+    answered instead.
+
+answers:
+  - id: sql-injection
+    verdict: not-applicable
+    reason: >-
+      No database and no SQL surface anywhere in the tree — verified, not
+      assumed: no sqlite3/psycopg/SQLAlchemy import, no cursor, no query text.
+      The catalog entry's own false-positive note says an SQL rule on a repo
+      with no database is pure noise. Flips the moment this repo stores
+      anything in a database.
+    decided_in: "2026-08-26 catalog adoption review, recorded in docs/wiki/Gate-Pipeline.md"
+
+  - id: xss-unescaped-output
+    verdict: not-applicable
+    reason: >-
+      No HTML rendering surface. warden emits JSON artifacts and terminal
+      text; the only `escape(` calls in the tree are `re.escape`, checked one
+      by one. Flips if the platform ever renders markup — a dashboard, a
+      served report, an HTML sticky comment.
+    decided_in: "2026-08-26 catalog adoption review, recorded in docs/wiki/Gate-Pipeline.md"
+
+  # os-command-injection carried a `deferred` answer here until its
+  # adjudication ADOPTED the starter as
+  # .warden/rules/os-command-injection.md — an enforced entry needs no
+  # answer, and a stale one is reported rather than ignored. The trust
+  # boundary the deferral asked for is now recorded at the line itself
+  # (warden/verify.py, the warden:allow marker) and in the rule body.

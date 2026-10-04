@@ -1,0 +1,235 @@
+# The warden gate, written by `warden init`. Every check it runs is declared in
+# repo.yaml; this file only orchestrates it, in three jobs on separate runners.
+#
+# install  The only job that reads AGENTOPS_DEPLOY_KEY, a read-only deploy key
+#          for the private platform ("CI access to the platform" in
+#          https://github.com/NightWatchEng/agentops/blob/main/docs/wiki/Installation.md).
+#          It refuses a repository that is not private, since any reader of
+#          the run can download the wheel it uploads.
+#          It checks out repo.yaml alone, refuses a commit without one, reads
+#          platform.pin from it as text,
+#          builds the platform wheel at that tag and uploads it. It executes
+#          nothing from this repository.
+# verify   Runs the verify commands, which are code a pull request controls,
+#          with no secret. It installs the wheel and uploads the verify results.
+#          It DECLARES the toolchain those commands invoke and installs no
+#          toolchain of this repository's own. WHERE THERE IS
+#          ONE TO DECLARE, the step named "require the toolchain the verify
+#          scopes run" appears below and names every absent binary, exiting 2
+#          before the first scope runs — so an enrolled Go or Node repo whose
+#          runner image drops the toolchain gets a statement of cause instead
+#          of a bare exit 127. Add the setup action your repository wants
+#          above that step; the gate never picks your toolchain version for
+#          you. A python-only enrollment has NO such step and that is not an
+#          omission: `uv` is the PLATFORM's runtime, the setup-uv step above
+#          installs it because warden is itself a uv tool, and a pre-flight
+#          requiring it would be the gate refusing itself on a check that can
+#          never fail.
+# gate     Executes no code from this repository: it refuses repo-local
+#          checkers. It installs the wheel only if its hash matches the one the
+#          install job recorded, and fails unless install and verify succeeded.
+#          It reads repo.yaml and the rules from the pull request, as the gate
+#          always has. The verify results are pull request output: they fill the
+#          review comment's verify lines and decide nothing, and they are
+#          written only into a .warden/out the gate creates itself.
+#
+# No job restores a uv cache: a cache one job wrote, another would read.
+name: warden
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  install:
+    name: warden install
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      wheel: ${{ steps.build.outputs.wheel }}
+      sha256: ${{ steps.build.outputs.sha256 }}
+    steps:
+      - name: require a private repository
+        shell: bash
+        env:
+          REPOSITORY_PRIVATE: ${{ github.event.repository.private }}
+        run: |
+          if [ "$REPOSITORY_PRIVATE" != true ]; then
+            echo "warden gate: this repository is not private (github.event.repository.private is ${REPOSITORY_PRIVATE:-empty}), and the install job uploads the private platform wheel as an artifact any reader of the run can download, so the wheel was not built and the gate DID NOT RUN." >&2
+            echo "A consumer repository must be private (\"CI access to the platform\" in https://github.com/NightWatchEng/agentops/blob/main/docs/wiki/Installation.md)." >&2
+            exit 2
+          fi
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7  # v10.2.0
+        with:
+          version: "0.12.1"
+          enable-cache: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: /repo.yaml
+          sparse-checkout-cone-mode: false
+      - name: require repo.yaml
+        shell: bash
+        run: |
+          if [ ! -f repo.yaml ]; then
+            echo "warden gate: repo.yaml is missing from this commit, so platform.pin cannot be read and the gate DID NOT RUN." >&2
+            exit 2
+          fi
+      - name: platform credential
+        shell: bash
+        env:
+          AGENTOPS_DEPLOY_KEY: ${{ secrets.AGENTOPS_DEPLOY_KEY }}
+        run: |
+          if [ -z "$AGENTOPS_DEPLOY_KEY" ]; then
+            echo "warden gate: the AGENTOPS_DEPLOY_KEY secret is empty, so the platform cannot be installed and the gate DID NOT RUN." >&2
+            echo "A pull request from a fork receives no repository secrets: push the branch to this repository and open the pull request from there." >&2
+            echo "A Dependabot pull request reads Dependabot secrets: store the same key with gh secret set AGENTOPS_DEPLOY_KEY --app dependabot." >&2
+            echo "Otherwise, store the read-only deploy key for NightWatchEng/agentops as the AGENTOPS_DEPLOY_KEY repository secret (\"CI access to the platform\" in https://github.com/NightWatchEng/agentops/blob/main/docs/wiki/Installation.md)." >&2
+            exit 2
+          fi
+          umask 077
+          printf '%s\n' "$AGENTOPS_DEPLOY_KEY" > "$RUNNER_TEMP/agentops_deploy_key"
+          printf '%s\n' \
+            'github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl' \
+            'github.com ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBEmKSENjQEezOmxkZMy7opKgwFB9nkt5YRrYMjNuG5N87uRgg6CLrbo5wAdT/y6v0mKV0U2w0WZ2YB/++Tpockg=' \
+            > "$RUNNER_TEMP/agentops_known_hosts"
+      - name: build warden at repo.yaml platform.pin
+        id: build
+        shell: bash
+        run: |
+          pin="$(awk '/^platform:/ {inside = 1; next} inside && /^[^[:space:]#]/ {inside = 0} inside && $1 == "pin:" {print $2; exit}' repo.yaml | tr -d "\"'\r")" || pin=""
+          if ! printf '%s\n' "$pin" | grep -Eqx 'v?[0-9]+\.[0-9]+\.[0-9]+'; then
+            echo "warden gate: repo.yaml platform.pin is ${pin:-missing}, not a release tag like v1.2.3 written as a block (platform: then an indented pin:); the gate DID NOT RUN." >&2
+            exit 2
+          fi
+          cd "$RUNNER_TEMP"
+          GIT_SSH_COMMAND="ssh -i $RUNNER_TEMP/agentops_deploy_key -o IdentitiesOnly=yes -o UserKnownHostsFile=$RUNNER_TEMP/agentops_known_hosts -o StrictHostKeyChecking=yes" \
+            git clone --quiet --depth 1 --branch "v${pin#v}" git@github.com:NightWatchEng/agentops.git platform-src
+          uv build --no-config --no-cache --wheel --out-dir warden-wheel platform-src
+          wheels=(warden-wheel/warden-*.whl)
+          if [ "${#wheels[@]}" -ne 1 ] || [ ! -f "${wheels[0]}" ]; then
+            echo "warden gate: the platform build did not produce exactly one warden wheel; the gate DID NOT RUN." >&2
+            exit 2
+          fi
+          echo "wheel=${wheels[0]#warden-wheel/}" >> "$GITHUB_OUTPUT"
+          echo "sha256=$(sha256sum "${wheels[0]}" | cut -d ' ' -f 1)" >> "$GITHUB_OUTPUT"
+      - name: remove platform credential
+        if: always()
+        shell: bash
+        run: |
+          rm -f "$RUNNER_TEMP/agentops_deploy_key"
+          test ! -e "$RUNNER_TEMP/agentops_deploy_key"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: warden-wheel
+          path: ${{ runner.temp }}/warden-wheel/${{ steps.build.outputs.wheel }}
+          if-no-files-found: error
+          retention-days: 1
+
+  verify:
+    name: warden verify
+    needs: install
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7  # v10.2.0
+        with:
+          version: "0.12.1"
+          enable-cache: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
+        with:
+          name: warden-wheel
+          path: ${{ runner.temp }}/warden-wheel
+      - name: install warden from the install job's wheel
+        shell: bash
+        env:
+          WHEEL: ${{ needs.install.outputs.wheel }}
+          WHEEL_SHA256: ${{ needs.install.outputs.sha256 }}
+        run: |
+          cd "$RUNNER_TEMP/warden-wheel"
+          printf '%s  %s\n' "$WHEEL_SHA256" "$WHEEL" | sha256sum --check --strict -
+          uv tool install --no-config --no-cache "$RUNNER_TEMP/warden-wheel/$WHEEL"
+          uv tool dir --bin >> "$GITHUB_PATH"
+@@VERIFY_STEPS@@
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        if: always()
+        with:
+          name: warden-verify
+          path: .warden/out/*-verify/verify-result.json
+          if-no-files-found: ignore
+          retention-days: 1
+
+  gate:
+    name: warden gate
+    needs: [install, verify]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: require the install and verify jobs
+        shell: bash
+        env:
+          INSTALL_RESULT: ${{ needs.install.result }}
+          VERIFY_RESULT: ${{ needs.verify.result }}
+        run: |
+          if [ "$INSTALL_RESULT" != success ]; then
+            echo "warden gate: the install job ended $INSTALL_RESULT, so the gate DID NOT RUN; its log says why." >&2
+            exit 2
+          fi
+          if [ "$VERIFY_RESULT" != success ]; then
+            echo "warden gate: the verify job ended $VERIFY_RESULT; the gate fails until every verify scope passes." >&2
+            exit 1
+          fi
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7  # v10.2.0
+        with:
+          version: "0.12.1"
+          enable-cache: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
+        with:
+          name: warden-wheel
+          path: ${{ runner.temp }}/warden-wheel
+      - name: install warden from the install job's wheel
+        shell: bash
+        env:
+          WHEEL: ${{ needs.install.outputs.wheel }}
+          WHEEL_SHA256: ${{ needs.install.outputs.sha256 }}
+        run: |
+          cd "$RUNNER_TEMP/warden-wheel"
+          printf '%s  %s\n' "$WHEEL_SHA256" "$WHEEL" | sha256sum --check --strict -
+          uv tool install --no-config --no-cache "$RUNNER_TEMP/warden-wheel/$WHEEL"
+          uv tool dir --bin >> "$GITHUB_PATH"
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
+        with:
+          name: warden-verify
+          path: ${{ runner.temp }}/warden-verify
+      - name: take the verify results
+        shell: bash
+        run: warden take --from "$RUNNER_TEMP/warden-verify"
+      - name: warden review
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: warden review --no-project-checkers --event "$GITHUB_EVENT_PATH"
+@@CLASSIFY_STEP@@
+      - name: warden certify
+        shell: bash
+        run: warden certify --level 3
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        if: always()
+        with:
+          name: warden-out
+          path: .warden/out/
+          if-no-files-found: ignore

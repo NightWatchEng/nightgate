@@ -1,0 +1,8 @@
+{
+  "name": "nightgate-skills",
+  "version": "0.23.0",
+  "author": {
+    "name": "NightWatchEng"
+  },
+  "description": "Nightgate generic workflow skills \u2014 enforcement stays in warden and the cage; these are the judgment protocols."
+}

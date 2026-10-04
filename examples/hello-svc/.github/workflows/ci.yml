@@ -1,0 +1,109 @@
+# The gate job a consuming repo copies.
+#
+# ONE LINE TO CHANGE ON THE WAY OUT, called out here because the earlier
+# version of this comment said "copy this out and it runs as-is" while every
+# step invoked a shim this example does not ship. The steps
+# below call the platform the way the platform's own CI exercises hello-svc in
+# place. A real consumer writes the pinned shim as enrollment step 3
+# (docs/wiki/Installation.md) and swaps each `uv run --locked --project ../..
+# warden` for it — the shim wraps exactly that call against an immutable SHA.
+#
+# Inside the platform repo this file never executes: GitHub runs workflows only
+# from the ROOT .github/ directory, and scripts/portability-sim.sh is what
+# proves the example's gate actually gates.
+name: CI
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  gate:
+    name: warden gate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          fetch-depth: 0
+      # The toolchain this gate runs, DECLARED rather than left to the
+      # runner image. `uv` is not on a GitHub-hosted image at all and
+      # `python3` is whatever the image ships, so without this step a
+      # consumer who copies this file gets `uv: command not found` — exit 127
+      # inside a step named "deterministic checks", with no statement of
+      # cause. The gate does not install either one, because that would make
+      # the platform pick a version the consumer never asked for; it names
+      # what is missing and exits 2, which is this gate's code for DID NOT
+      # RUN as opposed to 1, ran and failed. This is the shape `warden init`
+      # renders into every generated gate (warden/enroll.py).
+      - name: require the toolchain the verify scopes run
+        shell: bash
+        run: |
+          missing=""
+          for pair in "uv:app" "python3:app"; do
+            tool="${pair%%:*}"
+            scope="${pair#*:}"
+            command -v "$tool" > /dev/null 2>&1 && continue
+            echo "warden gate: $tool is not on PATH, so the $scope verify scope could not be evaluated and the gate DID NOT RUN." >&2
+            missing="$missing $tool"
+          done
+          if [ -n "$missing" ]; then
+            echo "This gate declares the toolchain its verify commands run and installs no toolchain of this repository's own. Add a step to this workflow, above this one, that installs${missing} — astral-sh/setup-uv and actions/setup-python are the usual ones, each pinned to a commit sha — or change the verify commands in repo.yaml to a toolchain this runner already carries." >&2
+            echo "PATH=$PATH" >&2
+            exit 2
+          fi
+      - name: deterministic checks declared in repo.yaml
+        run: uv run --locked --project ../.. warden verify --scope app
+      - name: the AI rules gate (HIGH findings exit 1)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: uv run --locked --project ../.. warden review --event "$GITHUB_EVENT_PATH"
+      - name: enrollment maturity may not regress
+        run: uv run --locked --project ../.. warden certify --level 3
+      # The tag-vocabulary drift ceiling declared in .warden/memory/tags.yaml,
+      # ENFORCED: exit 1 when a name in the committed corpus has no recorded
+      # disposition past the declared number, exit 2 when the declaration
+      # cannot be read. `memory ingest` only REPORTS this — its exit code
+      # means "was the corpus fed" — so the obligation needs its own step.
+      - name: tag-vocabulary drift ceiling
+        run: uv run --locked --project ../.. warden memory check-vocabulary
+      # Binds graph.yaml's light round over the PUSHED range; exits 0 with
+      # none declared, required by certify's R-14 once one is. It needs
+      # v2.3.0 or later.
+      - name: proportionate review tier
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          set -uo pipefail
+          out="$RUNNER_TEMP/attest-classify.txt"
+          status=0
+          uv run --locked --project ../.. warden attest classify --enforce \
+            --base "origin/$BASE_REF" > "$out" 2>&1 || status=$?
+          cat "$out"
+          { echo '### proportionate review tier';
+            echo '```'; cat "$out"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"
+      # Assert the PR carries a pre-PR review attestation that reached the
+      # committed corpus (.warden/memory/attest/), not just the gitignored run
+      # dir. ENFORCED as written — the E-01 certification rung accepts only a
+      # step that can gate. Add `continue-on-error: true` only while your
+      # review practice is ramping (below Level 4); an advisory step cannot
+      # certify Evidenced. Fork PRs are exempt: the orchestrated review needs
+      # credentials they do not have.
+      - name: pre-PR review attestation
+        env:
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          REPOSITORY: ${{ github.repository }}
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          if [ "$HEAD_REPO" != "$REPOSITORY" ]; then
+            echo "fork PR: attestation not required"; exit 0
+          fi
+          uv run --locked --project ../.. warden attest check --base "origin/$BASE_REF"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        if: always()
+        with:
+          name: warden-out
+          path: .warden/out/
+          if-no-files-found: ignore

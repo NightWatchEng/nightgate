@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "warden review-findings artifact",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "rules_version",
+    "engine",
+    "base_sha",
+    "head_sha",
+    "findings",
+    "deferred_to_pre_pr"
+  ],
+  "properties": {
+    "rules_version": {
+      "type": "string"
+    },
+    "engine": {
+      "const": "deterministic"
+    },
+    "base_sha": {
+      "type": "string"
+    },
+    "head_sha": {
+      "type": "string"
+    },
+    "deferred_to_pre_pr": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "rule_id",
+          "severity",
+          "file",
+          "finding",
+          "evidence"
+        ],
+        "properties": {
+          "rule_id": {
+            "type": "string"
+          },
+          "severity": {
+            "enum": [
+              "HIGH",
+              "MEDIUM",
+              "LOW"
+            ]
+          },
+          "file": {
+            "type": "string"
+          },
+          "line": {
+            "type": "integer"
+          },
+          "finding": {
+            "type": "string"
+          },
+          "evidence": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "paused": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "rule ids skipped because their rule file declares paused: true"
+    }
+  }
+}

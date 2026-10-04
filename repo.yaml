@@ -1,0 +1,161 @@
+# Nightgate's own policy — the platform is its own first consumer.
+version: 1
+repo: nightgate
+
+platform:
+  pin: v2.3.0   # this repo runs the version it IS; consumers pin releases
+
+components:
+  warden:  {path: warden/,  lang: python, description: "the repo-control CLI (gate, verify, attest, memory, graph)"}
+  cage:     {path: cage/,     lang: python, description: "the cage: cage.toml -> rendered runner/plist/profile"}
+  tests:    {path: tests/,    lang: python, description: "fixture-based suite — no external repo dependencies"}
+  examples: {path: examples/, lang: python, description: "hello-svc: the standing portability proof, enrolled by CI"}
+  skills:   {path: skills/,   lang: md,     description: "the plugin skill pack served via this repo's local marketplace"}
+  docs:     {path: docs/,     lang: md,     description: "the wiki (every reader-facing page) + design records"}
+
+risk_tiers:
+  - {glob: "warden/mechanical.py",       tier: HIGH, reason: "checker code IS policy (hashed into rules_version)"}
+  - {glob: "warden/plugins.py",          tier: HIGH, reason: "plugin loading = policy execution surface"}
+  - {glob: "warden/schemas/**",          tier: HIGH, reason: "artifact contracts consumers depend on"}
+  - {glob: ".warden/rules/**",           tier: HIGH, reason: "this repo's own gate config"}
+  - {glob: ".warden/certification.yaml",  tier: HIGH, reason: "the only file that can waive a rule_id past the certification gate — reviewed like any gate change"}
+  - {glob: ".warden/memory/tags.yaml",    tier: HIGH, reason: "an alias here would fold committed evidence between rules at every read seam; two guards refuse the shape and certify still does not notice, so the tier is the human look"}
+  - {glob: ".github/**",                  tier: HIGH, reason: "CI is the enforcement layer"}
+  # Found by `warden declare check` D-04 on its first run, not by a human
+  # noticing (the class the self-cage source was, four more instances). Every one of these is
+  # named in the policy's Never-edit paragraph — the declaration that says "a
+  # session must not touch this" — and every one classified by the UNMATCHED
+  # tier default, so `warden explain` reported LOW for the file that declares
+  # the contract itself. The specific globs above keep their own reasons; these
+  # are the catch-alls beneath them.
+  - {glob: "repo.yaml",                   tier: HIGH, reason: "this file IS the policy: components, tiers, the verify commands and the review enforcement keys a verdict is judged under"}
+  - {glob: ".warden/**",                  tier: HIGH, reason: "the gate's own config and committed evidence — the skills policy, the certification overlay, the memory corpus"}
+  - {glob: ".githooks/**",                tier: HIGH, reason: "the local gate: what runs before a push, and the one check a laptop applies"}
+  - {glob: ".claude/**",                  tier: HIGH, reason: "harness configuration — settings, hooks and agent definitions that execute on every session in this checkout"}
+  - {glob: "graph.yaml",                  tier: HIGH, reason: "the declared org constitution (who holds merge, who judges)"}
+  - {glob: "cage/run.sh",                 tier: HIGH, reason: "the hard-stop surface — every stop the model cannot rewrite lives here"}
+  - {glob: "cage/render.py",              tier: HIGH, reason: "renders the caged session's permission profile (allow/deny)"}
+  - {glob: "cage/providers.py",           tier: HIGH, reason: "renders shell that runs unattended outside the session"}
+  - {glob: ".cage/**",                    tier: HIGH, reason: "the self-cage SOURCE: the fences and hand-authored prompt of the platform's own unattended runner, rendered into what actually binds a run — the same class as cage/run.sh, and it classified LOW by default until this row was declared"}
+  - {glob: "warden/**",                  tier: MEDIUM}
+  - {glob: "cage/**",                     tier: MEDIUM}
+  - {glob: "examples/**",                 tier: MEDIUM, reason: "the portability fixture consumers copy from"}
+  - {glob: "skills/**",                   tier: MEDIUM, reason: "judgment protocols every consumer runs; boundaries sections especially"}
+  - {glob: ".claude-plugin/**",           tier: MEDIUM, reason: "marketplace manifest consumers install from"}
+  - {glob: "docs/wiki/**",                tier: MEDIUM, reason: "the reference a consumer enrolls from; a page that misdescribes the system is a defect"}
+  - {glob: "docs/**",                     tier: LOW}
+
+protected_paths:
+  - {path: "warden/schemas/",            reason: "additive-only; consumers parse these artifacts"}
+  - {path: ".warden/rules/",             reason: "gate config; edits change rules_version"}
+
+verify:
+  tests:
+    # Pinned in LOCKSTEP with .github/workflows/ci.yml and .githooks/pre-push,
+    # held by tests/test_local_gate.py::test_the_ruff_pin_is_the_same_in_
+    # all_three_executed_callers. This is the invocation CI actually runs —
+    # ci.yml's `verify` job executes `warden verify --scope tests`, and the
+    # `gate` job TAKES its result rather than re-running it — and it was the
+    # only one of the three with ruff floating, so a ruff release could turn
+    # the gate red or green with no diff. `--locked` does not govern a `--with`
+    # dependency, so the version is named here; the pin moves in all three
+    # callers or in none. The quotations of the same command in CLAUDE.md and
+    # .warden/skills-policy.md are prose an agent reads and COPIES; nothing
+    # executes them and no test reads them, so they move by hand when these do.
+    #
+    # `covers: ["**"]` is the DECLARED reach. These two commands
+    # genuinely exercise the whole tree from the repo root, and saying so is
+    # what stops warden inferring it: the inference read a root `cwd` as "makes
+    # no narrowness claim", which happens to give the same answer here and gives
+    # the WRONG one for a command that reaches outside a narrow cwd.
+    - {run: "uv run --locked --with ruff==0.16.5 ruff check warden cage tests --select F,E9", covers: ["**"]}
+    # NIGHTGATE_REQUIRE_TOOLCHAIN=1 makes THE GATE strict while a contributor's
+    # bare `uv run pytest -q` stays lenient. The
+    # split this platform ships is by CONTRACT — an environment that promised
+    # the toolchain and does not have it is broken and must say so; a laptop
+    # that promised nothing gets a named skip. This scope is the contract: it
+    # is what `warden verify --scope tests` runs and what ci.yml's `verify`
+    # job executes on the gate's behalf, so a run of it that skipped the go
+    # cell would be a gate PASS
+    # over the one executable proof in this suite that the enrollment surface
+    # works for a language the platform is not written in. That is exactly
+    # what .cage/cage.toml refuses for the cage, and the reason #276 made the
+    # cage's go cell FAIL rather than skip; putting the marker here rather
+    # than in `addopts` is what keeps both halves true at once.
+    #
+    # `-n auto` is here for the same reason the marker is, and it is the same
+    # split: the GATE runs the suite in parallel, a bare `uv run pytest` does
+    # not. This repo used to run the gate single-process by a recorded
+    # decision, on the argument that determinism outranks speed there. Half of
+    # that ruling still stands and is restated below; the other half was
+    # reversed on measurement. The decision shard under
+    # `.warden/memory/decide/` carries both halves, and `warden decide list`
+    # prints it — the original ruling was never a shard, it lived in this
+    # file, in `.githooks/pre-push`'s comment and in the guard's docstring,
+    # which is why its reversal is recorded properly rather than in kind.
+    #
+    # WHAT IS NOT REVERSED: pytest's `addopts` stays free of any parallel flag.
+    # A default there changes what "green" means for every consumer of this
+    # repo and for the shipped example, on machines whose core count nobody
+    # here controls. Parallelism is written in the INVOCATION, in every caller
+    # that wants it, where a reader of the command can see it — never smuggled
+    # in through a config file or a `PYTEST_ADDOPTS` environment variable that
+    # a nested pytest would inherit as well.
+    #
+    # WHAT WAS REVERSED, and why it was safe to: the suite's one known
+    # parallel-unsafe shape was a module-level capture of `os.environ` that
+    # bound to the real checkout under the `GIT_DIR` only `git push` exports.
+    # That is fixed at the session — `pytest_configure` strips the bindings
+    # before collection — with a static scan refusing the repo-less git call
+    # shape on top.
+    #
+    # THE MEASUREMENT, taken at the head this line landed on and stated as
+    # the pair it actually is: `uv run --locked pytest -q` against the same
+    # command plus `-n auto`, on one machine, same tree. Serial: 4534 passed,
+    # 1 skipped in 634.4s. Parallel: the same 4534 passed and 1 skipped in
+    # 195.8s, 161.8s and 143.9s across three runs. The VERDICT is what
+    # matters here and it never moved; the ratio is a laptop's and does not
+    # carry to a CI runner, whose own before/after is in the decision shard.
+    # A count that reproduces is the point: a test that passes serially and
+    # fails under this flag is an isolation bug, and finding one would be
+    # worth more than the speed.
+    - {run: "NIGHTGATE_REQUIRE_TOOLCHAIN=1 uv run pytest -q -n auto", covers: ["**"],
+       runner: pytest}
+  example:
+    # The hello-svc selfcheck runs IN examples/hello-svc and exercises nothing
+    # outside it — declared, not inferred from `cwd` + the `examples` component
+    # agreeing. `warden declare check` D-01 reports any scope
+    # still resolved by that inference.
+    - {run: "python3 -m hello_svc.app --selfcheck", cwd: examples/hello-svc,
+       covers: ["examples/hello-svc/**"]}
+
+# How many counting repair rounds a delivery runs before what is open reverts
+# or is parked: 1 to the platform cap of 2. certify R-12 requires it at Level
+# 3, and the deliver skill reads it. Outside `review:`, so rules_version does
+# not move with it.
+repair:
+  budget: 2
+
+# Which paths this repo never lets the proportionate (light) review round
+# reach, on top of warden's own floor. Read from repo.yaml at both ends of the
+# range being classified, so it cannot be spent on the diff that writes it.
+proportion:
+  # On top of warden's own constant floor, which this can only ADD to.
+  # `.claude/` is this repo's case and the reason the key exists: harness
+  # configuration — settings, hooks and agent definitions that execute on
+  # every session in this checkout — tiered HIGH above and invisible to a
+  # platform constant that cannot know which directories a consumer lets run
+  # code. A comment-only edit to an agent definition still edits something
+  # that runs.
+  never_light: [".claude/"]
+  # No other key. `prose_roots`, which once made Markdown under a declared
+  # root eligible, is refused by warden: the arm behind it was removed and
+  # Markdown always takes the full rounds.
+
+review:
+  rules_dir: .warden/rules
+  blocking_severities: [HIGH]
+  context_excludes:
+    - "**/uv.lock"
+    # This suite deliberately contains fake secrets in fixtures.
+    - "tests/**"

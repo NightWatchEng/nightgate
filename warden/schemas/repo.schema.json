@@ -1,0 +1,168 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "warden repo.yaml contract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "repo", "components", "risk_tiers", "verify", "review"],
+  "properties": {
+    "version": {"const": 1},
+    "repo": {"type": "string", "minLength": 1},
+    "components": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path"],
+        "properties": {
+          "path": {"type": "string", "minLength": 1},
+          "lang": {"type": "string"},
+          "description": {"type": "string"}
+        }
+      }
+    },
+    "risk_tiers": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["glob", "tier"],
+        "properties": {
+          "glob": {"type": "string", "minLength": 1},
+          "tier": {"enum": ["HIGH", "MEDIUM", "LOW"]},
+          "reason": {"type": "string"}
+        }
+      }
+    },
+    "protected_paths": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "reason"],
+        "properties": {
+          "path": {"type": "string", "minLength": 1},
+          "reason": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "verify": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "array",
+        "minItems": 1,
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["run"],
+          "properties": {
+            "run": {"type": "string", "minLength": 1},
+            "cwd": {"type": "string", "minLength": 1},
+            "covers": {
+              "type": "array",
+              "minItems": 1,
+              "items": {"type": "string", "minLength": 1},
+              "description": "OPTIONAL. The repo paths this step actually exercises, as globs, matched against a diff's changed files. DECLARED reach: with it, `warden review` asks for this scope exactly when the diff touches what the step says it covers. A glob ending in `/` means the SUBTREE, written `<dir>/**` — the trailing-slash spelling `components:` paths and `protected_paths` use for an area, which as a bare glob would match nothing and silently exempt the step from every diff. A bare directory NAME is not normalized: it is a legal glob matching one file, and `warden declare check` D-01 refuses any `covers` glob that matches no path in the tree rather than guessing. Without it warden INFERS the reach from `cwd` plus `components:` — a step in a declared component area is read as covering that subtree only — which silently exempts a command that reaches OUTSIDE its cwd (`pytest ../..`, a tool whose config sits at the repo root). Absent behaves byte-identically to before the key existed, and both unknowns still widen: a caller that could not compute the changed paths, a range that changed nothing, or a path no declared reach claims requires EVERY scope."
+            },
+            "runner": {
+              "enum": ["pytest"],
+              "description": "OPTIONAL. The program this step runs, DECLARED. `warden verify` prints pytest's pass/skip/fail counts on its summary line only for a step declaring `runner: pytest`, read from pytest's own summary output; the command text is never parsed for it. Undeclared, the step prints no counts, and a summary-shaped line in its output says so rather than being summed."
+            }
+          }
+        }
+      }
+    },
+    "deploy": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "array",
+        "minItems": 1,
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["run"],
+          "properties": {
+            "run": {"type": "string", "minLength": 1},
+            "cwd": {"type": "string", "minLength": 1},
+            "covers": {
+              "type": "array",
+              "minItems": 1,
+              "items": {"type": "string", "minLength": 1},
+              "description": "OPTIONAL. The repo paths this step actually exercises, as globs. A glob ending in `/` means the SUBTREE, written `<dir>/**` — the trailing-slash spelling `components:` paths and `protected_paths` use for an area, which as a bare glob would match nothing and silently exempt the step from every diff. A bare directory NAME is not normalized: it is a legal glob matching one file, and `warden declare check` D-01 refuses any `covers` glob that matches no path in the tree rather than guessing. Declared here for the same reason as on a `verify` step and read by the same code, but with a NARROWER consequence, said rather than copied: `scopes_for_paths` derives required scopes from `verify:` only, so nothing asks for a DEPLOY scope on the strength of a diff and this key changes no gate demand. What it does is make the step's reach legible — `warden declare check` D-01 reports a deploy step that narrows on the `cwd` + `components:` inference exactly as it does a verify step, because an undeclared reach is the defect whether or not a gate currently reads it. Without it warden INFERS the reach from `cwd` plus `components:` — a step in a declared component area is read as covering that subtree only — which silently exempts a command that reaches OUTSIDE its cwd (`pytest ../..`, a tool whose config sits at the repo root). Absent behaves byte-identically to before the key existed, and both unknowns still widen: a caller that could not compute the changed paths, a range that changed nothing, or a path no declared reach claims requires EVERY scope."
+            }
+          }
+        }
+      }
+    },
+    "design": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["decision_required"],
+      "properties": {
+        "decision_required": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"enum": ["HIGH", "MEDIUM", "LOW"]}
+        },
+        "charter": {"type": "string", "minLength": 1}
+      }
+    },
+    "platform": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pin"],
+      "properties": {
+        "pin": {"type": "string", "pattern": "^v?[0-9]+\\.[0-9]+\\.[0-9]+$"}
+      }
+    },
+    "review": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["rules_dir", "blocking_severities"],
+      "properties": {
+        "rules_dir": {"type": "string", "minLength": 1},
+        "blocking_severities": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"enum": ["HIGH", "MEDIUM", "LOW"]}
+        },
+        "context_excludes": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "repair": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["budget"],
+      "properties": {
+        "budget": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 2,
+          "description": "The repair budget: how many counting repair rounds a delivery may run before what is still open reverts or is parked. An integer from 1 to the platform cap (warden/certify.py PLATFORM_REPAIR_CAP; a test holds this maximum equal to it). A repo may declare a lower budget, never a higher one. OPTIONAL to this schema, so a repo.yaml without it still loads; REQUIRED at certification Level 3, where rung R-12 fails without it. The deliver skill reads it. Not part of the `review:` subtree, so it does not move rules_version."
+        }
+      }
+    },
+    "proportion": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "never_light": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"type": "string", "minLength": 1},
+          "description": "Paths in THIS repo that never earn the proportionate (light) review round, however provably inert the change to them is. A trailing slash marks a directory; anything else is a file name, and both match on a path-segment boundary at any depth. This key can only ADD to warden's own NEVER_LIGHT_FLOOR constant: there is no spelling here that removes an entry from it, because the platform's floor covers the gate's own machinery and a repo lowering its own bar there is the self-certification the tier exists to refuse. What a consumer names here is the machinery the platform cannot know about — a deploy script, a generated client, a rules directory under another name. Read from repo.yaml at BOTH ends of the range being classified and UNIONED, so a diff cannot widen its own tier by deleting an entry. Read ONLY from the repo.yaml at the git top level of the repository being classified: a nested module's own repo.yaml is a different repo's policy and this key in it has no effect, so declare it at the root."
+        },
+        "prose_roots": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"type": "string", "minLength": 1},
+          "description": "REMOVED, and REFUSED at runtime. This key once named the directories whose Markdown could earn the proportionate (light) review round when no code region changed. The prose arm behind it was deleted: Markdown always takes the full review rounds, and a repo.yaml that declares this key is refused — `warden` exits 2 and the classifier returns the full tier, both with one message saying the arm was removed and the key must be deleted. The key stays in this schema only because schemas are additive and an older repo.yaml must still parse; it admits nothing. Read ONLY from the repo.yaml at the git top level of the repository being classified, like never_light: a nested module's own repo.yaml is a different repo's policy."
+        }
+      }
+    }
+  }
+}

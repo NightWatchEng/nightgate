@@ -1,0 +1,9 @@
+#!/bin/sh
+# Chain the beads-managed hook first, if present (bd owns core.hooksPath
+# by default; enabling .githooks must not silently disable beads).
+if [ -x "$(git rev-parse --show-toplevel)/.beads/hooks/commit-msg" ]; then
+  "$(git rev-parse --show-toplevel)/.beads/hooks/commit-msg" "$@" || exit $?
+fi
+
+# Advisory layer of the commit convention; CI is the fence.
+exec "$(git rev-parse --show-toplevel)/scripts/commit-lint.sh" "$1"

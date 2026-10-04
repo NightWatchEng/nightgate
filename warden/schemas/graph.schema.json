@@ -1,0 +1,438 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "AgentOps declared agent-organization graph (graph.yaml)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "nodes",
+    "edges"
+  ],
+  "properties": {
+    "version": {
+      "const": 1
+    },
+    "nodes": {
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": {
+        "pattern": "^[a-z][a-z0-9-]*$"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "authority"
+        ],
+        "properties": {
+          "kind": {
+            "enum": [
+              "skill",
+              "subagent",
+              "human",
+              "deterministic"
+            ]
+          },
+          "impl": {
+            "type": "string",
+            "minLength": 1
+          },
+          "authority": {
+            "enum": [
+              "find",
+              "judge",
+              "gate",
+              "merge"
+            ]
+          },
+          "boundaries": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "github": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "GitHub logins this node acts as. Optional and additive. Without it nothing binds a real merge event to the declared merge node, and `warden mine` reports the merge-actor class as UNREAD rather than as 'no drift'."
+          }
+        }
+      }
+    },
+    "edges": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "from",
+          "to",
+          "payload"
+        ],
+        "properties": {
+          "from": {
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          },
+          "payload": {
+            "enum": [
+              "intent",
+              "diff",
+              "findings",
+              "attestation",
+              "pr"
+            ]
+          },
+          "artifact": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "memory": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "to",
+          "type"
+        ],
+        "properties": {
+          "to": {
+            "type": "string"
+          },
+          "type": {
+            "enum": [
+              "patterns",
+              "precedents"
+            ]
+          }
+        }
+      }
+    },
+    "verification": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "independent_judges": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "convergence": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "failure": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "policy"
+            ],
+            "properties": {
+              "policy": {
+                "enum": [
+                  "retry",
+                  "escalate",
+                  "abort"
+                ]
+              },
+              "max": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "to": {
+                "type": "string",
+                "description": "escalate: the node work escalates TO (must be declared)"
+              }
+            },
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "policy": {
+                      "const": "retry"
+                    }
+                  },
+                  "required": [
+                    "policy"
+                  ]
+                },
+                "then": {
+                  "required": [
+                    "max"
+                  ]
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "policy": {
+                      "const": "escalate"
+                    }
+                  },
+                  "required": [
+                    "policy"
+                  ]
+                },
+                "then": {
+                  "required": [
+                    "to"
+                  ]
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "policy": {
+                      "const": "abort"
+                    }
+                  },
+                  "required": [
+                    "policy"
+                  ]
+                },
+                "then": {
+                  "not": {
+                    "anyOf": [
+                      {
+                        "required": [
+                          "max"
+                        ]
+                      },
+                      {
+                        "required": [
+                          "to"
+                        ]
+                      }
+                    ]
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "caps": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "org-wide budgets no single node's policy may exceed",
+          "properties": {
+            "total_retries": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "escalation_depth": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        }
+      }
+    },
+    "review": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "The review crew, declared. Optional and additive: a graph without it validates and renders as before. `warden graph crew --round N` resolves one round; `warden attest write --review-dir` refuses a roster that is not that round's crew.",
+      "required": [
+        "rounds",
+        "cap",
+        "lenses",
+        "merge_authority"
+      ],
+      "properties": {
+        "rounds": {
+          "type": "array",
+          "minItems": 1,
+          "description": "The ordered roles dispatched in each round. A role is a declared node with find or judge authority, or crew:<lens id> for a lens dispatched on its own.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "round",
+              "roles"
+            ],
+            "properties": {
+              "round": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "roles": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "string",
+                  "pattern": "^([a-z][a-z0-9-]*|crew:[a-z0-9]+(-[a-z0-9]+)*)$"
+                }
+              }
+            }
+          }
+        },
+        "cap": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "The round cap. Must equal repo.yaml repair.budget; validate refuses a disagreement."
+        },
+        "lenses": {
+          "type": "array",
+          "minItems": 1,
+          "description": "The charter lenses, complete. Each is a checklist the crew runs, or a pointer at the rule file that enforces it.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+              },
+              "checklist": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "rule": {
+                "type": "string",
+                "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+                "description": "A rule id: the lens is enforced by <rules_dir>/<rule>.md, which must exist."
+              }
+            },
+            "oneOf": [
+              {
+                "required": [
+                  "checklist"
+                ]
+              },
+              {
+                "required": [
+                  "rule"
+                ]
+              }
+            ]
+          }
+        },
+        "merge_authority": {
+          "type": "string",
+          "description": "The node holding merge authority; it must declare authority: merge."
+        },
+        "closure": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "The NON-BUDGETED closure round — the round minted PAST `cap`, whose only purpose is to give a repaired head something to attest. Optional and additive: a review block without it declares that nothing runs past the cap at all, which is the fail-closed reading and the behaviour every shard predating this key was written under. WHY IT IS NOT EXTRA BUDGET, which is the only question about it that matters: `cap` stays the REPAIR budget, and a closure round buys none, because `warden attest write --review-dir` refuses its payload unless every record repeats a CLAIM a round at or under the cap already committed to this branch — rule_id, file, line, severity and finding text, the whole assertion rather than a key that indexes it, because a (rule_id, file) pair is cheap to reuse and a new defect could ride in under one. It re-files; it cannot find, and it cannot re-judge: only `fixed` and `dismissed-with-reason` are accepted. What makes it terminal is that rule, not a count — nothing limits how many closure rounds a branch attests, because each is a re-statement and bounding it would strand a branch whose head moved again. Its NUMBER is not pinned: the cap's refusal fires at `warden attest write`, after `warden round new` has already created the directory, so a builder who met the trap is holding a stray empty round at cap+1 and closes at cap+2. What is enforced is 'past the cap', which costs nothing to relax because a closure round buys no review budget at any number. The softer alternative — counting change-defect rounds only — was rejected on purpose: that verdict is visible to the builder BEFORE the mint, which teaches a builder to characterise findings as repair-defects.",
+          "required": [
+            "roles",
+            "payload"
+          ],
+          "properties": {
+            "roles": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 1,
+              "description": "The closure round's crew: exactly ONE declared finder or judge, and one is the maximum the schema can express. A closure round with a crew is a review round, and a review round past the cap is the budget this block exists not to grant. The role may not also be declared for a round within the cap — re-dispatching the review crew past the cap is that same grant wearing a different name.",
+              "items": {
+                "type": "string",
+                "pattern": "^([a-z][a-z0-9-]*|crew:[a-z0-9]+(-[a-z0-9]+)*)$"
+              }
+            },
+            "payload": {
+              "enum": [
+                "prior-findings-only"
+              ],
+              "description": "What the closure round may file. One value is representable, on purpose: there is no declaration under which a closure round may raise something new, so the key states the rule rather than choosing it. `warden attest write` enforces it record by record."
+            }
+          }
+        },
+        "light": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "The PROPORTIONATE round: the one crew that reviews a change proven, from the diff alone, to be incapable of altering behaviour. Optional and additive — a review block without it declares that every change takes the full rounds, which is the fail-closed reading and the behaviour every shard predating this key was written under. WHAT MAKES IT SAFE is not its size but a proof: `warden attest write --review-dir` accepts this roster only when every changed file clears `warden attest classify`. One surface can clear it: a Python file must be identical once docstrings are stripped, so no branch, call or value can differ. Every other surface, Markdown included, takes the full rounds, because no proof covers it. The gate's own machinery is excluded whatever its trees say. ELIGIBILITY IS NEVER DECLARED. A builder cannot assert it, label it, or record it: warden recomputes the verdict from the two trees at write time and CI recomputes it again over the pushed range, and a roster that reaches for this crew over a range that does not clear the proof is refused with the first blocking file named. WHAT IT DOES NOT BUY is a skipped review. The round is minted, the crew is dispatched, findings are dispositioned and the shard is committed exactly as any other round's — `warden attest check` is unchanged and still requires a clean attestation covering every commit. What shrinks is the crew, to the one lens that fits what a proven-inert diff can still get wrong: a claim that is not true of the tree. Comments and docstrings are exactly where this repo's claim defects live, and a docstring is not inert to a reader — this platform prints them as CLI usage text.",
+          "required": [
+            "roles",
+            "payload"
+          ],
+          "properties": {
+            "roles": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 1,
+              "description": "The light round's crew: exactly ONE declared finder or judge, and one is the maximum the schema can express. A second role would make this a cheaper full round rather than a different one, and the saving this block exists for is the dispatch it does not make. The role may not also be declared for a round within the cap: re-using the adversarial crew here would mean the light tier and the full tier were the same review at different prices, and a reader could no longer tell from the shard which one ran.",
+              "items": {
+                "type": "string",
+                "pattern": "^([a-z][a-z0-9-]*|crew:[a-z0-9]+(-[a-z0-9]+)*)$"
+              }
+            },
+            "payload": {
+              "enum": [
+                "claims-only"
+              ],
+              "description": "What the light round examines. One value is representable, on purpose: there is no declaration under which a light round reviews executable logic, because the proof that admitted it is precisely that no executable logic changed. The key states the rule rather than choosing it."
+            }
+          }
+        },
+        "delegation": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "The TERMS on which the EXECUTION of merge authority may be delegated — never a grant. Optional and additive: a review block without it declares that execution may not be delegated at all, which is the fail-closed reading. This object is deliberately incapable of holding a live grant: it has no field for who holds one, when it was issued, or when it expires, and additionalProperties is false, so a grant written here is refused by the schema. graph.yaml is tracked and has no clock; a grant recorded in it outlives the session it was given for, and a later session reading a months-old grant as live is worse than no record at all. `warden graph authority` prints the standing answer to 'who may merge right now, and on what basis'.",
+          "required": [
+            "permits",
+            "grantable_by",
+            "eligible",
+            "max_lifetime",
+            "recorded_in"
+          ],
+          "properties": {
+            "permits": {
+              "enum": [
+                "merge-on-green",
+                "merge"
+              ],
+              "description": "The widest act a grant may permit. merge-on-green is narrower than merge: it permits pressing the button on a PR the gate has already passed, and nothing else. Auto-merge is not a value here and cannot be declared — enabling auto-merge-on-green is a FURTHER grant, taken never assumed."
+            },
+            "grantable_by": {
+              "type": "string",
+              "description": "The node that may issue a grant. It must be the merge_authority node: a delegation issued by anyone else is self-issued."
+            },
+            "eligible": {
+              "type": "array",
+              "minItems": 0,
+              "description": "The declared nodes that may hold a grant. Eligibility is standing policy, NOT permission — an eligible node still merges nothing without a grant. An empty list declares that no node in this org may hold one, and that is a statement rather than an omission.",
+              "items": {
+                "type": "string"
+              }
+            },
+            "max_lifetime": {
+              "enum": [
+                "session"
+              ],
+              "description": "The longest a grant may live. Only `session` is representable, on purpose: a grant that outlives the session it was given for is the stale grant this block exists to make impossible."
+            },
+            "recorded_in": {
+              "enum": [
+                "decide"
+              ],
+              "description": "Where a grant that was EXERCISED is recorded, after the fact — a dated, past-tense artifact (`warden decide list`), never a live permission a later session can read as its own."
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,120 @@
+# AgentOps enrollment maturity — the platform baseline ladder.
+#
+# A consuming repo may ADD checks (.warden/certification.yaml) but can never
+# remove or redefine a baseline check: a ladder you can shorten certifies
+# nothing. Levels are cumulative — L3 requires L1 and L2.
+#
+# Run: warden certify [--level N]
+version: 1
+levels:
+  1:
+    name: Gated
+    description: A PR cannot merge without the deterministic gate having spoken.
+    checks:
+      - {id: G-01, label: "repo.yaml declares policy", type: file_exists, path: "repo.yaml"}
+      - {id: G-02, label: "at least one rule declared", type: glob_min, path: ".warden/rules/*.md", min: 1}
+      - {id: G-03, label: "platform pin recorded", type: file_contains, path: "repo.yaml", pattern: "platform:"}
+      - {id: G-04, label: "CI runs the gate", type: any_file_contains, path: ".github/workflows/*.yml", pattern: "warden review"}
+  2:
+    name: Verified
+    description: Deterministic checks exist and CI actually runs them.
+    checks:
+      - {id: V-01, label: "verify scopes declared", type: file_contains, path: "repo.yaml", pattern: "^verify:"}
+      - {id: V-02, label: "CI runs a verify scope", type: any_file_contains, path: ".github/workflows/*.yml", pattern: "warden verify"}
+      - {id: V-03, label: "risk tiers declared", type: file_contains, path: "repo.yaml", pattern: "^risk_tiers:"}
+  3:
+    name: Reviewed
+    description: Judgment is orchestrated and leaves an attestation.
+    checks:
+      - {id: R-01, label: "skills policy contract present", type: file_exists, path: ".warden/skills-policy.md"}
+      - {id: R-02, label: "policy declares Verify commands", type: file_contains, path: ".warden/skills-policy.md", pattern: "^## Verify$"}
+      - {id: R-03, label: "policy declares autonomy scope", type: file_contains, path: ".warden/skills-policy.md", pattern: "^## Autonomy scope$"}
+      - {id: R-04, label: "policy declares forbidden paths", type: file_contains, path: ".warden/skills-policy.md", pattern: "^## Forbidden paths$"}
+      - {id: R-05, label: "policy declares a review charter", type: file_contains, path: ".warden/skills-policy.md", pattern: "^## Review charter$"}
+      - {id: R-06, label: "policy declares integrations", type: file_contains, path: ".warden/skills-policy.md", pattern: "^## Integrations$"}
+      - {id: R-07, label: "policy declares shipping rules", type: file_contains, path: ".warden/skills-policy.md", pattern: "^## Shipping$"}
+      - {id: R-08, label: "review-memory cache is not committed", type: not_tracked, path: ".warden/memory/findings.jsonl"}
+      # Same class as R-08, and the one gate-rule validation walks you into:
+      # a mutation proof — plant a pattern, watch the gate fire, revert —
+      # writes gate shards each run. They are local
+      # working state (the next `warden review` re-derives them, and
+      # `attest check` ignores them by design), so committing one files a
+      # SYNTHETIC defect against a commit no ref contains; one `git add -A`
+      # is enough to do it. The attest shards
+      # beside them ARE evidence and stay committed — the asymmetry is the
+      # whole point. Repos with no gate dir pass vacuously, as with R-10.
+      - {id: R-11, label: "gate shards are not committed", type: not_tracked, path: ".warden/memory/gate/"}
+      # Same class again, one level up: the evidence RUN ROOT. Every run dir
+      # under it is uniquely named, which is why tracking the root once only
+      # bloated history — but the progress boundary log is a FIXED path under
+      # it, appended to on every branch, so a repo tracking the root gets a
+      # file that conflicts on every reviewing branch, the shape R-08 exists
+      # for. Repos with no run root yet pass vacuously, as with R-10.
+      - {id: R-13, label: "evidence run root is not committed", type: not_tracked, path: ".warden/out/"}
+      # Same class as R-08 — derived files are not evidence: bd rebuilds this
+      # log on every command, so tracking it dirties every tree and aborts
+      # rebases.
+      # Repos without bd pass vacuously: an absent file is not tracked.
+      - {id: R-10, label: "bd interaction log is not committed", type: not_tracked, path: ".beads/interactions.jsonl"}
+      - {id: R-09, label: "declared build disciplines are recognized", type: policy_disciplines_valid, path: ".warden/skills-policy.md"}
+      # deliver enforces "capped at 2 — a repo may set a lower cap, never a
+      # higher one". The budget is repo.yaml's typed `repair.budget` key,
+      # bounded by repo.schema.json. This reads the key and fails when it is
+      # undeclared (required at Level 3, founder ruling 2026-09-15), not a
+      # whole number, or above the platform cap. Policy prose is not read.
+      - {id: R-12, label: "declared repair budget respects the platform cap", type: policy_repair_budget_capped, path: "repo.yaml"}
+      # A declared light round needs the CI step that recomputes its verdict;
+      # none declared passes. `--enforce` is a flag, read in
+      # any argument order; an abbreviated `--enf` is not credited.
+      - {id: R-14, label: "a declared light round is enforced in CI", type: light_round_enforced, pattern: "warden attest classify", flags: ["--enforce"], event: pull_request}
+  4:
+    name: Evidenced
+    description: Reviews leave committed evidence, CI declares the checks over it, and every rule_id resolves.
+    checks:
+      # ci_step_enforced parses the workflows: some step running the pattern
+      # must not be continue-on-error (step or job level) in a workflow whose
+      # `on:` names the event, and the command's exit must not be
+      # shell-swallowed. Swallow detection is an enumerated DENYLIST of
+      # common spellings, not a proof the step gates. Caught,
+      # any spacing: `|| true`, `|| :`, `|| exit 0`, `|| echo`, `|| printf`,
+      # `; true`, `; exit 0` on the gate command's own line; `set +e` /
+      # `set +o errexit` anywhere in the run block; and a pipe after the
+      # gate command when nothing sets pipefail. NOT evaluated — the open
+      # residuals: if: expressions (step and job), trigger branch/path
+      # filters, reusable-workflow (`uses:`) indirection, a bare `exit 0`
+      # line (the conditional early-exit form is legitimate), `||` followed
+      # by any OTHER command that succeeds, grouped and quoted forms like
+      # `|| { log; exit 0; }` and `|| exit "0"`, escaped quotes (segment
+      # stripping is not a shell parser), a captured-but-never-re-raised
+      # `|| status=$?`, and a CUSTOM shell template (`shell: bash {0}` runs
+      # without -e, so markers are judged under default-shell assumptions
+      # while such a step earns no pipefail credit).
+      # A gate reachable only via merge_group or workflow_call does not
+      # satisfy E-01 today; that shape assumption is documented in docs/wiki/Adopting.md.
+      - {id: E-01, label: "CI runs warden attest check, enforced, on pull_request", type: ci_step_enforced, pattern: "warden attest check", event: pull_request}
+      - {id: E-02, label: "every attestation rule_id resolves", type: attest_rule_ids_resolve}
+      - {id: E-03, label: "CI runs warden memory ingest, enforced, on push", type: ci_step_enforced, pattern: "warden memory ingest", event: push}
+      - {id: E-04, label: "corpus holds 5+ review events", type: corpus_min_reviews, min: 5}
+  5:
+    name: Self-improving
+    description: The organization is declared, its reviews compound, and rule changes carry proof.
+    checks:
+      - {id: S-01, label: "org graph declared", type: file_exists, path: "graph.yaml"}
+      - {id: S-02, label: "org graph validates", type: graph_valid}
+      - {id: S-03, label: "graph is gate surface (risk-tiered)", type: file_contains, path: "repo.yaml", pattern: "graph\\.yaml"}
+      - {id: S-04, label: "a rule was promoted through the loop, with its backtest", type: rule_promoted_through_loop}
+      - {id: S-05, label: "a rule change carries a backtest artifact", type: rule_change_backtested}
+
+# Unattended operation is a capability, not a maturity rung: a repo with no
+# cage can climb the whole ladder. The cage checks live on as a badge —
+# always reported in the render, gateable in CI with
+# `warden certify --capability autonomous` — never counted into the
+# cumulative chain above.
+capabilities:
+  autonomous:
+    name: Autonomous
+    description: Unattended runs can happen inside hard stops the model cannot rewrite.
+    checks:
+      - {id: N-01, label: "cage enrolled (cage.toml reachable)", type: cage_enrolled}
+      - {id: N-02, label: "cage declares forbidden paths", type: cage_forbidden_paths_nonempty}
+      - {id: N-03, label: "session prompt hand-authored", type: cage_file_exists, path: "prompt.md"}

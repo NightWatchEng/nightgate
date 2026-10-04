@@ -1,0 +1,40 @@
+# Pin freshness for GitHub Actions — the copy that travels with the example.
+#
+# hello-svc/.github/workflows/ci.yml pins every action to a commit SHA (a tag
+# can be force-moved, a SHA cannot). But a SHA nobody updates decays into an
+# unpatched dependency, and the trailing version comment makes an update
+# legible without making one happen. Dependabot is the mechanism: it bumps the
+# SHA AND its trailing comment together, at zero build cost.
+#
+# WHY THIS FILE SHIPS WITH THE EXAMPLE: GitHub reads
+# Dependabot config only from a repository's ROOT `.github/dependabot.yml`. The
+# platform repo's own root config keeps THIS copy fresh inside nightgate — it
+# does not travel when a consumer copies hello-svc/ out. This file does: copied
+# to the consumer's root it becomes active there, so the enrollment surface a
+# consumer takes carries its own freshness mechanism instead of decaying
+# invisibly. (Inside the platform repo GitHub ignores this subdirectory file,
+# so it does not collide with the root config.)
+#
+# MONTHLY and GROUPED, deliberately: a Nightgate Definition of Done makes every
+# PR expensive (adversarial review, attestation, evidence), so staleness
+# surfaces as one bundled PR a month, not a stream. Dependabot proposes; it
+# never merges — each PR still goes through the full gate. A different cadence
+# is a new decision: change it when you adopt, with the reason.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    # The consumer's root — hello-svc IS the repo once copied out, so its
+    # workflows live at `/`, not at /examples/hello-svc.
+    directory: /
+    schedule:
+      interval: monthly
+    # commit-lint.sh (if you adopt it) exempts exactly this header shape;
+    # configuring it here beats letting Dependabot infer a prefix that could
+    # flip and turn every monthly PR red.
+    commit-message:
+      prefix: build
+      include: scope
+    groups:
+      action-pins:
+        patterns:
+          - "*"

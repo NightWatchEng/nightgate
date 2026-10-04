@@ -1,0 +1,10 @@
+{
+  "name": "nightgate-mermaid-toolchain",
+  "version": "1.0.0",
+  "private": true,
+  "description": "The pinned mermaid render toolchain for scripts/validate-diagrams.sh. Exact versions plus the committed package-lock.json pin the FULL transitive tree by integrity hash; the validator installs it with `npm ci --ignore-scripts`, so nothing here runs a lifecycle script - the browser comes from PUPPETEER_EXECUTABLE_PATH or the script's explicit probe, never from puppeteer's postinstall download.",
+  "dependencies": {
+    "@mermaid-js/mermaid-cli": "11.16.0",
+    "puppeteer": "24.43.1"
+  }
+}

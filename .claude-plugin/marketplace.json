@@ -1,0 +1,15 @@
+{
+  "name": "nightgate",
+  "description": "Nightgate platform marketplace — the generic skill pack consumed by every enrolled project (docs/wiki/Skills-Policy.md).",
+  "owner": {
+    "name": "NightWatchEng"
+  },
+  "license": "PolyForm-Shield-1.0.0",
+  "plugins": [
+    {
+      "name": "nightgate-skills",
+      "source": "./skills/nightgate-skills",
+      "description": "Generic workflow skills: ship (the entry point), intake, deliver, pre-pr-review, autonomous-run, review-queue, retro, rule-advisor, orchestrate. Project specifics live in each repo's .warden/skills-policy.md."
+    }
+  ]
+}

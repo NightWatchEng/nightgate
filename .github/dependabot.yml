@@ -1,0 +1,37 @@
+# Pin freshness for GitHub Actions.
+#
+# Every action is pinned to a commit SHA; a SHA nobody updates
+# decays into an unpatched dependency, and the trailing version comment
+# makes an update legible without making one happen. Dependabot is the
+# decided mechanism because it understands SHA pins — it bumps the sha AND
+# the trailing comment together — at zero build cost, which fits the
+# platform's economy better than a bespoke staleness checker.
+#
+# MONTHLY and GROUPED, deliberately: this repo's Definition of Done makes
+# every PR expensive (adversarial review, attestation, evidence), so
+# staleness surfaces as one bundled PR a month, not a stream. Each such PR
+# still goes through the full gauntlet — Dependabot proposes, it never
+# merges. A different cadence is a new decision: record it in the bead and
+# in tests/test_adopted_rules.py, which pins this file's shape.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    # Both workflow surfaces: the repo's own CI and the shipped example
+    # consumers copy — a freshness mechanism narrower than the pinned
+    # surface lets the example decay invisibly (a review-round finding).
+    directories:
+      - /
+      - /examples/hello-svc
+    schedule:
+      interval: monthly
+    # The commit header shape is CONFIGURED here, not inferred from commit
+    # history: scripts/commit-lint.sh exempts exactly this shape, and an
+    # inferred prefix could flip and turn every monthly PR red at the
+    # commits job (a review-round finding).
+    commit-message:
+      prefix: build
+      include: scope
+    groups:
+      action-pins:
+        patterns:
+          - "*"

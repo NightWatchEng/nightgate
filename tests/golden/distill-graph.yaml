@@ -1,0 +1,60 @@
+# distill's autonomous-loop org, declared — the design's first-target topology
+# (docs/design/graph.md: builder -> council -> finder -> independent judge ->
+# deterministic gate -> founder-merge, with typed memory edges). This fixture
+# proves the SCHEMA captures that topology. The name stays because that is
+# what a first-TARGET fixture is — a design target named for the repo it was
+# drawn from, a different animal from the enrollment MIRROR next door. A
+# committed review record turns on exactly that distinction: search
+# .warden/memory/attest/ for "the design's first-TARGET topology by its own
+# header", which is the reason a finding against this file was refuted.
+#
+# It used to end "distill's own graph.yaml lands with its consumer-switch PR".
+# That clause is gone: no such PR is coming. Nothing here
+# depended on it — what this fixture proves is that the SCHEMA captures the
+# topology above, which is true whoever declares it.
+version: 1
+nodes:
+  builder:
+    kind: skill
+    impl: "nightgate-skills:autonomous-run"
+    authority: find
+    boundaries: ["one bead per run", "never merges", "never edits gate surface"]
+  plan-council:
+    kind: subagent
+    impl: "bmad-party-mode --party anti-consensus-club"
+    authority: find
+    boundaries: ["advisory only — never decides"]
+  code-reviewer:
+    kind: subagent
+    impl: "general-purpose (pre-pr-review reviewer pass)"
+    authority: find
+  cross-examiner:
+    kind: subagent
+    impl: "general-purpose (pre-pr-review examiner pass)"
+    authority: judge
+  gate:
+    kind: deterministic
+    impl: "warden review --base origin/main --no-comment"
+    authority: gate
+  founder:
+    kind: human
+    authority: merge
+edges:
+  - {from: builder, to: plan-council, payload: intent}
+  - {from: plan-council, to: builder, payload: findings}
+  - {from: builder, to: code-reviewer, payload: diff}
+  - {from: code-reviewer, to: cross-examiner, payload: findings}
+  - {from: cross-examiner, to: builder, payload: findings}
+  - {from: builder, to: gate, payload: attestation, artifact: "attestation.json"}
+  - {from: gate, to: founder, payload: pr, artifact: ".run-summary"}
+memory:
+  - {to: code-reviewer, type: patterns}
+  - {to: cross-examiner, type: precedents}
+verification:
+  independent_judges: [cross-examiner]
+  convergence:
+    - "a finding survives only if the cross-examiner confirms it"
+  failure:
+    builder: {policy: retry, max: 2}
+    code-reviewer: {policy: retry, max: 2}
+    gate: {policy: abort}

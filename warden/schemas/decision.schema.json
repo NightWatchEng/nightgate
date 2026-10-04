@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "warden decision record",
+  "description": "A ruling bound to a commit and rules_version: what was decided, why, what it costs if wrong, the alternatives weighed, and the scope it governs. Borrowed from the ephemeral 'Ruling:' ledger line and made durable so decisions compound.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "head_sha",
+    "base_sha",
+    "rules_version",
+    "decided_at",
+    "decided",
+    "why",
+    "cost_if_wrong",
+    "alternatives",
+    "scope"
+  ],
+  "properties": {
+    "head_sha": {
+      "type": "string",
+      "minLength": 40,
+      "maxLength": 40,
+      "description": "the commit the decision was made at (HEAD when recorded)"
+    },
+    "base_sha": {
+      "type": "string",
+      "minLength": 40,
+      "maxLength": 40,
+      "description": "the commit state the decision was made AGAINST — defaults to head_sha ('as of this commit'). It is NOT a diff base: a decision is a ruling, not a review of a range, and no reader should compute head_sha..base_sha from it."
+    },
+    "rules_version": {
+      "type": "string"
+    },
+    "decided_at": {
+      "type": "string"
+    },
+    "decided": {
+      "type": "string",
+      "minLength": 1,
+      "description": "the ruling itself, in one line"
+    },
+    "why": {
+      "type": "string",
+      "minLength": 1,
+      "description": "the reasoning a later reader can agree or disagree with"
+    },
+    "cost_if_wrong": {
+      "type": "string",
+      "minLength": 1,
+      "description": "what it costs if this turns out to be the wrong call"
+    },
+    "alternatives": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "description": "the options considered and not taken; at least one, because a decision with no alternative was not a decision"
+    },
+    "scope": {
+      "type": "string",
+      "minLength": 1,
+      "description": "what this ruling governs, and where it stops"
+    },
+    "pr": {
+      "type": "string",
+      "description": "PR number/URL this decision belongs to"
+    },
+    "bead": {
+      "type": "string",
+      "description": "tracker id the decision belongs to"
+    }
+  }
+}

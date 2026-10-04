@@ -1,0 +1,89 @@
+# distill's cage, declared — the consumer-shaped fixture. It MIRRORS the
+# enrolled cage it was rendered from, at ~/workspace/cage/cage.toml:
+# manual trigger, no scheduler, cage-named paths. Regenerating from this
+# config must reproduce that cage's behavior exactly. PAST TENSE on purpose: that
+# cage's ledger and reports were last written 2026-08-24/25 and
+# docs/wiki/Cost-and-Throughput.md calls the window closed, so "the LIVE
+# enrolled cage" read as an enrollment still running, which it is not.
+#
+# branch_prefix is deliberately ABSENT: that cage stopped declaring it at
+# the v1.0 migration, so it takes the platform default (auto/). The historical
+# night/* branches in distill stay as they are — evidence of runs that
+# happened, not a namespace anything still writes to.
+#
+# The profile oracle beside this file is an INDEPENDENT target: its rule ORDER
+# predates the renderer's and order is semantics-free, so the consuming test
+# compares SETS. Never refresh it from a render — edit it by
+# hand, deliberately, when a config fact genuinely changes.
+#
+# HOME PATHS ARE PLACEHOLDERS. Every `/Users/me/...` below stood as one
+# maintainer's real home directory once; this file is tracked
+# and read by strangers, and a repo that ships someone's `$HOME` is leaking
+# an operator detail nothing here needs. `/Users/me` is the placeholder the
+# wiki already uses (docs/wiki/Configuration.md), so the two agree.
+#
+# What that costs the oracle: nothing it was measuring. The mirror is of that
+# cage's SHAPE — trigger set, forbidden-path regex, scrub list, extra
+# allow/deny, the absent branch_prefix — none of which is a function of the
+# home prefix; the renderer passes these paths through unchanged apart from a
+# leading slash it prepends on the six deny entries it DERIVES from them
+# (which is where the `//Users` doubling in the profile oracle comes from —
+# the extra_deny values below are copied verbatim). So "MIRRORS the enrolled
+# cage" above means its declared facts, not its literal home. Do not
+# re-personalize them to make a diff against a real cage.toml read cleaner;
+# tests/test_docs.py refuses a real home path in any tracked file except one
+# immutable attestation shard it exempts by name.
+#
+# The `distill` NAME stays, decided rather than left open.
+# A home directory identifies a person and proves nothing; a consumer name
+# identifies the repo this fixture is the equivalence oracle FOR, and the
+# claim it makes — generalized, not forked — is only checkable because the
+# fixture names a repo that really enrolled and really ran. Renaming this to
+# `acme` would hide that evidence and leave the claim standing. The synthetic
+# fixtures next door (`sampleproj`, hello-svc) already cover the
+# reads-well-to-a-stranger case.
+#
+# The warrant is the enrollment, and nothing else. Two earlier drafts propped
+# it on some OTHER tracked file naming distill — README, which does not name
+# it today, and then CLAUDE.md, which did until it was corrected to
+# name shortfall. Both props were removed rather than repaired, and a prop is
+# what they were: this file is not the repo's statement of who consumes the
+# platform, and for that a reader should go to CLAUDE.md.
+[project]
+name = "distill"
+github = "NightWatchEng/distill"
+live_checkout = "/Users/me/workspace/distill"
+worktree = "/Users/me/workspace/distill-night"
+
+[cage]
+dir = "/Users/me/workspace/cage"
+log = "/Users/me/Library/Logs/distill-cage.log"
+
+[gate]
+platform_probe = ".warden/bin/warden --help"
+forbidden_paths = [
+    '\.warden/',
+    'tools/warden/',
+    'repo\.yaml$',
+    'graph\.yaml$',
+    '\.github/',
+    'supabase/migrations/',
+    '\.claude/',
+    'scripts/validate-nightshift-docs\.sh$',
+    '\.githooks/',
+]
+scrub_paths = ["_bmad-output"]
+
+[profile]
+extra_allow = ["Bash(xcrun swiftc -typecheck:*)"]
+extra_deny = ["Bash(gcloud:*)", "Bash(supabase:*)"]
+additional_directories = ["/Users/me/workspace/_bmad-output/"]
+
+# v1.0.0: the schedule concept is deprecated entirely —
+# no clock fires this cage. Runs start when the founder starts one.
+[triggers.manual]
+
+[quiet_hours]
+# Explicitly none: with no schedule, quiet hours would only fight
+# deliberate manual runs.
+enabled = false

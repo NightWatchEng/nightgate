@@ -1,0 +1,1067 @@
+name: CI
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+    branches: [main]
+    # `edited` re-arms CI on retitles: with GitHub's default
+    # activity set (opened/synchronize/reopened) a PR retitled AFTER CI went
+    # green fired no new run, and with branch protection non-strict the stale
+    # green satisfied the merge button — an invalid header could land on main
+    # permanently (the fcd3d19 shape). Listing types replaces the defaults,
+    # so all three defaults are restated. Cost, accepted by recorded decision
+    # (a warden decide shard): every title/body/base edit re-runs
+    # all jobs. The alternative — a separate cheap title workflow — adds a
+    # status context that cannot gate until branch protection learns it,
+    # which would be a check that runs and cannot block. Residual, recorded
+    # not covered: the new run registers asynchronously, so between the edit
+    # and its check run appearing (or if run creation fails outright) the
+    # stale green is still the latest — retitle-then-instant-merge can slip
+    # through; this narrows the hole to that delivery window.
+    types: [opened, synchronize, reopened, edited]
+  workflow_dispatch: {}
+
+jobs:
+  # WHAT THIS EVENT INVALIDATES. The `edited` trigger above is
+  # load-bearing and stays; what changed is that a title edit no longer
+  # re-builds the EIGHT jobs that never read the title. Eight, counted off
+  # this file, which declares TWELVE jobs. A pull_request runs ten of them:
+  # `triage` (this one), `commits`, `tests`, `verify`, `tests-all`,
+  # `diagrams`, `gate`, `enrollment`, `init-proof` and `tracker`; `corpus`
+  # is push-only and `release-tag` tag-only. Of those ten, `commits` reads
+  # the title and `triage` decides — both run on every edit — which leaves
+  # the eight that are gated below. The seventh arrived when the one run of
+  # this repo's declared verify scopes was split out of the `gate` job; the
+  # eighth reads the tracker from a fresh clone.
+  # The "cost, accepted by recorded decision" the comment above records
+  # is what this job pays down: measured over 60 consecutive pull_request runs
+  # (45 distinct head shas), 15 were a second or third build of a sha already
+  # built, and the `edited` trigger accounts for 326 RUNNER-MINUTES of that.
+  #
+  # RUNNER-MINUTES, never wall clock, and the reason is worth stating
+  # precisely because this job changes the shape it used to rest on. Before
+  # this, every job started in the same second and a run's wall clock was its
+  # slowest interpreter leg. Now eight of them WAIT on this one, which checks
+  # out and asks the forge two questions — measured at 8 seconds on its first
+  # real run — on every event including `push` and `synchronize`, where the
+  # fast path can never fire. So this job makes a PR report slightly SLOWER
+  # and cost considerably less, and the ~8 seconds times every run is the
+  # price of the 326 minutes, paid knowingly.
+  #
+  # The alternative the recorded decision rejected — a separate cheap title
+  # workflow — is still rejected, and for its original reason: it publishes a
+  # status context branch protection does not know, so it would be a check
+  # that runs and cannot block. This keeps every check in this one workflow,
+  # under the names branch protection already requires.
+  #
+  # THE DECISION IS A SCRIPT, not an `if:` expression, because it must be
+  # FAIL-CLOSED and every branch of it has to be executed by a test. A job
+  # skipped by `if:` publishes its check run as SKIPPED and branch protection
+  # reads a skipped required check as a passed one — so a fast path is a way
+  # to turn a red run green by retitling, unless it can only be taken on a sha
+  # that has ALREADY been green. scripts/ci-event-scope.sh asks the forge
+  # exactly that and answers `false` to everything else, including a base-
+  # branch change (which also arrives as `edited` and genuinely invalidates
+  # everything), a base branch whose TIP has moved since that green run, and
+  # an unanswerable query. tests/test_local_gate.py runs each branch with the
+  # queries stubbed rather than reading this file's text, and one of its cells
+  # reads the `env:` below to pin that every input the script branches on is
+  # actually supplied here — an omitted one is a branch nothing can reach.
+  triage:
+    name: what this event invalidates
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      fast: ${{ steps.scope.outputs.fast }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - id: scope
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          EVENT_NAME: ${{ github.event_name }}
+          ACTION: ${{ github.event.action }}
+          BASE_CHANGED: ${{ github.event.changes.base != null }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          WORKFLOW_FILE: ci.yml
+        run: sh scripts/ci-event-scope.sh | tee -a "$GITHUB_STEP_SUMMARY"
+
+  commits:
+    name: commit messages
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: validate commit messages
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BEFORE: ${{ github.event.before }}
+          SHA: ${{ github.sha }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [ "$EVENT_NAME" = "push" ] \
+             && ! echo "$BEFORE" | grep -q '^0\{40\}$'; then
+            commits=$(git rev-list "$BEFORE..$SHA")
+          elif [ "$EVENT_NAME" = "pull_request" ]; then
+            commits=$(git rev-list "$PR_BASE_SHA..$PR_HEAD_SHA")
+          else
+            commits=$SHA
+          fi
+          for sha in $commits; do
+            git log -1 --format=%B "$sha" > /tmp/msg
+            echo "checking $sha: $(head -1 /tmp/msg)"
+            ./scripts/commit-lint.sh /tmp/msg
+          done
+
+      # A squash merge does not land the commits above. It lands ONE commit
+      # whose header is the PR TITLE plus " (#N)" — text nothing validated.
+      # That let `fcd3d19` land permanently with the invalid type `retro(...)`.
+      #
+      # Scope, measured rather than assumed: main's commit-lint was red on nine
+      # consecutive merges, but stripping the forge suffix from those nine
+      # headers and re-checking gives 8 PASS / 1 FAIL. Eight were the missing
+      # suffix strip, fixed by f615ed9; the forge writes that
+      # suffix, so no title check could have caught them. Exactly one — fcd3d19
+      # — is an instance of what this step catches.
+      #
+      # Both forms are checked. The strip is single-pass, so a title ALREADY
+      # ending in " (#123)" loses one suffix here and carries two on main:
+      # green at the gate, red on main, the failure this step exists to remove.
+      # Copy-pasting a landed header from `git log` produces exactly that shape.
+      #
+      # Retitles re-validate: `on.pull_request` lists `edited`, so a title
+      # change after a green run fires a fresh run whose result replaces the
+      # stale green (the trigger comment above records the
+      # event-delivery window this cannot close). Irreducible residual,
+      # recorded rather than claimed covered: the squash dialog lets the
+      # merger retype the subject at merge time, which no CI run can observe
+      # — detection for that stays where it already is, push CI on main
+      # going red afterwards.
+      #
+      # The title goes through `env:`, never through ${{ }} inside the script.
+      # Interpolating it would let a PR title containing $(...) or backticks
+      # execute in the job that validates every PR — the injection shape this
+      # repo's own os-command-injection rule exists to catch.
+      - name: validate the PR title (it becomes main's header on squash)
+        if: github.event_name == 'pull_request'
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          echo "checking PR title: $PR_TITLE"
+          printf '%s\n' "$PR_TITLE" > /tmp/title
+          ./scripts/commit-lint.sh --header-only /tmp/title
+          printf '%s (#0)\n' "$PR_TITLE" > /tmp/title-squashed
+          ./scripts/commit-lint.sh --header-only /tmp/title-squashed
+
+  # The interpreter is NAMED here, on every leg. It used to be
+  # whatever the machine offered: the founder's Mac resolved 3.14.7 and this
+  # runner resolved CPython 3.12.3, and they had differed the whole time. PR
+  # #167 was green locally and red in CI on an IDENTICAL sha because Python
+  # 3.13 made the compiler strip common leading whitespace from docstrings,
+  # which turned a test's hand-rolled unwrap into a no-op — the assertion
+  # silently stopped evaluating on 3.14 while still firing on 3.12.
+  #
+  # A MATRIX rather than a single pin, decided rather than assumed (see the
+  # interpreter-matrix decision shard). A pin makes local reproduce CI and hides the
+  # divergence permanently, and it cuts both ways: under a 3.12 pin every
+  # 3.14-only failure becomes invisible to the gate forever, on the very
+  # interpreter the founder develops on. The interpreters CI exercises are the
+  # floor `requires-python` CLAIMS (3.11 — previously a claim nothing
+  # evaluated, which is this repo's named recurring defect class), the
+  # committed `.python-version` this runner also defaults to (3.12), and the
+  # developer interpreter (3.14). 3.13 is omitted deliberately: it is nobody's
+  # interpreter here, and the dedent change it introduced is straddled by the
+  # 3.12/3.14 pair.
+  #
+  # THE SET IS THREE; THIS MATRIX IS TWO OF THEM. 3.12 is run
+  # by the `verify` job below, which runs the same suite through this repo's
+  # own declared gate scope. Before this, the suite ran FOUR times on every
+  # pull request — three legs here plus the gate job's own
+  # `warden verify --scope tests` — and the fourth was a re-run of what this
+  # matrix had already proved, measured at a mean of 15.3 runner-minutes over
+  # 15 consecutive pull_request runs (min 11.3, max 17.7). It runs three times
+  # now. The interpreter set did not shrink; the duplicate did. Which job runs
+  # which interpreter is derived, never retyped: `tests/test_local_gate.py::
+  # test_the_interpreter_is_pinned_and_the_matrix_covers_what_we_claim`
+  # reads the union of this matrix and the `verify` job's pin, so dropping a
+  # leg is red wherever it is dropped from.
+  tests:
+    name: warden tests (py${{ matrix.python }})
+    runs-on: ubuntu-latest
+    needs: [triage]
+    # A title edit re-runs nothing here. `always()` is
+    # what makes that fail-closed: without it a triage job that failed
+    # would SKIP this one, and a skipped required check reads as a
+    # passed one. The fast path is taken only on a positive 'true' from
+    # a forge answer that a run of this workflow on this same sha has
+    # already been green — never on the absence of an answer.
+    if: always() && needs.triage.outputs.fast != 'true'
+    strategy:
+      # Every leg reports. fail-fast would cancel the others on the first red
+      # and hide whether a failure is version-specific — which is the single
+      # question this matrix exists to answer.
+      fail-fast: false
+      matrix:
+        # Held in lockstep with .python-version and pyproject's
+        # requires-python by tests/test_local_gate.py::
+        # test_the_interpreter_is_pinned_and_the_matrix_covers_what_we_claim
+        # — which reads this list TOGETHER WITH the `verify` job's pin, since
+        # the committed .python-version (3.12) is that job's leg.
+        python: ["3.11", "3.14"]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          # The suite holds guards that compare the tree against origin/main —
+          # the pack-version invariant is the first (a judgment contract must
+          # not change under a frozen version id). Those guards SKIP when the
+          # base ref cannot be resolved, and a skip is honest but useless: the
+          # gate would only ever check them on a developer's machine
+          # (a round-2 review finding). Full history makes them run
+          # where they gate.
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7  # v10.2.0
+        with:
+          version: "0.12.1"  # the resolver is a gate-surface tool too: pin it
+          python-version: "${{ matrix.python }}"
+      # --python on each invocation as well as setup-uv's input: the committed
+      # .python-version would otherwise decide the interpreter, and every leg
+      # would quietly test the same one while reporting three names. (Written
+      # without naming the resolver's run subcommand: `pinned-run-invocations`
+      # scans comment text too, and a comment cannot carry --locked. Its
+      # bluntness is deliberate — a pin written in a comment above a floating
+      # command is exactly the shape `pinned-run-invocations` refuses.)
+      # The toolchain this suite shells out to, DECLARED rather than inherited.
+      # `tests/test_init.py` enrolls a fixture repo per
+      # language and runs the verify scope `warden init` wrote for it, so the
+      # suite executes `go` and `npm` for real — and until now these two steps
+      # did not exist. The cells passed because the GitHub-hosted image happens
+      # to preinstall Go and Node: an undeclared dependency on a runner image,
+      # which a single image change turns into five `exit 127` cells with no
+      # stated cause. `tests/test_toolchain.py` pins that a step here installs
+      # every entry of pyproject.toml's [tool.nightgate.toolchain].require, so
+      # a fourth language cannot land without its toolchain.
+      #
+      # The version inputs are pinned at major.minor, NOT at a patch, and that
+      # is a decision rather than laziness: Dependabot's github-actions
+      # ecosystem bumps the `uses:` SHA and its trailing comment, and does not
+      # touch a `go-version:` input. An exact patch pin here would therefore
+      # decay into an unpatched runtime that nothing in .github/dependabot.yml
+      # can see, which is worse than the minor pin it replaced. major.minor
+      # fixes the language semantics the fixtures depend on and still takes
+      # security patches.
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e  # v7.0.0
+        with:
+          go-version: "1.27"
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
+        with:
+          node-version: "26"
+      - name: ruff (pyflakes + syntax)
+        run: uv run --locked --with ruff==0.16.5 --python "${{ matrix.python }}" ruff check warden cage tests --select F,E9
+      # The checkout contract the suite assumes, ASSERTED rather than declared.
+      # `fetch-depth: 0` above is what makes the guards that
+      # compare against origin/main evaluate here instead of skipping, and
+      # tests/test_local_gate.py pins that the workflow declares it — but that
+      # pin reads YAML, and YAML is not the runner. If actions/checkout changes
+      # what fetch-depth 0 fetches, or the fetch half-fails, the declaration
+      # stays green while every one of those guards silently starts skipping.
+      # This is the same shape as the `edited` trigger and the tests-all
+      # aggregator: state the assumption where it can actually fail.
+      - name: the checkout provides the base ref the suite compares against
+        run: |
+          git rev-parse --verify --quiet origin/main >/dev/null || {
+            echo "origin/main does not resolve in this checkout, so every guard that compares the tree against the base ref would SKIP — a skipped guard is not a passed one"
+            exit 1
+          }
+      # `-rs` reports the REASON for every skip. Without it a
+      # leg prints "1889 passed, 8 skipped" and nothing says which eight or
+      # why, so the suite can get quietly weaker in CI while every run stays
+      # green — the class this suite already caught once, when an absent zsh
+      # removed five commit-lint tests and nobody was told. The skips are
+      # deliberate and named at their sites; this is what carries those names
+      # to the only place the gate is ever read from.
+      - name: pytest (fixture-based, no external repo dependency)
+        # NIGHTGATE_REQUIRE_TOOLCHAIN=1 is this job saying "I installed the two
+        # steps above, so hold me to them". It is what makes an
+        # absent `go` a NAMED FAILURE here while the same absence on a
+        # contributor's laptop is a NAMED SKIP — the split is by which
+        # environment PROMISED the toolchain, not by which tool it is; see
+        # tests/toolchain.py for the argument. Without it the setup steps above
+        # could silently stop working and the go cell would skip green, which
+        # would lose the only executable proof in this suite that the
+        # enrollment surface works for a language the platform is not written
+        # in. `-rs` prints every skip reason, so the lenient half is legible
+        # here too.
+        #
+        # `-n auto` is the ONE lever on this workflow's wall clock, and it is
+        # written here rather than defaulted. Measured on two green PR runs
+        # before it landed, every step in every job was under three minutes
+        # except four: this step on each of the three interpreter legs (8.6,
+        # 16.1 and 19.2 min on one run; 13.8, 16.7 and 17.4 on the other) and
+        # the gate job's own `warden verify --scope tests` (17.5 and 16.6).
+        # Those four steps were what this workflow's wall clock was made of,
+        # and nothing else on it could move them.
+        #
+        # THREE OF THOSE FOUR REMAIN: the fourth was a re-run
+        # of this one, and it is gone. What is left is this step on two legs
+        # and the `verify` job's `--scope tests`, which is the same command on
+        # the third interpreter. The set of steps that decide the clock did
+        # not change shape; it lost its duplicate.
+        #
+        # "The jobs all start together" is what this paragraph used to say,
+        # and the title-only fast path retired it: seven jobs now wait on `triage`, so they
+        # start a few seconds after it rather than in the same second. The
+        # sentence above is written to what is still true — these steps are
+        # the wall clock — because the serial hop is seconds against minutes.
+        # The gate job now waits on `verify` as well, and that hop is NOT
+        # seconds: the gate's verdict lands after the suite rather than
+        # beside it. It is the one wall-clock cost of the change and it is
+        # recorded in the `verify` job's own header.
+        #
+        # It moves in EVERY caller of the suite invocation or in none. This
+        # leg and repo.yaml's `tests` scope are the two CI callers; leaving
+        # either serial leaves the wall clock exactly where it was, because
+        # both run the whole suite and the longer one decides. `.githooks/
+        # pre-push` has run parallel since the flag arrived.
+        #
+        # NOT in `addopts`, and not in `PYTEST_ADDOPTS` either. A default
+        # would change what "green" means for every consumer of this repo and
+        # for the shipped example; an environment variable would additionally
+        # be inherited by the pytest runs this suite itself shells out to.
+        # Parallelism belongs in the command, where whoever reads the command
+        # can see it. tests/test_local_gate.py holds all of that, including
+        # both spellings of the environment variable.
+        env:
+          NIGHTGATE_REQUIRE_TOOLCHAIN: "1"
+        run: uv run --locked --python "${{ matrix.python }}" pytest -q -rs -n auto
+      - name: the leg ran the interpreter it claims to
+        run: |
+          got=$(uv run --locked --python "${{ matrix.python }}" python -c 'import sys; print("%d.%d" % sys.version_info[:2])')
+          echo "requested ${{ matrix.python }}, ran $got"
+          [ "$got" = "${{ matrix.python }}" ] || {
+            echo "this leg reported ${{ matrix.python }} and ran $got — a matrix that does not vary the interpreter is three copies of one run"
+            exit 1
+          }
+
+  # THE ONE RUN OF THIS REPO'S OWN DECLARED GATE SCOPES, and
+  # the job whose results the gate job TAKES rather than re-earning.
+  #
+  # This is the layout `warden init` writes for every consumer — an `install`
+  # job, a `verify` job that runs the scopes and uploads its results, and a
+  # `gate` job that downloads them, `warden take`s them into `.warden/out` and
+  # reviews. Until now this repo did not run the shape it ships: its gate job
+  # ran `warden verify --scope tests` itself, on top of three interpreter legs
+  # that had already run the same two commands. Self-hosting is the platform's
+  # credibility test, and the take path was the one part of the emitted
+  # workflow the platform did not use on itself.
+  #
+  # WHAT IT SAVES, and in which currency: a mean of 15.3 runner-minutes per
+  # pull_request run, measured over 15 consecutive ones. Not wall clock, and
+  # the distinction is load-bearing here for two reasons. The suite is the
+  # pole either way — this job's `--scope tests` step and the two interpreter
+  # legs are the only steps in this workflow over three minutes — and they all
+  # start together, so removing a fourth copy of the pole moves no clock. And
+  # the gate job now WAITS on this one, where before it ran alongside, so the
+  # gate reports its verdict its own remaining steps later than it used to.
+  # The saving is a bill, the cost is a few minutes of latency on the gate
+  # comment, and both are stated rather than one of them.
+  #
+  # WHY THE INTERPRETER IS THE COMMITTED PIN. repo.yaml's scope commands carry
+  # no `--python`, deliberately: that file is the contract a consumer's gate
+  # runs too, and an interpreter named there would be this repo's. So the
+  # interpreter comes from the runner, and `python-version` below is what
+  # makes it a DECLARATION rather than whatever the image offered — the defect
+  # the named interpreter closed for the matrix, which this job would otherwise
+  # reintroduce for the one leg the matrix no longer carries. The step after
+  # the scopes asserts what actually ran against `.python-version`, because a
+  # pin that nothing evaluates is the class this repo keeps finding.
+  verify:
+    name: warden verify
+    runs-on: ubuntu-latest
+    needs: [triage]
+    # A title edit re-runs nothing here. `always()` is
+    # what makes that fail-closed: without it a triage job that failed
+    # would SKIP this one, and a skipped required check reads as a
+    # passed one. The fast path is taken only on a positive 'true' from
+    # a forge answer that a run of this workflow on this same sha has
+    # already been green — never on the absence of an answer.
+    if: always() && needs.triage.outputs.fast != 'true'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          # Same reason as the interpreter legs: the suite holds guards that
+          # compare the tree against origin/main and they SKIP when the base
+          # ref cannot be resolved. A skip that only ever happens in CI is a
+          # check that does not exist there.
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7  # v10.2.0
+        with:
+          version: "0.12.1"  # the resolver is a gate-surface tool too: pin it
+          # Held equal to the committed .python-version by
+          # tests/test_local_gate.py::test_the_declared_gate_scopes_run_
+          # once_and_the_gate_takes_them.
+          python-version: "3.12"
+      # The suite shells out to `go` and `npm` for real, and
+      # this job is where the suite now runs under the declared scope, so the
+      # declaration is installed here. tests/test_toolchain.py derives the
+      # jobs that run the suite rather than naming them, so this job inherited
+      # the requirement the moment it started running it.
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e  # v7.0.0
+        with:
+          go-version: "1.27"
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
+        with:
+          node-version: "26"
+      - name: the checkout provides the base ref the suite compares against
+        run: |
+          git rev-parse --verify --quiet origin/main >/dev/null || {
+            echo "origin/main does not resolve in this checkout, so every guard that compares the tree against the base ref would SKIP — a skipped guard is not a passed one"
+            exit 1
+          }
+      # `NIGHTGATE_REQUIRE_TOOLCHAIN=1` is not set here and must not be: it is
+      # written into repo.yaml's own scope command, which is what makes THE
+      # GATE strict while a contributor's bare invocation stays lenient.
+      # Setting it on the step as well would make the
+      # split unreadable and would put it on the `example` scope too.
+      - name: warden verify (this repo's own declared gate, the tests scope)
+        run: .warden/bin/warden verify --scope tests
+      # EVERY declared scope, not just `tests`. `warden review`
+      # renders one line per scope a diff REQUIRES, so a PR touching
+      # examples/hello-svc needs `example` too, and a scope nothing ran
+      # renders `NO VERIFY RESULT for the reviewed commit` — a true line about
+      # a real gap the author cannot clear by doing anything right. ~0.03s.
+      - name: warden verify (every other declared scope)
+        run: .warden/bin/warden verify --scope example
+      - name: this job ran the interpreter the workflow declares for it
+        run: |
+          want=$(tr -d '[:space:]' < .python-version)
+          got=$(uv run --locked python -c 'import sys; print("%d.%d" % sys.version_info[:2])')
+          echo "committed .python-version is $want, this job ran $got"
+          [ "$got" = "$want" ] || {
+            echo "this job is the $want interpreter leg and ran $got — the matrix no longer carries $want, so an unevaluated pin here drops an interpreter from the gate in silence"
+            exit 1
+          }
+      # `if: always()` so a FAILING scope still hands its result across. The
+      # gate must be able to tell "the suite failed" from "no evidence
+      # reached me": without the artifact the gate's `warden take` exits 2 and
+      # says the gate DID NOT RUN, which is the right answer for missing
+      # evidence and the wrong one for a red suite. The gate reads this job's
+      # RESULT for that, in its first step.
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        if: always()
+        with:
+          # `warden declare check` D-03 credits the gate job for a scope run
+          # here only through this exact seam: the scope runs in a step BEFORE
+          # an upload whose `path` names `verify-result.json` under the
+          # `.warden/out/` of the directory the step ran in, the gate job
+          # `needs` this one and downloads the artifact by this name, and
+          # between that download and `warden review` the gate runs the
+          # one-line `warden take --from`. Rename either end and D-03 reports
+          # drift naming which end moved.
+          name: warden-verify
+          path: .warden/out/*-verify/verify-result.json
+          if-no-files-found: error
+          retention-days: 1
+
+  # Branch protection names ONE required check, and matrix legs carry their
+  # version in their names. This aggregator keeps `warden tests` resolvable so
+  # the required check does not vanish the moment the job above becomes a
+  # matrix — a required status that never reports blocks every merge.
+  #
+  # It aggregates the `verify` job too. `warden tests` must
+  # keep meaning "every declared interpreter is green", and 3.12 is no longer
+  # a matrix leg — it is the `verify` job. Leaving that job out would publish
+  # a green `warden tests` over two of the three interpreters this workflow
+  # claims to exercise.
+  tests-all:
+    name: warden tests
+    runs-on: ubuntu-latest
+    needs: [tests, triage, verify]
+    # always() + an explicit result check, not the default. Without always()
+    # this job SKIPS when a leg fails, and a skipped required check is not a
+    # passed one but it is also not a red one — the ambiguity is exactly the
+    # fail-open shape the charter's fail-closed lens exists to catch. Read the
+    # result and decide.
+    # `&& needs.triage.outputs.fast != 'true'` rides on the same always():
+    # on the title-only fast path the matrix does not run, so
+    # there is no result to read and this aggregator skips with it. The
+    # predicate is a positive 'true' or nothing happens, so a triage job that
+    # failed leaves the full matrix in place rather than skipping it green.
+    if: always() && needs.triage.outputs.fast != 'true'
+    steps:
+      - name: every interpreter leg must have passed
+        run: |
+          result='${{ needs.tests.result }}'
+          echo "interpreter matrix result: $result"
+          [ "$result" = "success" ] || {
+            echo "at least one interpreter leg did not pass — local-green and CI-green mean the same thing only if every declared interpreter is green"
+            exit 1
+          }
+      - name: and so must the interpreter the verify job carries
+        run: |
+          result='${{ needs.verify.result }}'
+          echo "verify job result (the committed .python-version leg, run through the declared gate scope): $result"
+          [ "$result" = "success" ] || {
+            echo "the verify job did not pass — it runs the committed .python-version interpreter, which the matrix no longer carries, so a green warden tests without it covers two of the three declared interpreters"
+            exit 1
+          }
+
+  diagrams:
+    name: diagram parse
+    runs-on: ubuntu-latest
+    needs: [triage]
+    # A title edit re-runs nothing here. `always()` is
+    # what makes that fail-closed: without it a triage job that failed
+    # would SKIP this one, and a skipped required check reads as a
+    # passed one. The fast path is taken only on a positive 'true' from
+    # a forge answer that a run of this workflow on this same sha has
+    # already been green — never on the absence of an answer.
+    if: always() && needs.triage.outputs.fast != 'true'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      # The pytest fence check is a cheap string test that runs everywhere; it
+      # passes diagrams the real parser rejects (two such diagrams once shipped).
+      # This job renders them for real, so a diagram that will not render
+      # cannot reach the wiki. It gates only once `diagram parse` is in main's
+      # required status checks — until then it reports without blocking.
+      # Puppeteer skips its own browser download when PUPPETEER_EXECUTABLE_PATH
+      # is set, so using the runner's Chrome costs no chromium fetch.
+      - name: validate mermaid diagrams
+        env:
+          PUPPETEER_EXECUTABLE_PATH: /usr/bin/google-chrome
+        run: bash scripts/validate-diagrams.sh docs/wiki
+      # The gate's own mutation proof, run on every PR rather than once by
+      # hand: a KNOWN-BAD diagram must still be rejected. Without this the
+      # validator could be silently blinded — a changed invocation, a stricter
+      # glob — and every run would keep reporting green.
+      # A rejection is exit 1 AND a `FAIL <name> - Mermaid render failed:` line
+      # for every fixture: exit 1 alone is also what `set -e` returns when a
+      # command in the validator fails with status 1. Exit 4 is a validator
+      # that found no diagram to check, which is where a fence match blind to
+      # the indented fixture lands. Exit 3 is a browser that never launched,
+      # retried with the same bound as wiki-sync's diagram step, then named.
+      # Negating the exit (`! bash ...`) passed on every one of these.
+      - name: prove the gate rejects a known-bad diagram
+        env:
+          PUPPETEER_EXECUTABLE_PATH: /usr/bin/google-chrome
+          DIAGRAM_LAUNCH_ATTEMPTS: "3"
+          DIAGRAM_LAUNCH_BACKOFF_SECS: "20"
+        run: |
+          log=$(mktemp)
+          attempt=1
+          while true; do
+            status=0
+            bash scripts/validate-diagrams.sh tests/fixtures/broken-diagram >"$log" 2>&1 || status=$?
+            cat "$log"
+            case "$status" in
+              1)
+                missing=""
+                for f in tests/fixtures/broken-diagram/*.md; do
+                  name=$(basename "$f" .md)
+                  grep -qxF "FAIL ${name} - Mermaid render failed:" "$log" || missing="${missing} ${name}"
+                done
+                if [ -n "$missing" ]; then
+                  echo "::error title=Exit 1 without a rejection::scripts/validate-diagrams.sh exited 1 but printed no rejection line for:${missing}. Exit 1 alone is also a script that aborted on a failing command, so this control proves nothing."
+                  exit 1
+                fi
+                echo "The gate rejected the known-bad diagram, as it must."
+                exit 0
+                ;;
+              4)
+                echo "::error title=Validator checked no diagram::scripts/validate-diagrams.sh exited 4 on tests/fixtures/broken-diagram: it checked no diagram, so it rejected nothing and this control proves nothing. A fence match that no longer sees the indented fixture lands here."
+                exit 4
+                ;;
+              3)
+                if [ "$attempt" -ge "$DIAGRAM_LAUNCH_ATTEMPTS" ]; then
+                  echo "::error title=Browser launch failed, control not run::Headless Chrome did not launch in ${attempt} attempts, so the known-bad diagram was never checked and this control proves nothing. This is not a diagram problem: re-run the job."
+                  exit 3
+                fi
+                pause=$((DIAGRAM_LAUNCH_BACKOFF_SECS * attempt))
+                echo "::warning title=Browser launch retry::Headless Chrome did not launch (attempt ${attempt} of ${DIAGRAM_LAUNCH_ATTEMPTS}); retrying in ${pause}s."
+                sleep "$pause"
+                attempt=$((attempt + 1))
+                ;;
+              0)
+                echo "::error title=Gate accepted a known-bad diagram::scripts/validate-diagrams.sh exited 0 on tests/fixtures/broken-diagram, so the validator can no longer catch a diagram that will not render."
+                exit 1
+                ;;
+              *)
+                echo "::error title=Validator error::scripts/validate-diagrams.sh exited ${status} on tests/fixtures/broken-diagram; this control passes only on exit 1, the rejection of the diagram."
+                exit "$status"
+                ;;
+            esac
+          done
+
+  gate:
+    name: warden gate
+    runs-on: ubuntu-latest
+    needs: [triage, verify]
+    # The platform gates itself with the code in this very PR (dogfood).
+    # The triage clause is the title-only fast path, fail-closed
+    # on a positive 'true' for the reason the tests job states.
+    if: always() && github.event_name == 'pull_request' && needs.triage.outputs.fast != 'true'
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          fetch-depth: 0
+      # The public export (publish.yaml) carries neither the review corpus nor
+      # the tracker. A step that reads one runs unless this step says
+      # `absent`, and the reason is in the step summary. Here it also reads the
+      # base: a PR that deletes the corpus is refused, never skipped.
+      - id: evidence
+        name: which private evidence this tree carries
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: python3 scripts/private-evidence.py --base "origin/$BASE_REF"
+      # A verify job that did not pass is a RED gate, not a gate that did not
+      # run, and the two must not look alike. `warden take` below exits 2 and
+      # says the gate DID NOT RUN when no evidence reached it — the right
+      # answer for a lost artifact and the wrong one for a failing suite. This
+      # step is where a failing suite gets its own verdict, before the take
+      # ever has the chance to blame the plumbing. `always()` on the job is
+      # what makes this step reachable at all when the verify job is red.
+      - name: require the verify job
+        env:
+          VERIFY_RESULT: ${{ needs.verify.result }}
+        run: |
+          if [ "$VERIFY_RESULT" != success ]; then
+            echo "the verify job ended $VERIFY_RESULT; the gate fails until every declared verify scope passes — its log says which scope and why" >&2
+            exit 1
+          fi
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7  # v10.2.0
+        with:
+          version: "0.12.1"  # the resolver is a gate-surface tool too: pin it
+      # `warden` as a bare word, for the take step alone. `declare check` D-03
+      # counts a take only in the exact one-line form `warden init` writes —
+      # `warden take --from "$RUNNER_TEMP/..."` and nothing else in the step —
+      # so the shim cannot be named by path there the way every other step
+      # here names it. D-03 states the residual this leaves in its own
+      # docstring: it does not prove that no earlier step shadows `warden` on
+      # PATH, and `warden review` has the same exposure.
+      - name: the platform shim on PATH, for the take step's bare `warden`
+        run: echo "$PWD/.warden/bin" >> "$GITHUB_PATH"
+      # Verify evidence pairs to the reviewed commit by SHA inside ONE
+      # runner's filesystem, which is why a verify run in
+      # another job used to be invisible here and the sticky comment rendered
+      # NO VERIFY RESULT forever. `warden take` is the seam that carries it
+      # across instead: the `verify` job uploads each scope's
+      # verify-result.json, this job downloads it, and the take replaces
+      # `.warden/out` with a fresh directory holding those results. Both SHA
+      # axes survive the hop — both jobs check out the same merge ref, and
+      # `pr_head_sha` is read from the Actions event payload, which is the
+      # same document in every job of the run.
+      #
+      # THE TAKE MUST COME FIRST among the steps that touch `.warden/out`: it
+      # deletes and recreates that directory. A verify run in this job before
+      # it would be thrown away; one after it would survive, which is why
+      # `--scope example` moved to the verify job with `--scope tests` rather
+      # than staying here after the take. One place runs the scopes.
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
+        with:
+          name: warden-verify
+          path: ${{ runner.temp }}/warden-verify
+      - name: take the verify results
+        shell: bash
+        run: warden take --from "$RUNNER_TEMP/warden-verify"
+      - name: warden review (own rules, own gate)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          REPOSITORY: ${{ github.repository }}
+          BASE_REF: ${{ github.base_ref }}
+        # Fork PRs get a read-only token: the sticky comment would 403 and a
+        # clean review would exit 2 (review P1-9). Findings still gate; they
+        # land in the job log + artifact instead of a comment.
+        run: |
+          if [ "$HEAD_REPO" != "$REPOSITORY" ]; then
+            .warden/bin/warden review --base "origin/$BASE_REF" --no-comment
+          else
+            .warden/bin/warden review --event "$GITHUB_EVENT_PATH"
+          fi
+      # `warden rules recommend` answers the guardrail gap, and this step makes
+      # an unanswered gap RED without a human choosing to look. The ceiling and
+      # its rationale live in .warden/catalog-answers.yaml (one source of
+      # truth — no count re-typed here); the bare command enforces it: exit 1
+      # over the ceiling; exit 2 when the answers file or its ceiling cannot
+      # be read, or when the gap cannot be computed WHILE a ceiling is
+      # declared. The one hole this step cannot see — ruleset broken AND the
+      # ceiling declaration deleted in the same diff — is caught by
+      # test_this_repos_ceiling_is_declared_and_holds in the tests job,
+      # which pins that the declaration exists at all.
+      - name: guardrail gap ceiling (rules recommend)
+        run: .warden/bin/warden rules recommend
+      # The round cap, checked where the builder is NOT standing.
+      # `repair.round_count` is derivable from the range — the shards committed in `base..head`
+      # carry `reviewers[].round` — and the only caller was `warden round
+      # new`, on the builder's own machine. A budget enforced only on a
+      # laptop is advice; hard stops live outside the model.
+      #
+      # IT FAILS, it does not merely report. What it gates on is a FLOOR read
+      # off evidence the branch itself committed, so it understates (a branch
+      # that commits no shard has no floor) and can only fire on the branch's
+      # own admission that it ran more rounds than the budget allows. The
+      # closure round is exempt by its own `closure_verification` artifact,
+      # not by arithmetic. The floor is read from the range AND from every
+      # `--prior-head`, and a prior head's reading reaches the VERDICT
+      # deliberately: if a head the rewrite left behind only reported,
+      # dropping the commits would still buy the budget back, which is the
+      # defect the prior head closes. The readings that are facts about the
+      # evidence rather than breaches of the budget — the two chains
+      # disagreeing, shards recording no round, and the rewrite report itself
+      # — are PRINTED at exit 0 into the step summary.
+      #
+      # `--prior-head` is the witness a history rewrite cannot take with it:
+      # on a force-push the `synchronize` payload's `before`
+      # is the PRE-rewrite head, whose own `base..before` still carries the
+      # shard commits a `rebase --onto` dropped. Without it, a drop of those
+      # commits leaves the range with no `.warden/memory/**` change at all,
+      # so `evidence-intact` is never dispatched and the floor resets in
+      # silence. A prior head this reading cannot produce — an activity type
+      # the forge sends no `before` on, or a `before` the runner cannot fetch
+      # — does not fail the PR: the step degrades to the IN-RANGE count,
+      # which is still the enforced gate, and the counter itself refuses a
+      # `--prior-head` it WAS handed and could not read. The fail-open is
+      # confined to obtaining the witness, and every path where one is
+      # missing raises a ::warning:: annotation that names it, so it is never
+      # a silence. The two standing limits of this witness — `before` rides
+      # only on `synchronize`, and it is one push deep — are
+      # named in docs/wiki/Graph-Layer.md rather than claimed closed.
+      #
+      # No `--head`: the command takes the PR head from the Actions event.
+      # `rev-parse HEAD` here is the MERGE REF actions/checkout built, whose
+      # first parent is the base tip, and the shard walk is first-parent — so
+      # a bare HEAD reads a committed floor of 0 on every PR and this gate
+      # could not fire at all (round-1 F-7, the trap `attest check` and
+      # `verify` already close the same way).
+      - name: review round count (the cap, off the builder's laptop)
+        if: steps.evidence.outputs.corpus != 'absent'
+        env:
+          BEFORE: ${{ github.event.before }}
+          ACTION: ${{ github.event.action }}
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          set -uo pipefail
+          prior=()
+          if [ -z "${BEFORE:-}" ] || echo "$BEFORE" | grep -q '^0\{40\}$'; then
+            echo "::warning::the forge sends no previous head on a pull_request '${ACTION:-?}' event (only 'synchronize' carries one), so this run counts the range alone and is blind to a rewrite that dropped the shard commits"
+          elif git cat-file -e "${BEFORE}^{commit}" 2>/dev/null \
+               || git fetch --no-tags --quiet origin "$BEFORE" 2>/dev/null; then
+            prior=(--prior-head "$BEFORE")
+          else
+            echo "::warning::this PR's previous head $BEFORE is not fetchable on this runner, so the rewrite witness outside the branch's own history is missing for this run"
+          fi
+          out="$RUNNER_TEMP/round-count.txt"
+          status=0
+          .warden/bin/warden round count --base "origin/$BASE_REF" \
+            ${prior[@]+"${prior[@]}"} > "$out" 2>&1 || status=$?
+          cat "$out"
+          { echo '### review round count';
+            echo '```'; cat "$out"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"
+      # The proportionate tier, bound where a session cannot talk it away.
+      # `warden attest write` admits a light round on the builder's machine,
+      # against the range as it stood then; a builder who pushes more commits
+      # afterwards would be carrying that attestation over a range that is no
+      # longer inert. So the verdict is recomputed HERE, over the pushed
+      # range, and a committed attestation whose roster is the light crew is
+      # refused unless the range still clears the proof. Reporting is
+      # unconditional and costs nothing; the refusal only fires where a light
+      # attestation actually exists. A fork PR is classified like any other:
+      # the verdict needs no credential, so it has no exempt path.
+      - name: proportionate review tier
+        if: steps.evidence.outputs.corpus != 'absent'
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          set -uo pipefail
+          out="$RUNNER_TEMP/attest-classify.txt"
+          status=0
+          .warden/bin/warden attest classify --enforce \
+            --base "origin/$BASE_REF" > "$out" 2>&1 || status=$?
+          cat "$out"
+          { echo '### proportionate review tier';
+            echo '```'; cat "$out"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"
+      # Every PR must leave a pre-PR review attestation in the committed
+      # corpus. Without this the corpus grew only when someone remembered to
+      # run the review — 5 of the 19 PRs merged the day this landed carried
+      # one — while `certify --level 3` claimed "judgment is orchestrated and
+      # leaves an attestation" off nothing but headings in a policy file.
+      #
+      # ENFORCING: the advisory cycle
+      # is over — every PR since has carried its attestation shard, and the
+      # E-01 rung (ci_step_enforced) certifies only a step that can gate.
+      # The CLI is fail-closed (exit 1 = no attestation, exit 2 = could not
+      # determine).
+      #
+      # Fork PRs are exempt for the same reason the review step special-cases
+      # them: the orchestrated review needs credentials a fork PR does not get.
+      - name: pre-PR review attestation
+        if: steps.evidence.outputs.corpus != 'absent'
+        env:
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          REPOSITORY: ${{ github.repository }}
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          set -uo pipefail
+          if [ "$HEAD_REPO" != "$REPOSITORY" ]; then
+            echo "fork PR: attestation not required (the orchestrated review cannot run here)"
+            exit 0
+          fi
+          out="$RUNNER_TEMP/attest-check.txt"
+          status=0
+          .warden/bin/warden attest check --base "origin/$BASE_REF" \
+            > "$out" 2>&1 || status=$?
+          cat "$out"
+          { echo '### pre-PR review attestation';
+            echo '```'; cat "$out"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        if: always()
+        with:
+          name: warden-out
+          path: .warden/out/
+          if-no-files-found: ignore
+
+  corpus:
+    name: corpus health
+    runs-on: ubuntu-latest
+    # E-03's step plus the enforcement it cannot provide alone: ingest only
+    # validates NEW artifacts at the out->shard seam (absent in CI), so the
+    # committed shards are validated by `certify --level 4` — E-02 re-checks
+    # every shard's rule_id against the ruleset on every merge to main. A
+    # shard whose rule is deleted or renamed goes red HERE, not silently
+    # missing from the promotion data.
+    if: github.event_name == 'push'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      # What the public export leaves out; see the gate job's step of this id.
+      - id: evidence
+        name: which private evidence this tree carries
+        run: python3 scripts/private-evidence.py
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7  # v10.2.0
+        with:
+          version: "0.12.1"  # the resolver is a gate-surface tool too: pin it
+      - name: warden memory ingest (cache rebuild must parse every shard)
+        if: steps.evidence.outputs.corpus != 'absent'
+        run: uv run --locked warden memory ingest
+      - name: warden certify --level 4 (E-02 validates the committed corpus)
+        if: steps.evidence.outputs.corpus != 'absent'
+        run: uv run --locked warden certify --level 4
+
+  enrollment:
+    name: portability proof
+    runs-on: ubuntu-latest
+    needs: [triage]
+    # A title edit re-runs nothing here. `always()` is
+    # what makes that fail-closed: without it a triage job that failed
+    # would SKIP this one, and a skipped required check reads as a
+    # passed one. The fast path is taken only on a positive 'true' from
+    # a forge answer that a run of this workflow on this same sha has
+    # already been green — never on the absence of an answer.
+    if: always() && needs.triage.outputs.fast != 'true'
+    # examples/hello-svc is enrolled exactly as docs/wiki/Adopting.md prescribes; if
+    # enrollment mechanics ever break, the platform goes red.
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      # What the public export leaves out; see the gate job's step of this id.
+      - id: evidence
+        name: which private evidence this tree carries
+        run: python3 scripts/private-evidence.py
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7  # v10.2.0
+        with:
+          version: "0.12.1"  # the resolver is a gate-surface tool too: pin it
+      - name: example resolves its own policy
+        working-directory: examples/hello-svc
+        run: uv run --locked --project ../.. warden explain
+      - name: example verify scopes pass
+        working-directory: examples/hello-svc
+        run: uv run --locked --project ../.. warden verify --scope app
+      # Certified as a standalone repository, the way docs/wiki/Quickstart.md
+      # runs it. In place, below this repository's git root, certify credits
+      # only a root workflow that names the enrollment, and GitHub never runs
+      # the example's nested .github/workflows/ci.yml. Copied out and
+      # committed, that file is the git root's own.
+      - name: example certifies LEVEL 3 as a standalone repository, the level docs/wiki/Quickstart.md shows
+        run: |
+          bash scripts/example-standalone.sh "$RUNNER_TEMP/hello-svc"
+          cd "$RUNNER_TEMP/hello-svc"
+          uv run --locked --project "$GITHUB_WORKSPACE" warden certify --level 3
+      - name: platform certifies itself (dogfood the ladder)
+        # Level 4 to match the corpus-health job's push-time assertion — one
+        # fence, both trigger points. The platform renders
+        # LEVEL 5 live; 4 is asserted because the S-rungs read corpus state
+        # a PR may legitimately be in the middle of changing.
+        if: steps.evidence.outputs.corpus != 'absent'
+        run: uv run --locked warden certify --level 4
+      # E-04 counts committed review events, so a tree with no corpus asks the
+      # level it can still prove rather than none.
+      - name: platform certifies itself without its corpus (the public export)
+        if: steps.evidence.outputs.corpus == 'absent'
+        run: uv run --locked warden certify --level 3
+      # The redesign's five run-time evidence items, posted where a PR reader
+      # sees them and gating nothing: `--report-only` exits 0 whatever the
+      # table says, so the only way this step goes red is the command itself
+      # failing to run. The cage item stays UNMEASURED here by design — the
+      # ledger lives beside the cage's checkout, not in any CI clone.
+      - name: warden certify --goal (the success criteria, report only)
+        run: |
+          out="$RUNNER_TEMP/goal.txt"
+          status=0
+          uv run --locked warden certify --goal --report-only > "$out" 2>&1 || status=$?
+          cat "$out"
+          { echo '### goal: the redesign success criteria';
+            echo '```'; cat "$out"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"
+      - name: gated PR simulation (clean passes, planted secret blocks)
+        run: ./scripts/portability-sim.sh
+
+  # `warden init` on repositories that have never seen the platform, run the
+  # way a reader runs the README's Try it, from the block itself, read by
+  # scripts/readme-try-it.sh. tests/test_init.py proves the same
+  # enrollment in process, from this checkout's source; this job proves it from
+  # the wheel a release is built from, installed as a uv tool outside the
+  # checkout, with the README's own commands, and with git refusing every
+  # transport, checked on each spelling of the platform repository the
+  # isolation script lists. The job holds no secret, so it runs on fork PRs.
+  #
+  # The workflow init writes cannot run for real here: its install job needs a
+  # deploy key for the platform. What stands in for that run: actionlint (with
+  # shellcheck over every run script) on the file each init wrote, and a dry
+  # job-graph check, scripts/workflow-graph-check.py, whose docstring lists
+  # the references it follows and the findings it reports.
+  init-proof:
+    name: warden init proof
+    runs-on: ubuntu-latest
+    needs: [triage]
+    # A title edit re-runs nothing here. `always()` is
+    # what makes that fail-closed: without it a triage job that failed
+    # would SKIP this one, and a skipped required check reads as a
+    # passed one. The fast path is taken only on a positive 'true' from
+    # a forge answer that a run of this workflow on this same sha has
+    # already been green — never on the absence of an answer.
+    if: always() && needs.triage.outputs.fast != 'true'
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7  # v10.2.0
+        with:
+          version: "0.12.1"  # the resolver is a gate-surface tool too: pin it
+      - name: build the wheel from this checkout
+        run: uv build --wheel --out-dir "$RUNNER_TEMP/dist"
+      - name: install warden from that wheel as a uv tool
+        run: |
+          uv tool install "$RUNNER_TEMP"/dist/warden-*.whl
+          uv tool dir --bin >> "$GITHUB_PATH"
+      - name: warden is the uv tool's, and git refuses every transport, checked on each listed spelling of the platform repository
+        run: bash scripts/init-proof-isolation.sh
+      # The block the proof runs, printed as the README holds it, so the log
+      # shows the commands a reader would type.
+      - name: the README's Try it block, byte for byte
+        run: bash scripts/readme-try-it.sh
+      - name: fresh Python, Node and Go repositories reach Level 3 through the README's Try it
+        run: bash scripts/init-proof.sh "$RUNNER_TEMP/fresh"
+      - name: actionlint, pinned by checksum, passes every workflow init wrote
+        env:
+          ACTIONLINT_VERSION: "1.7.12"
+          ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP"
+          curl -fsSL -o actionlint.tar.gz \
+            "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          printf '%s  actionlint.tar.gz\n' "$ACTIONLINT_SHA256" | sha256sum --check --strict -
+          tar -xzf actionlint.tar.gz actionlint
+          # actionlint skips run scripts silently when shellcheck is absent.
+          command -v shellcheck || { echo "no shellcheck on the runner, so actionlint would not check the run scripts"; exit 1; }
+          ./actionlint -version
+          ./actionlint fresh/python/.github/workflows/warden.yml \
+            fresh/node/.github/workflows/warden.yml fresh/go/.github/workflows/warden.yml
+      - name: every output and artifact the generated gate reads comes from a job it needs
+        run: |
+          uv run --locked python scripts/workflow-graph-check.py \
+            "$RUNNER_TEMP/fresh/python/.github/workflows/warden.yml" \
+            "$RUNNER_TEMP/fresh/node/.github/workflows/warden.yml" \
+            "$RUNNER_TEMP/fresh/go/.github/workflows/warden.yml"
+
+  # A fresh clone has no tracker: the Dolt database under .beads/ is
+  # gitignored. Its history is published on the git remote as refs/dolt/data,
+  # .beads/config.yaml names that remote, and the block under CONTRIBUTING.md's
+  # "## Reading the tracker" clones it. This job is that block, run as written
+  # in a clone of this checkout by scripts/tracker-from-a-clone.sh, which then
+  # asserts `bd show <a known bead>`, `bd ready` and `bd dolt pull` exit 0
+  # and that the clone's HEAD and tree are untouched.
+  #
+  # What it proves, and what it does not. The config names the remote over
+  # ssh, and a hosted runner holds no ssh key, so the script hands bd the same
+  # repository over https with the job's token (TRACKER_PROOF_REMOTE, read
+  # into BD_SYNC_REMOTE for the run; bd persists it into the clone's tracked
+  # config.yaml, which the script checks is the only tracked change and then
+  # restores, and into the clone's gitignored embedded Dolt store, which is
+  # discarded with $RUNNER_TEMP — the token is the run's own). bd's git-backed
+  # Dolt clone fetches refs/dolt/data from GitHub either way — that path, the
+  # one a collaborator's `bd bootstrap` and `bd dolt pull` take, is what runs
+  # here. The ssh transport itself, and pushing, are not exercised.
+  # bd is not on the runner image; it is installed from its release tarball,
+  # pinned by version and checksum the way actionlint is above.
+  tracker:
+    name: tracker from a clone
+    runs-on: ubuntu-latest
+    needs: [triage]
+    # A title edit re-runs nothing here; `always()` is what
+    # keeps that fail-closed — see the init-proof job above.
+    if: always() && needs.triage.outputs.fast != 'true'
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      # What the public export leaves out; see the gate job's step of this id.
+      - id: evidence
+        name: which private evidence this tree carries
+        run: python3 scripts/private-evidence.py
+      - name: install bd, pinned by version and checksum
+        if: steps.evidence.outputs.tracker != 'absent'
+        env:
+          BD_VERSION: "1.1.2"
+          BD_SHA256: a72d71ed374955dc9f83a0f90b54bd7b6a0016709dd1676ae2e368651ed401c2
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP"
+          curl -fsSL -o bd.tar.gz \
+            "https://github.com/gastownhall/beads/releases/download/v${BD_VERSION}/beads_${BD_VERSION}_linux_amd64.tar.gz"
+          printf '%s  bd.tar.gz\n' "$BD_SHA256" | sha256sum --check --strict -
+          mkdir -p bd-bin && tar -xzf bd.tar.gz -C bd-bin bd
+          echo "$RUNNER_TEMP/bd-bin" >> "$GITHUB_PATH"
+          bd-bin/bd version
+      - name: a fresh clone reads the tracker with the CONTRIBUTING.md block, as written
+        if: steps.evidence.outputs.tracker != 'absent'
+        env:
+          TRACKER_PROOF_REMOTE: "git+https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
+        run: bash scripts/tracker-from-a-clone.sh "$RUNNER_TEMP/clone"
+
+  # Every consumer's repo.yaml platform.pin is compared against
+  # warden.__version__, so a v* tag whose name is not that version would be
+  # refused by every consumer that pins it.
+  release-tag:
+    name: release tag names the package version
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - name: the tag is v + warden.__version__
+        env:
+          TAG: ${{ github.ref_name }}
+        run: python3 scripts/release-tag-check.py "$TAG"

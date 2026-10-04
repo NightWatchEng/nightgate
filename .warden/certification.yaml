@@ -1,0 +1,108 @@
+# Project certification overlay — nightgate's own.
+#
+# Only entry today is the grandfather list, and it exists for one reason:
+# writing a rule for a recurring candidate class retroactively invalidates
+# every shard that ever filed under that class's `unmapped:` slug.
+#
+# The sequence, watched live on 2026-08-26 while landing the fail-open rule:
+#   1. the retro proposes "write the fail-open rule" (27 judged, 93%)
+#   2. the rule ships and declares `covers: [fail-open]`, which is the seam
+#      that stops `memory stats` re-proposing a rule that already exists
+#   3. `attest`'s validator — the SAME one certify's E-02 calls — now refuses
+#      `unmapped:fail-open`, because a declared rule covers it
+#   4. all 27 of those ids sit in 12 already-committed shards
+#   5. E-02 fails and certification drops from LEVEL 5 to LEVEL 3
+#
+# The invariant certify.py states for exactly this case is that committed
+# evidence written before a rule existed must not be retroactively
+# invalidated, and that rewriting evidence to satisfy a check would be worse.
+# So the ids are declared here instead: loud, named in E-02's own output,
+# and never usable by the promotion gate.
+#
+# WHAT THIS LIST DOES NOT DO, stated because this comment used to claim it
+# did (PR #169). It said a waived id was "STILL
+# rejected by `attest write` for new attestations" — a write-side floor that
+# would make the waiver a one-way migration door. There is no such floor.
+# `attest write` never reads this file. It refuses a covered slug because an
+# UNPAUSED rule answers the class (`attest._RuleIndex.answered`), and a PAUSE
+# removes that answer on purpose — so while a covering rule is
+# paused, fresh `unmapped:<slug>` records are ACCEPTED, they carry no era
+# marker, and on unpause E-02 absorbs them under this same waiver,
+# indistinguishable from the genuinely legacy ones. The waiver is a
+# declaration that a slug's records are not resolved against the ruleset; it
+# is not a write-side refusal. A recorded ruling (PR #167) declined to build
+# the era marker that would separate them, so the mixture is a known, accepted
+# behaviour rather than a promise anything keeps.
+#
+# This is the file `docs/wiki/Adopting.md` tells a consumer to CREATE, and
+# this copy is the worked example they — and `nightgate-skills:rule-advisor` —
+# read when drafting one, so a false promise here is the one most likely to be
+# copied. The same correction landed in `certify._grandfathered_rule_ids`'s
+# docstring, E-02's remedy, Adopting and Memory; this surface was missed
+# because it is a forbidden path.
+#
+# This file is the only one that can waive a rule_id past the certification
+# gate, so repo.yaml tiers it HIGH — a diff touching it
+# now draws the same scrutiny as one touching `.warden/rules/**`, encoded
+# rather than left to a reviewer to remember. It used to match no risk_tiers
+# glob and default to LOW, the same tier as docs/**; that gap is closed.
+#
+# This is not a way to keep filing findings under a covered slug. New rounds
+# file `fail-closed`. This list only says what the corpus already contains.
+version: 1
+
+grandfathered_rule_ids:
+  # 27 findings across 12 shards, 2026-08-23..2026-08-26, all judged before
+  # the fail-closed rule existed. They are the evidence that justified
+  # writing it — discarding them to satisfy the check that they justified
+  # would be circular.
+  - unmapped:fail-open
+  # A synthesis pass over six review rounds wrote rules for the three classes past
+  # the corpus's own proposal bar. Same reasoning as fail-open, same
+  # deliberate act: each list entry below is the frozen evidence that
+  # justified its rule. tests/test_corpus_rules.py re-derives the backtest
+  # artifacts' count FIELDS from the shards on every run; the figures in
+  # these comments are dated snapshots (2026-08-27) that no test reads.
+  # 45 findings across 20 shards, 2026-08-23..2026-08-27 — the
+  # enforcement-truth rule covers this class.
+  - unmapped:enforcement-claim
+  # 11 findings across 8 shards, 2026-08-24..2026-08-26 — the tests-bite
+  # rule covers this class.
+  - unmapped:test-cannot-fail
+  # 10 findings across 4 shards, 2026-08-24..2026-08-27 — the pattern-fit
+  # rule covers this class.
+  - unmapped:overbroad-pattern
+  # 6 findings across 4 shards, 2026-08-24..2026-08-25, all judged (fixed)
+  # before the rule existed — earned across the night->run vocabulary
+  # retirements. The rename-complete rule covers this class;
+  # same deliberate act as the entries above.
+  - unmapped:incomplete-rename
+  # 5 findings across committed shards, 2026-08-24..2026-08-26, all judged
+  # (fixed) before the rule existed — 'a failure that reports nothing
+  # actionable about its cause'. The error-names-cause rule covers this class.
+  # `diagnosability` also remains a cross-cutting TAG.
+  - unmapped:diagnosability
+  # 9 findings across 5 shards, 2026-08-25..2026-08-30, all judged (fixed)
+  # before the rule existed — 'the review corpus or its evidence chain
+  # corrupted, colliding, or silently dropping records'. The evidence-intact
+  # rule covers this class; same deliberate act as the
+  # entries above. `corpus-integrity` also remains a cross-cutting TAG.
+  - unmapped:corpus-integrity
+  # 32 findings across 14 review rounds, 2026-08-24..2026-09-15, every one
+  # judged before the rule existed — 'evidence cited to a source or actor that
+  # does not support it'. The attribution-holds rule covers this class; same
+  # deliberate act as the entries above, and the first one waived for a rule a
+  # retro proposed AFTER the class had crossed the promotion bar rather than
+  # at it. `evidence-attribution` also remains a cross-cutting TAG. Covering
+  # the class also refuses the `unsupported-source-claim` alias that used to
+  # fold onto it, so the count waived here is 32 and not the 33 a pre-rule
+  # `memory stats` prints; the receipt for that name is in
+  # .warden/memory/tags.yaml.
+  - unmapped:evidence-attribution
+  # 31 records across 27 shards, 2026-09-02..2026-09-28, folding to 21
+  # judged findings, every one judged before the rule existed — the one charter lens no rule enforced,
+  # filed under its own slug. The blast-radius-named rule covers this class;
+  # same deliberate act as the entries above. Like rename-complete,
+  # error-names-cause and evidence-intact, it was written below the promotion
+  # bar (floor 0.5), which governs automating a rule, not writing one.
+  - unmapped:consumer-blast-radius

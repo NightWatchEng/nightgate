@@ -1,0 +1,17 @@
+# Python bytecode caches
+__pycache__/
+*.pyc
+
+# warden evidence run dirs (uploaded as CI artifacts, never committed)
+.warden/out/
+
+# review-memory derived cache — rebuilt by `warden memory ingest` from the
+# committed shards in .warden/memory/attest/; committing it conflicts on
+# every concurrent branch
+.warden/memory/findings.jsonl
+
+# gate shards — local working state, re-derived by the next `warden review`.
+# The DoD's mutation proof (plant a pattern, watch the gate fire, revert)
+# writes these, so committing one files a synthetic defect against a commit
+# no ref contains. Rung R-11 fails Level 3 if any are tracked.
+.warden/memory/gate/

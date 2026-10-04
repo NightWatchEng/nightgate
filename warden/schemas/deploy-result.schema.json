@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "warden deploy-result artifact",
+  "description": "Provenance for one deploy attempt: which commit, under which rules_version, whether the gate's preconditions held (reachable from the deploy branch + a clean committed attestation), and what the declared scope commands did. A refused deploy still writes this artifact — the refusal IS the evidence.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["commit", "head", "branch", "branch_tip", "scope", "dirty",
+               "rules_version", "reachable_from_branch", "refusals",
+               "deployed"],
+  "properties": {
+    "commit": {
+      "type": "string",
+      "minLength": 1,
+      "description": "the fully resolved commit the deploy was asked to ship; a deploy proceeds only when `head` equals it"
+    },
+    "head": {
+      "type": "string",
+      "minLength": 1,
+      "description": "the checkout's HEAD when the check ran — deploy runs the working tree, so head != commit is a named refusal"
+    },
+    "dirty": {
+      "type": "boolean",
+      "description": "whether the working tree carried uncommitted content BEFORE any scope command ran (a dirty tree is a named refusal; an unreportable tree state aborts the run at exit 2, so this field is never a guess). Distinct from run.dirty, which is measured before the first command and after the last, and may reflect files they wrote"
+    },
+    "branch": {
+      "type": "string",
+      "minLength": 1,
+      "description": "the branch a deployable commit must be reachable from, as given to --branch"
+    },
+    "branch_tip": {
+      "type": "string",
+      "minLength": 1,
+      "description": "the commit `branch` resolved to when the check ran"
+    },
+    "scope": {
+      "type": "string",
+      "minLength": 1,
+      "description": "the repo.yaml deploy: scope this run was asked to execute"
+    },
+    "rules_version": {
+      "type": "string",
+      "minLength": 1,
+      "description": "the ruleset digest in force when the deploy ran — binds the artifact to the policy, not just the code"
+    },
+    "reachable_from_branch": {
+      "type": "boolean",
+      "description": "whether `commit` is an ancestor of `branch_tip`; false is a named refusal, never a warning"
+    },
+    "clean_attestation": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["shard", "sha", "via"],
+      "properties": {
+        "shard": {"type": "string", "minLength": 1},
+        "sha": {"type": "string", "minLength": 1},
+        "via": {"enum": ["introduced-by-commit"]}
+      },
+      "description": "the clean-verdict shard the commit's own first-parent diff introduced, read from the commit's tree (never the filesystem) — the binding that survives a squash merge, where no shard sha does. null exactly when the store was readable and no clean shard was introduced; an unreadable store aborts the run (exit 2) and writes no artifact, so null is never 'could not tell'."
+    },
+    "refusals": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1},
+      "description": "every reason this deploy was refused, each naming its cause; empty when the preconditions held"
+    },
+    "deployed": {
+      "type": "boolean",
+      "description": "true only when the preconditions held AND every declared command in the scope exited 0"
+    },
+    "run": {
+      "type": ["object", "null"],
+      "description": "the verify-result document for the scope run (already validated against verify-result.schema.json by the shared runner); null when the deploy was refused before any command ran"
+    }
+  }
+}

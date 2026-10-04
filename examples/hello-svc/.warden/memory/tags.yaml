@@ -1,0 +1,32 @@
+# The declared defect-class vocabulary for hello-svc, and its drift ceiling.
+#
+# Tags are the review corpus's recall KEY: two spellings of one defect class
+# split the index, and recall that should have fired never does. `warden
+# memory ingest` WARNS on a tag that is not declared here — a new class must
+# be nameable the moment it is found — and the retro proposes additions,
+# merges (`aliases:`) and removals like any other policy edit.
+#
+# Name the DEFECT CLASS, never the file. Two to four words, kebab-case.
+tags:
+  fail-open: a check that errs toward passing instead of blocking when it cannot evaluate
+  enforcement-claim: a comment, doc, or message asserting a check that does not exist
+  handler-contract: a handler returning something other than the (status, body) pair it declares
+  debug-artifact: a debugger hook, print, or scratch file left in shipped code
+
+# A name in the corpus has three honest dispositions — declared above, folded
+# under `aliases:`, or written down under `left_undeclared:` with a one-line
+# reason. The ceiling bounds the names carrying NONE of the three, and
+# `warden memory check-vocabulary` enforces it: exit 1 above the number, exit
+# 2 when this block cannot be read (never headroom). The CI job in
+# .github/workflows/ci.yml runs it on every pull request, so a branch whose
+# review round coins a name goes red in its OWN CI, where a receipt is
+# cheapest to write. Raise the number only by replacing the rationale with
+# one arguing for the NEW value.
+ceiling:
+  max_undecided: 0
+  rationale: >-
+    Zero, because the obligation this bounds is a receipt rather than a
+    decision: writing one line under left_undeclared: commits its author to
+    nothing about the class, so there is no honest reason for a backlog of
+    names nobody has written a sentence about, and a backlog is exactly how
+    a vocabulary drifts unnoticed.

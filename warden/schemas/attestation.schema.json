@@ -1,0 +1,242 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "warden pre-PR review attestation",
+  "$defs": {
+    "lens": {
+      "description": "The controlled vocabulary a finding's `lens` and, under `warden attest write --review-dir`, a roster entry's `role` are drawn from. Two shapes, on purpose. The ENUM names the roles the platform's own skills dispatch, which are the same in every enrolled repo: `code-reviewer` (pre-pr-review's adversarial reviewer), `cross-examiner` (its refute-first arbiter), `scoped-re-reviewer` (deliver's per-round re-review of exactly the findings a repair round set out to fix), `builder` (the builder's own self-review) and `closure-attestor` (the terminal closure round's single role, dispatched ONCE past the cap purely to attest the repaired head — it raises nothing, and `warden attest write` refuses any record of its whose rule_id+file no round at or under the cap already filed). `claims-auditor` is the light round's single role, dispatched for a range warden has PROVEN carries nothing but claims — every changed file Python and identical once docstrings are stripped, nothing under the gate's own machinery — and it audits the one thing such a diff can still get wrong, which is whether the claims it edits are true of the tree. The proof is recomputed from the two trees at write time and again by CI, never read from the payload, so this role cannot be reached by asserting it. A charter lens — one a repo's `.warden/skills-policy.md` `## Review charter` declares, such as this repo's fail-closed, enforcement-truth and consumer-blast-radius — is `crew:<slug>`, lowercase words joined by '-'. The prefix is structurally distinguishable and the slug is a comparable corpus key, which is the `unmapped:<slug>` argument for rule ids applied to reviewers: before this, the corpus carried 22 spellings for about 7 roles ('crew:fail-closed', 'crew-fail-closed', 'fail-closed', 'fail-closed review (independent, post-hoc)' were four keys for one lens), and exactly one of those four is valid here. The shape governs SPELLING, not which charter lenses exist: that is each repo's charter, and a platform enum of this repo's three would make every consumer's charter lens a platform schema change.",
+      "anyOf": [
+        {
+          "enum": [
+            "code-reviewer",
+            "cross-examiner",
+            "scoped-re-reviewer",
+            "builder",
+            "closure-attestor",
+            "claims-auditor"
+          ]
+        },
+        {
+          "type": "string",
+          "pattern": "^crew:[a-z0-9]+(-[a-z0-9]+)*$"
+        }
+      ]
+    }
+  },
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "head_sha",
+    "base_sha",
+    "rules_version",
+    "reviewed_at",
+    "reviewers",
+    "findings",
+    "verdict"
+  ],
+  "properties": {
+    "head_sha": {
+      "type": "string",
+      "minLength": 40,
+      "maxLength": 40
+    },
+    "base_sha": {
+      "type": "string",
+      "minLength": 40,
+      "maxLength": 40
+    },
+    "rules_version": {
+      "type": "string"
+    },
+    "reviewed_at": {
+      "type": "string"
+    },
+    "reviewers": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "role",
+          "agent"
+        ],
+        "properties": {
+          "role": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Which lens this reviewer was. A free string in the contract because 22 spellings of about 7 roles are already committed and warden/schemas is additive-only; the vocabulary is enforced on the write path instead: `warden attest write --review-dir` refuses a role that is not one of `$defs/lens`, exactly as it refuses a roster entry with no `returned`. A finding's `lens` joins to this field, so on a shard written under the check every role IS a vocabulary member; on an older shard it is whatever the writer typed, and no reader may normalise it after the fact."
+          },
+          "agent": {
+            "type": "string",
+            "minLength": 1
+          },
+          "round": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The review round this reviewer was dispatched in: 1 for the first pass over the diff, incremented on each re-review after fixes (a scoped re-review, a second cross-examination). One roster entry is one dispatch, so a lens that ran in two rounds is two entries with two rounds, each with its own `output`. One attestation covers ONE round: `--review-dir` names THAT round's `reviewers/`, the roster declares only the dispatches that ran in it, and no earlier round's report is copied, moved or renamed into it: `warden attest write` refuses a report byte-identical to a sibling round's. Each earlier round is evidence in its OWN committed shard, and the PR body's evidence chain names them in order. That is the current shape: older shards carry rosters spanning several rounds, which was correct under the contract they were written under, and no reader may re-attribute them after the fact. This field is what makes 'cross-examiner-round2' a structured claim rather than a filename. Optional for backward compatibility; `warden attest write --review-dir` requires it."
+          },
+          "returned": {
+            "type": "boolean",
+            "description": "Whether this reviewer actually came back with a report. A reviewer that was dispatched and did not return is declared here as false, NOT dropped from the roster \u2014 a silently shorter roster hides a reviewer that never came back. Optional for backward compatibility; `warden attest write --review-dir` requires it, because a roster entry that does not say whether it returned cannot be checked against anything."
+          },
+          "findings": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "How many raw findings this reviewer returned, before consolidation. Structured so it is readable by a parser: it used to be jammed into `agent` as free text (see the 20260831T232211Z shard, whose agent strings end '- RETURNED, 6 findings (2 HIGH, 3 MEDIUM, 1 LOW)'), where nothing could check or count it."
+          },
+          "output": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Basename of this reviewer's raw output file inside the directory passed to `warden attest write --review-dir`. This is the observable artifact a `returned: true` claim is cross-checked against. A plain basename, never a path: a roster must not be able to point the check at a file outside the round it describes."
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "reviewed-clean",
+              "reviewed-findings",
+              "no-review"
+            ],
+            "description": "What this dispatch came back WITH. `returned: true` with zero findings used to mean both 'reviewed and found nothing' and 'came back with a refusal, a classifier decline, a truncated run, or a nothing-to-review written without reading the diff' — one number, and the zero-yield denominator every lens-retirement decision rests on. Under `warden attest write --review-dir` warden DERIVES it from the artifacts and stamps it: `reviewed-findings` when the roster counts findings; `no-review` when the reviewer did not return, or returned an output that names no file the attested range changed — a review that read nothing cannot cite what it read; `reviewed-clean` only when a zero-finding output names at least one changed file. A declared `reviewed-clean` the output cannot corroborate is REFUSED, and a declared outcome that contradicts the derivation is refused; a declared `no-review` always stands — the builder may lower an outcome, never raise it. Without `--review-dir` a declared value is carried as the builder's word and an undeclared one stays absent. Optional for backward compatibility: ABSENT on every shard written before this field shipped, and absent is UNKNOWN — no reader may upgrade it to reviewed-clean."
+          }
+        }
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "rule_id",
+          "severity",
+          "file",
+          "finding",
+          "evidence",
+          "status"
+        ],
+        "properties": {
+          "rule_id": {
+            "type": "string"
+          },
+          "severity": {
+            "enum": [
+              "HIGH",
+              "MEDIUM",
+              "LOW"
+            ]
+          },
+          "file": {
+            "type": "string"
+          },
+          "line": {
+            "type": "integer"
+          },
+          "finding": {
+            "type": "string"
+          },
+          "evidence": {
+            "type": "string"
+          },
+          "judges": {
+            "type": "string",
+            "enum": ["behaviour", "wording"],
+            "description": "What this finding judges, read by `warden round classify` only on an `unmapped:<slug>` finding, which names no rule to say. Absent, such a finding is `wording` and does not count toward a repair round; a reviewer writes `behaviour` to make it count. On a finding under a declared rule the rule's own `judges:` decides and this field is ignored."
+          },
+          "status": {
+            "enum": [
+              "confirmed",
+              "refuted",
+              "fixed",
+              "dismissed-with-reason"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "lens": {
+            "$ref": "#/$defs/lens",
+            "description": "The lens that RAISED this finding — the roster entry it is attributed to, by `role`. This is the join per-reviewer counts alone never make: a roster says how many raw findings each reviewer returned, and without this field nothing says which reviewer a recorded finding came from, so per-lens outcome (fixed vs refuted vs dismissed) cannot be recovered. Optional for backward compatibility — 0 of 979 committed records carried one, and none is retrofitted. `warden attest write --review-dir` requires it, and refuses a lens no roster entry declares, one whose reviewer did not return, or one not dispatched in the finding's `round`."
+          },
+          "round": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "The round whose dispatch put this finding in THIS payload, matching the `round` of the roster entry its `lens` joins to \u2014 and the only round `warden attest write` will join it to. For a finding raised here, that is the round it was FIRST raised in. For a finding still OPEN when a round ended, and therefore RE-RAISED by the lens that re-confirms it in the next round's payload, it is the round that RE-CONFIRMED it \u2014 not the round it first arrived in. One attestation covers one round, so a carried finding's earlier rounds are evidence in their own committed shards and `verify_attribution` joins it to no other round from here. Optional for backward compatibility; `warden attest write --review-dir` requires it."
+          }
+        },
+        "if": {
+          "properties": {
+            "status": {
+              "enum": [
+                "dismissed-with-reason",
+                "refuted"
+              ]
+            }
+          }
+        },
+        "then": {
+          "required": [
+            "reason"
+          ]
+        }
+      }
+    },
+    "verdict": {
+      "enum": [
+        "clean",
+        "findings-open"
+      ]
+    },
+    "roster_verification": {
+      "enum": [
+        "verified",
+        "unverified-roster"
+      ],
+      "description": "Whether this roster was cross-checked against observable per-reviewer outputs. 'verified': `warden attest write` was given a --review-dir and every reviewer claiming `returned: true` named a distinct, non-empty file in it. 'unverified-roster': no review dir was offered, so the roster is builder-asserted and nothing checked it. ABSENT on shards written before this field shipped \u2014 absent is NOT 'verified': it means the question was never asked, and no reader may upgrade it. What 'verified' does and does not claim: it proves the roster's claim was backed by an artifact that existed at attest time, which is what refuses a reviewer asserted out of nothing (a fabricated reviewer produces no file, because no subagent ran). It cannot detect a caller that writes a plausible file itself."
+    },
+    "round_binding": {
+      "enum": [
+        "bound",
+        "unminted",
+        "no-review-dir"
+      ],
+      "description": "Whether the reviewer outputs this attestation rests on came from a round warden itself minted, and whether that round was minted for THIS commit. 'bound': `warden round new` minted the review dir and its head_sha equals the attested head. 'unminted': a directory was passed to --review-dir but warden did not mint it, so warden has no identity for it and cannot say which commit its reports describe. 'no-review-dir': none was offered, so the question was never asked. A DISPROVEN binding is not a value here — a round minted for a different head refuses the write outright, so no shard can record one. ABSENT on shards written before this field shipped — absent is NOT 'bound': it means the question was never asked, and no reader may upgrade it. This is `roster_verification`'s exact sibling: same --review-dir input, same 'could not look' state, same rule that the state rides into the committed corpus rather than stopping at stderr and a gitignored run manifest."
+    },
+    "base_ancestry": {
+      "enum": [
+        "ancestor",
+        "not-ancestor",
+        "unavailable"
+      ],
+      "description": "Whether the `base_sha` this shard records is an ancestor of the `head_sha` it stamps. 'ancestor': the recorded base is REACHABLE from the head, so `git diff base..head` over this shard's own figures is a range that holds — never a claim the range is only this change, since a branch that merged its base branch forward is still 'ancestor' and the range then carries the base branch's work too. 'not-ancestor': the base branch moved past the round's base before the round was minted, so the two-dot range diffs against a tree this branch never had: the base's own advance comes back INVERTED, and a line both sides touched prints the base's line as the one this change removed, so this change's own before-state is not in the output. Not this change plus something to subtract — the review judged the three-dot range `base...head`, and figures are recomputed from that range or not at all. 'unavailable': git could not evaluate it, which is neither reading and must not be upgraded to either. A READING and never a refusal: a base that is not an ancestor is a legitimate shape (any branch whose base branch moved past its fork point before the mint), and refusing it was measured against this repo's own corpus and rejected — see `attest.base_binding`. ABSENT on shards written before this field shipped — absent is NOT 'ancestor': it means the question never rode into the corpus, and no reader may upgrade it. This is `round_binding`'s sibling: same rule that a reading warden already computes rides into the committed evidence rather than stopping at stderr and a gitignored run manifest."
+    },
+    "closure_verification": {
+      "enum": [
+        "verified"
+      ],
+      "description": "Present ONLY on a closure round's shard, and only when its payload was proved to raise nothing new. The closure round is the terminal, non-budgeted round minted one past `graph.yaml` review.cap so that a branch which REPAIRED a capped round's finding still has a head something can attest (the repair moves head, the sealed round cannot be re-pointed, and no further review round fits under the cap). It is not extra review budget, and this field is the record that it could not be: `warden attest write --review-dir` refuses the write unless every record's rule_id+file was already filed by a round at or under the cap, every round within the cap has a committed shard on this branch, and every finding still `confirmed` at the cap is spoken to here. ABSENT on every non-closure shard and on every shard written before this field shipped — absent is NOT 'this was checked and found fine'; it means the question was never asked. A DISPROVEN closure is not a value here: a payload that raises anything new refuses the write outright, so no shard can record one."
+    },
+    "pr": {
+      "type": "string",
+      "description": "PR number/URL this review covered"
+    },
+    "bead": {
+      "type": "string",
+      "description": "tracker id the work belongs to"
+    },
+    "range_patch_ids": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{40}$"
+      },
+      "description": "Stable per-commit patch-ids of the attested range, recorded so a content-preserving rebase \u2014 which rewrites every commit sha \u2014 does not invalidate this attestation. Absent on shards written before it shipped; those match by sha exactly as before."
+    }
+  }
+}

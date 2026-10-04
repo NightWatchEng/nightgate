@@ -1,0 +1,6 @@
+#!/bin/sh
+# Pass-through: chain the beads-managed hook so 'core.hooksPath .githooks'
+# never silently disables beads (review P1-2).
+BH="$(git rev-parse --show-toplevel)/.beads/hooks/post-merge"
+[ -x "$BH" ] && exec "$BH" "$@"
+exit 0

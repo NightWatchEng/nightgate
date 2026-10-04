@@ -1,0 +1,138 @@
+name: wiki-sync
+
+# Publishes docs/wiki/ to the repo's GitHub wiki tab as a rendered mirror
+# The source of truth stays in docs/wiki/, which lands
+# through the same gate as code.
+#
+# WHAT THIS DOES AND DOES NOT GUARANTEE, said exactly, because the first cut of
+# this header claimed "nothing reaches the published pages outside review" and
+# nothing in the tree can enforce that (review round 1, F5). GitHub keeps the
+# wiki tab writable in the browser to anyone with repo write; no workflow can
+# revoke that. What is actually true:
+#
+#   * every page in `.wiki-managed` is OVERWRITTEN from source on each run, so
+#     a hand-edit to a managed page is reverted by the next publish — which
+#     fires on merges touching the sources, not on the edit itself, so it can
+#     survive in between;
+#   * a page it published and no longer builds is retired;
+#   * a page NOT named by the manifest is never touched. That manifest lives in
+#     the wiki, which the same people can edit, so it is an input this workflow
+#     validates (plain `<Name>.md` entries only) rather than a boundary it can
+#     enforce — someone with repo write can already delete a wiki page directly.
+#
+# ONE-TIME PREREQ — DONE for agentops, still handled for everyone else.
+# A GitHub wiki git repo does not exist until someone creates its first page in
+# the browser, and until then every run of this workflow fails at the clone
+# step with the ::error:: below, which names the fix:
+#
+#   repo -> Wiki tab -> "Create the first page" -> Save (any placeholder text)
+#   then Actions -> wiki-sync -> "Run workflow"
+#
+# For THIS repo that is finished: `git ls-remote agentops.wiki.git` returned 404
+# on 2026-08-29 while this was being written and resolves to refs/heads/master
+# now, so the first publish needs only a merge to main. The clone guard stays
+# because this workflow is the stencil a consuming repo copies, and every one of
+# them starts at that 404.
+#
+# From the first publish on it republishes on every merge to main that touches
+# the sources. A placeholder first page survives unless it is named `Home.md`,
+# in which case the built Home overwrites it — which is the case here.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/wiki/**'
+      - 'scripts/build-wiki.sh'
+      - 'scripts/publish-wiki.sh'
+      - 'scripts/validate-diagrams.sh'
+      - '.github/workflows/wiki-sync.yml'
+  workflow_dispatch: {}
+
+permissions:
+  contents: write          # the wiki repo is written with GITHUB_TOKEN
+
+concurrency:
+  group: wiki-sync         # never let two publishes race the same wiki repo
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    name: publish docs/wiki to the wiki tab
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      # Parse every mermaid fence with the real engine BEFORE anything is
+      # published — a diagram that will not render must not reach the wiki, so
+      # this step is first and `test_workflow_validates_diagrams_before_it_publishes`
+      # pins that ordering. The validator is scripts/validate-diagrams.sh, reused rather
+      # than reimplemented: two rival diagram gates would drift. CI's `diagram
+      # parse` job runs the same script on every PR, so this is the second line
+      # rather than the only one — it catches a diagram that reaches main by a
+      # path a PR check did not gate.
+      # Puppeteer skips its own browser download when PUPPETEER_EXECUTABLE_PATH
+      # is set, so using the runner's Chrome costs no chromium fetch.
+      #
+      # A browser that never launches is not a diagram problem, and a red
+      # check on main must not read as a gate failure when it is neither. The
+      # validator exits 3 for exactly that class (and waits 90s for the launch,
+      # not puppeteer's 30s); this step retries 3 alone, a bounded number of
+      # times with a growing pause, and ends with an annotation naming the
+      # cause. Any other exit fails at once, unrelabelled.
+      # tests/test_build_wiki.py runs this `run:` text against a fake validator.
+      - name: Validate mermaid diagrams
+        env:
+          PUPPETEER_EXECUTABLE_PATH: /usr/bin/google-chrome
+          DIAGRAM_LAUNCH_ATTEMPTS: "3"
+          DIAGRAM_LAUNCH_BACKOFF_SECS: "20"
+        run: |
+          attempt=1
+          while true; do
+            status=0
+            bash scripts/validate-diagrams.sh docs/wiki || status=$?
+            if [ "$status" -ne 3 ]; then
+              exit "$status"
+            fi
+            if [ "$attempt" -ge "$DIAGRAM_LAUNCH_ATTEMPTS" ]; then
+              echo "::error title=Browser launch failed, not a gate failure::Headless Chrome did not launch in ${attempt} attempts, so no diagram was checked and nothing was published. This is not a diagram problem and not a gate failure: re-run the job."
+              exit "$status"
+            fi
+            pause=$((DIAGRAM_LAUNCH_BACKOFF_SECS * attempt))
+            echo "::warning title=Browser launch retry::Headless Chrome did not launch (attempt ${attempt} of ${DIAGRAM_LAUNCH_ATTEMPTS}); retrying in ${pause}s."
+            sleep "$pause"
+            attempt=$((attempt + 1))
+          done
+
+      - name: Build wiki pages from docs/wiki
+        run: bash scripts/build-wiki.sh
+
+      - name: Publish to the wiki
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          if ! git clone --depth 1 \
+               "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.wiki.git" wiki \
+               2>/tmp/clone.err; then
+            echo "::error::Wiki repo ${REPO}.wiki.git could not be cloned. A GitHub wiki does not exist until its first page is created by hand: open the repo's Wiki tab, click 'Create the first page', save any placeholder text, then re-run this workflow (Actions -> wiki-sync -> Run workflow). If the wiki already exists, the token lacks wiki write. Details: $(tr '\n' ' ' </tmp/clone.err)"
+            exit 1
+          fi
+
+          # Ownership is the manifest, not this step — see scripts/publish-wiki.sh.
+          # Keeping it in a script is what lets a test RUN the reconcile against a
+          # fixture wiki instead of grepping this YAML for one spelling of `rm`.
+          bash scripts/publish-wiki.sh wiki build/wiki
+
+          git -C wiki config user.name  "github-actions[bot]"
+          git -C wiki config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git -C wiki add -A
+          if git -C wiki diff --cached --quiet; then
+            echo "Wiki already matches docs/wiki — nothing to publish."
+            exit 0
+          fi
+          git -C wiki commit -m "docs: mirror docs/wiki from ${SHA}"
+          git -C wiki push
+          echo "Published. https://github.com/${REPO}/wiki"

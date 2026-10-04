@@ -1,0 +1,172 @@
+#!/bin/sh
+# git feeds the pushed refs on stdin: "<local_ref> <local_sha> <remote_ref>
+# <remote_sha>", one line per ref. Capture them ONCE, first — the chained
+# beads hook reads stdin too, and a second reader of a consumed pipe gets
+# nothing.
+refs=$(cat)
+
+# Chain the beads-managed hook first, if present (bd owns core.hooksPath
+# by default; enabling .githooks must not silently disable beads). Byte
+# fidelity both ways: git always newline-terminates ref lines, so printf
+# reproduces a non-empty stream exactly — but an up-to-date push sends
+# 0-byte stdin, and printf '%s\n' "" would hand beads one blank ref line
+# where git gave it EOF (review round: hook-stdin-fidelity).
+if [ -x "$(git rev-parse --show-toplevel)/.beads/hooks/pre-push" ]; then
+  if [ -n "$refs" ]; then
+    printf '%s\n' "$refs" | "$(git rev-parse --show-toplevel)/.beads/hooks/pre-push" "$@" || exit $?
+  else
+    "$(git rev-parse --show-toplevel)/.beads/hooks/pre-push" "$@" < /dev/null || exit $?
+  fi
+fi
+
+# A branch deletion pushes an all-zero local sha and no code; gating it runs
+# the full suite for nothing (13 deletions ~= 4.5 minutes).
+# Skip ONLY when there is at least one ref line and EVERY local sha is
+# all-zeroes — empty stdin or any real sha falls through to the gates: a
+# hook that skips more than deletions is a gate that looks like it is
+# running and is not.
+if [ -n "$refs" ] && \
+   [ -z "$(printf '%s\n' "$refs" | awk '$2 !~ /^0+$/')" ]; then
+  echo "[pre-push] only branch deletion(s) — nothing to gate."
+  exit 0
+fi
+
+# Definition-of-Done gate (versioned; enable once per clone with:
+#   git config core.hooksPath .githooks
+# ). Nothing leaves this machine with red tests: either the gates below run
+# here, or a clean `warden verify --scope tests` PASS on the exact pushed
+# commit is already on disk and the hook names it and accepts it.
+set -e
+
+cd "$(git rev-parse --show-toplevel)"
+
+# A VERIFY ARTIFACT THAT ALREADY NAMES WHAT IS BEING PUSHED stands for this
+# run: `warden verify --scope tests` runs this repo's gate
+# scope — the same ruff and the same strict parallel suite as below — and
+# records the commit it judged, so a push right after it ran the suite a
+# second time for a verdict already on disk. The question is a fixed command,
+# `warden verify --check-head`, over the pairing rule `warden ship`'s
+# verify-at-head step reads; nothing here parses JSON. Accepted ONLY when every
+# pushed non-deletion sha has an artifact of its own that is a PASS on that
+# commit itself, from a clean tree, of the commands repo.yaml's `tests` scope
+# declares now. Anything else — no artifact, another head, FAIL, dirty, other
+# commands, or a check that cannot run — falls through to the gates below
+# exactly as before; empty stdin names no sha and always falls through.
+pushed=$(printf '%s\n' "$refs" | awk 'NF >= 2 && $2 !~ /^0+$/ {print $2}' | sort -u)
+if [ -n "$pushed" ]; then
+  accepted=yes
+  while IFS= read -r sha; do
+    [ -n "$sha" ] || continue
+    uv run --quiet --locked warden verify --scope tests --check-head "$sha" < /dev/null || { accepted=no; break; }
+  done <<PUSHED_SHAS
+$pushed
+PUSHED_SHAS
+  if [ "$accepted" = yes ]; then
+    echo "[pre-push] every pushed commit already has a PASS from \`warden verify --scope tests\` (named above) — not re-running it."
+    exit 0
+  fi
+  echo "[pre-push] no verify artifact stands for this push — running the gates."
+fi
+
+echo "[pre-push] lint (ruff F,E9)..."
+uv run --quiet --locked --with ruff==0.16.5 ruff check warden cage tests --select F,E9
+
+# PARALLEL HERE AND IN CI, deliberately, and NOWHERE BY DEFAULT. This gate
+# runs on a developer laptop dozens of times a session and charges the full
+# suite every time: measured at the head this line landed on, `-n auto` takes
+# it from 634s to between 144s and 196s, with the same 4534 passed and 1
+# skipped either way.
+# CI's gate ran single-process until measurement said otherwise; it now runs
+# the same flag, so local-green and CI-green mean the same thing under the
+# same mode. What has NOT changed is `addopts`: a default there would decide
+# what "green" means for every consumer of this repo and for the shipped
+# example, on machines whose core count nobody here controls, so a bare
+# `uv run pytest` is still single-process and the flag is written in each
+# invocation that wants it. `pytest-xdist` lives in the dev dependency group
+# so `--locked` resolves it; without that entry this line dies with
+# "unrecognized arguments: -n" on every push, which is why
+# tests/test_local_gate.py pins the two together.
+#
+# THE SUITE ENVIRONMENT CI SETS, restated here so a push is judged under the
+# same contract the gate applies. The flags were already in lockstep; the
+# ENVIRONMENT was not, and the difference was silent: the CI tests job sets
+# NIGHTGATE_REQUIRE_TOOLCHAIN=1 on its pytest step and repo.yaml's `tests`
+# scope — what `warden verify --scope tests` runs — sets it inline, so the
+# cells that shell out to `go` and `npm` SKIP under this hook and FAIL under
+# both CI gates. A push could be green here and red there with the code
+# identical, twice this session. Held equal to BOTH of those callers — the CI
+# step's `env:` and repo.yaml's inline assignment — in every direction by
+# tests/test_local_gate.py, the same one-derivation shape the ruff pin above
+# has across its three executed callers: the list moves in all three or in
+# none.
+SUITE_ENV="NIGHTGATE_REQUIRE_TOOLCHAIN=1"
+
+# WHY IT IS CONDITIONAL, and why that is not a loophole. tests/toolchain.py
+# argues the strict/lenient split at length and the argument is about
+# CONTRACT, not about tools: a runner installs every declared binary with a
+# pinned action and then promises them, so an absence there is a breach and
+# red is the honest word. A contributor's fresh Mac has neither `go` nor
+# `node` and is not broken — it promised nothing, and failing it for a Go
+# toolchain it never agreed to install is the first thing this project would
+# say to a newcomer. So the hook makes CI's promise exactly where the machine
+# can keep it, and where it cannot it NAMES what this run did not prove
+# instead of discovering it in CI. Fail-closed on the read itself: a declared
+# list this cannot obtain stops the push rather than quietly going lenient.
+#
+# ONE TOOL PER LINE, read through a here-doc rather than word-split out of a
+# variable, because word splitting is not portable across the shells this
+# machine has: zsh does not split an unquoted expansion at all, and a script
+# that relied on it once issued a delete for origin/main. A newline-delimited
+# read behaves the same under every one of them, and an absent list is
+# refused above rather than read as "nothing missing".
+#
+# THE OLD TABLE IS AN ALIAS until v4.0.0: `[tool.agentops.toolchain]` is read
+# only when `[tool.nightgate.toolchain]` is absent, and the read says so on
+# stderr, which the command substitution does not capture. tests/toolchain.py
+# reads the same two tables in the same order.
+declared=$(uv run --quiet --locked python -c '
+import pathlib, sys, tomllib
+tool = tomllib.loads(pathlib.Path("pyproject.toml").read_text())["tool"]
+if "toolchain" not in tool.get("nightgate", {}) and "toolchain" in tool.get("agentops", {}):
+    print("[pre-push] DEPRECATED: [tool.agentops.toolchain] in pyproject.toml is read as [tool.nightgate.toolchain] until v4.0.0, when the old table stops being read. Rename the table.", file=sys.stderr)
+    tool = {"nightgate": tool["agentops"]}
+print("\n".join(tool["nightgate"]["toolchain"]["require"]))')
+if [ -z "$declared" ]; then
+  echo "[pre-push] cannot read [tool.nightgate.toolchain].require from pyproject.toml, so this hook cannot tell whether it may apply CI's strict contract — refusing rather than running the lenient half in silence."
+  exit 1
+fi
+missing=""
+while IFS= read -r tool; do
+  [ -n "$tool" ] || continue
+  command -v "$tool" >/dev/null 2>&1 || missing="$missing $tool"
+done <<DECLARED_TOOLCHAIN
+$declared
+DECLARED_TOOLCHAIN
+
+# THE SAME HERE-DOC READ for the environment itself, and for the same reason
+# the toolchain list gets one. `env $SUITE_ENV ...` leaned on an unquoted
+# expansion splitting into words, twenty lines under the paragraph that says
+# word splitting is not portable across the shells on this machine. With one
+# pair the two spellings happen to agree; the SECOND pair — which the lockstep
+# guard explicitly invites, since it asserts agreement rather than a literal
+# name — would arrive under zsh as one argument named
+# `VAR=1 OTHER=2` and be set as a single bogus variable, applying neither. So
+# each pair is exported one per line, inside a subshell, and nothing depends
+# on how the shell splits.
+if [ -z "$missing" ]; then
+  echo "[pre-push] tests (parallel, strict toolchain — the same environment CI runs)..."
+  (
+    while IFS= read -r pair; do
+      [ -n "$pair" ] || continue
+      export "$pair"
+    done <<DECLARED_SUITE_ENV
+$(printf '%s' "$SUITE_ENV" | tr ' ' '\n')
+DECLARED_SUITE_ENV
+    uv run --quiet --locked pytest -q -rs -n auto
+  )
+else
+  echo "[pre-push] tests (parallel, LENIENT:$missing absent, so the cells that shell out to$missing SKIP here and RUN in CI — install them to gate on what CI gates on)..."
+  uv run --quiet --locked pytest -q -rs -n auto
+fi
+
+echo "[pre-push] all gates green."

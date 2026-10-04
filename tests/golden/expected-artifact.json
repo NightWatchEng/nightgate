@@ -1,0 +1,21 @@
+{
+  "rules_version": "goldenversion",
+  "engine": "deterministic",
+  "base_sha": "cccccccccccccccccccccccccccccccccccccccc",
+  "head_sha": "dddddddddddddddddddddddddddddddddddddddd",
+  "findings": [
+    {
+      "file": "app/config.py",
+      "line": 3,
+      "finding": "Added line introduces a Anthropic API key.",
+      "evidence": "AAI_KEY = \"sk-ant-api03-fakefakefake\"",
+      "rule_id": "secrets-in-diff",
+      "severity": "HIGH"
+    }
+  ],
+  "deferred_to_pre_pr": [
+    "scope-creep",
+    "tests-required"
+  ],
+  "paused": []
+}

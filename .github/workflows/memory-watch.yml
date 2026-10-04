@@ -1,0 +1,81 @@
+name: memory-watch
+
+# The memory loop's doorbell. `warden memory watch` compares what the committed
+# review corpus shows now against the last committed watch record under
+# .warden/memory/watch/ and reports three transitions: a candidate crossing the
+# promotion bar, a declared rule entering pause or demote territory, and a
+# skill file crossing the skill-change propose bar.
+#
+# Detection only. The watch never edits a rule, a skill, the ruleset or the
+# baseline, and this job never commits or pushes: contents is read-only. What a
+# transition asks for is a retro, which a person runs. To acknowledge a
+# transition, run `warden memory watch --record` locally and commit the dated
+# record it writes.
+#
+# The notification surface is one standing GitHub issue, because a bead cannot
+# be filed from CI: the tracker syncs through a Dolt remote this job does not
+# have. Each transition carries a stable key in a hidden comment, so a weekly
+# rerun against an unchanged baseline does not report the same crossing again.
+#
+# UNREAD fails the job. A failed ingest, or a corpus, vocabulary, ruleset or
+# baseline the watch cannot read, is never reported as "no transitions".
+
+on:
+  schedule:
+    - cron: "23 6 * * 1"   # Mondays, 06:23 UTC
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: memory-watch
+  cancel-in-progress: false
+
+jobs:
+  watch:
+    name: memory watch
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7  # v10.2.0
+        with:
+          version: "0.12.1"  # the resolver is a gate-surface tool too: pin it
+      # The exit code stands. A failed ingest fails this step, and the report
+      # step reads the step's outcome and files UNREAD.
+      - name: warden memory ingest
+        id: ingest
+        run: uv run --locked warden memory ingest
+      # Exit 1 means transitions, which is not a failure of this job, so the
+      # code is captured here and judged by the report step: 0 quiet,
+      # 1 transitions, 3 UNREAD, anything else a crash the report treats as
+      # UNREAD.
+      - name: warden memory watch
+        id: watch
+        if: ${{ !cancelled() }}
+        run: |
+          status=0
+          uv run --locked warden memory watch --json > "$RUNNER_TEMP/watch.json" || status=$?
+          cat "$RUNNER_TEMP/watch.json"
+          echo "exit=$status" >> "$GITHUB_OUTPUT"
+      - name: report on the standing issue
+        if: ${{ !cancelled() }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          INGEST_OUTCOME: ${{ steps.ingest.outcome }}
+          WATCH_EXIT: ${{ steps.watch.outputs.exit }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          python3 scripts/memory-watch-issue.py \
+            --repo "$REPO" \
+            --ingest-outcome "$INGEST_OUTCOME" \
+            --watch-exit "$WATCH_EXIT" \
+            --watch-json "$RUNNER_TEMP/watch.json" \
+            --run-url "$RUN_URL"

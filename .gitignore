@@ -1,0 +1,48 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.ruff_cache/
+
+# warden evidence run dirs (CI-artifact uploaded, never committed)
+.warden/out/
+
+# review-memory derived cache (rebuilt by `warden memory ingest`;
+# the committed store is the shards in .warden/memory/attest/)
+.warden/memory/findings.jsonl
+
+# gate shards — LOCAL hotspot signal, re-derived by the next `warden review`.
+# Never committed, unlike the attest shards beside them: a gate shard records
+# a deterministic checker firing, including on a mutation proof the DoD tells
+# you to run and then revert. Untracked-but-not-ignored meant one `git add -A`
+# after such a probe would commit synthetic defect records into the shared
+# corpus. `attest check` ignores gate shards by design.
+.warden/memory/gate/
+
+# rendered wiki output (`scripts/build-wiki.sh`), rebuilt by wiki-sync on
+# every publish. Derived, so never tracked: a committed derived tree conflicts
+# on every branch that touches its source.
+# Anchored with a leading slash: the unanchored `build/` matched a `build`
+# directory ANYWHERE in the tree, which is far wider than the reason given for
+# it and would silently swallow a package build dir someone meant to track
+# (review round 1, cross-examiner note 1).
+/build/
+
+# macOS
+.DS_Store
+
+# Beads / Dolt files (added by bd init)
+.dolt/
+*.db
+.beads-credential-key
+.beads/proxieddb/
+
+# Agent worktrees (parallel execution). Never committed: each holds a full
+# checkout, and a stray `git add -A` in the parent would vendor the repo into
+# itself. They also share the parent's .git/config, so a core.bare=true
+# written from any of them breaks the parent (`warden explain` checks it).
+.claude/worktrees/
+
+# bd rebuilds this log on every command — derived, never evidence (R-10)
+.beads/interactions.jsonl

@@ -1,0 +1,17 @@
+# What scripts/publish-public.py exports, as committed at the exported commit. A
+# top-level path in no top_level list (in both: excluded) or an entry matching
+# nothing refuses the export. `exclude` drops paths inside included ones (`dir/`,
+# or a glob per part); `keep` wins. `retro-2*.md` spares retro-rationale.md.
+
+top_level:
+  include: [.agents, .cage, .claude, .claude-plugin, .codex, .githooks,
+            .github, .gitignore, .python-version, .warden, AGENTS.md,
+            CLAUDE.md, CONTRIBUTING.md, LICENSE.md, README.md, cage, docs,
+            examples, graph.yaml, publish.yaml, pyproject.toml, repo.yaml,
+            scripts, skills, tests, uv.lock, warden]
+  exclude: [.beads]
+
+exclude: [.warden/memory/, docs/design/retro-2*.md, docs/design/newcomer-trace-*.md,
+          docs/design/cost-per-pr-*.md, docs/design/patent-assessment-brief.md,
+          docs/design/prior-art-positioning.md]
+keep: [.warden/memory/tags.yaml]

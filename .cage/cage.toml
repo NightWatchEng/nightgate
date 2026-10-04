@@ -1,0 +1,205 @@
+# Nightgate's own cage, declared. The platform gates itself with
+# its own warden; this is the other half of self-hosting — the same unattended
+# runner it ships, pointed at the repo that ships it.
+#
+# This file is the SOURCE, versioned so a PR can review it and a test can hold
+# it in lockstep with `.warden/skills-policy.md`. It does not bind from here:
+# `cage enroll` renders only beside its own toml, and `warden certify` finds a
+# cage beside the checkout, so install it by copying it out —
+#
+#   mkdir -p ~/workspace/agentops-cage
+#   cp .cage/cage.toml .cage/prompt.md ~/workspace/agentops-cage/
+#   uv run cage enroll ~/workspace/agentops-cage/cage.toml
+#
+# — and re-copy + re-enroll after every change here, exactly as any toml
+# change needs a re-enroll. `[cage].dir` is deliberately absent: the cage dir
+# is wherever the copy lives, so no path here names it twice. `<checkout>-cage/`
+# beside the checkout is a discovery convention certify knows; `../cage/` is
+# the other, and on the founder's machine it holds the consumer's cage. The
+# two paths below are `~`-relative on purpose: the schema expands `~`, and a
+# tracked file must not carry anyone's real home directory
+# (tests/test_docs.py::test_no_maintainer_home_path_is_tracked).
+[project]
+name = "nightgate"
+github = "NightWatchEng/agentops"
+live_checkout = "~/workspace/agentops"
+worktree = "~/workspace/agentops-caged"
+
+[gate]
+# The platform repo runs the package it contains — this shim IS the pinned
+# platform here (`uv run --locked --project <root> warden`).
+platform_probe = ".warden/bin/warden --help"
+# In lockstep with `## Forbidden paths` in .warden/skills-policy.md, held by
+# tests/test_self_cage.py. The runner tests `git diff --name-only` against
+# this list with `grep -E`; a hit closes the PR.
+forbidden_paths = [
+    '\.warden/',
+    'repo\.yaml$',
+    'graph\.yaml$',
+    '\.github/',
+    '\.githooks/',
+    '\.claude/',
+    'cage/run\.sh$',
+    'cage/render\.py$',
+    'cage/providers\.py$',
+    'warden/certification/',
+    # The gate's own machinery, all three tiered HIGH in repo.yaml and all
+    # three fenced: checker code IS policy, plugin loading
+    # is the policy execution surface, and the schemas are the artifact
+    # contracts consumers parse. Nothing but prompt.md's own hand-kept list
+    # kept a session off them, and that list named two of the three —
+    # `plugins.py` was unfenced AND handed over. The one `warden/` path this
+    # list DID carry, `warden/certification/`, is tiered MEDIUM by the
+    # `warden/**` catch-all, so the count closed was none of three. All three
+    # are here now; the prompt points at this list instead of re-listing it.
+    'warden/mechanical\.py$',
+    'warden/plugins\.py$',
+    'warden/schemas/',
+    # The self-cage SOURCE. The installed copy beside the
+    # checkout is what binds a run; this is what a PR reviews, and a session
+    # that rewrote it would be editing the next run's fences.
+    '\.cage/',
+]
+# The policy's autonomy ladder already grants the machine tier its four
+# narrow `.warden/` writes via a PR a human merges (widened
+# once to admit the attestation shard a review round leaves);
+# this is
+# the runner-side half of the same grant: a forbidden-path
+# hit that `warden autonomy carve-out` judges to be exactly that write leaves
+# the PR OPEN instead of closing it. Never a merge. Declared true here because
+# the policy declares it — a cage that closed what the policy permits would
+# be the two documents disagreeing.
+#
+# The COUNT here is a copy of the policy's and went stale once already
+# (a review round's `attribution-holds` finding): this comment said "three"
+# after the policy said four. The behaviour never disagreed — the flag
+# delegates to `warden autonomy carve-out`, which is the one definition — and
+# the count is prose. Nothing checks it, which is why the widening is written
+# here as provenance rather than as a second enumeration to keep in step.
+#
+# WRITTEN AS A LIST, NOT `true`. `true` means "whatever the
+# pinned platform admits", and what it admitted moved under a granted
+# consumer once already: adding the attestation store took it from three `.warden/` writes
+# to four, and any cage on `true` got the fourth by re-pinning, with no new
+# grant and nothing in its own toml to read. These are the stores THIS
+# project grants, and the runner clears a forbidden path only when the
+# platform's carve-out and this list both admit it. A fifth store the
+# platform grows stays stopped here until a human adds it — the run says
+# which store it was, so the widening arrives as a named refusal rather than
+# as silence. Narrower than the toml is deliberate; wider is the bug.
+autonomy_carve_out = [
+    '.warden/rules/',             # the pause field and the non-blocking add
+    '.warden/memory/backtests/',  # the artifact either one carries
+    '.warden/memory/attest/',     # the round's attestation,
+    #                               which the runner also publishes itself on
+    #                               a cleared run — without
+    #                               this entry that publication is refused
+]
+
+[profile]
+# The policy's Verify section names the portability proof for enrollment
+# surfaces; the base profile allows `uv` and `python3` but no bare script.
+extra_allow = [
+    "Bash(./scripts/portability-sim.sh:*)",
+    "Bash(scripts/portability-sim.sh:*)",
+]
+# Self-cage hazard: the worktree CONTAINS the cage package, so `uv run cage
+# enroll <the live cage's toml>` from inside the session would re-render the
+# live runner from the session's own cage/run.sh. These stop that literal
+# spelling; the base profile denies the re-spellings (`uv run --project`,
+# `uv run --locked --project`, `uvx`, `uv tool`, `python3 -m cage.cli`). Still
+# true: a prefix deny names spellings, not the class (`uv run --no-sync cage
+# enroll` passes), the profile's Write/Edit denies on the cage dir are
+# tool-level and do not govern Bash, the forbidden-path post-check greps the
+# COMMITTED worktree diff and cannot see a write into the cage dir, and
+# branch protection guards main. So this is a tripwire plus the prompt's
+# "never run cage enroll", and the session log is where a trip would show.
+extra_deny = [
+    "Bash(uv run cage:*)",
+    "Bash(uv run --locked cage:*)",
+]
+
+# No clock fires this cage, and not for want of eligible work. The list
+# ABOVE renders as ONE START-ANCHORED alternation (`^(...)`, cage/config.py
+# forbidden_regex), so every pattern in it binds at the repo ROOT. It
+# closes every path repo.yaml tiers HIGH — that relation is
+# derived from repo.yaml and executed by tests/test_self_cage.py::test_
+# the_fence_and_the_prompt_close_every_high_tiered_path, which reddens if a
+# HIGH glob is added that this list does not reach. It still closes MORE than
+# HIGH (`warden/certification/` is tiered MEDIUM by the `warden/**`
+# catch-all) and that direction is deliberate: a fence wider than the tiers
+# costs a run some eligible work, a fence narrower is the bug.
+# What it does NOT close is the whole repo, and the anchoring is why:
+# `warden/`, `tests/`, `docs/`, `skills/`, `scripts/` and `examples/` are
+# open apart from the named HIGH paths under them. The example
+# consumer's own `.warden/`, `repo.yaml` and `.github/` under `examples/` are
+# outside it deliberately: that tree is the portability fixture, tiered
+# MEDIUM, and ALL THREE are pinned as ordinary work by
+# tests/test_self_cage.py::test_forbidden_regex_leaves_ordinary_work_alone,
+# which carried only the `repo.yaml` of the three at first — a
+# citation wider than its evidence, and for exactly the two paths a reader
+# would want the proof of.
+# What a run here may take is what `.cage/prompt.md` tells a session it may
+# take, and this comment does not restate it: the prompt points at the
+# tracker's `cage-eligible` shortlist and then says in the same breath that
+# the label is a hint, not a guarantee, and never a grant — a labelled item
+# can still be release mechanics, which the policy's `## Autonomy scope`
+# rules out whatever paths it touches (this line used to name
+# the shortlist flatly, and the toml contradicted the document it points at).
+# The reason no clock fires is that this cage
+# has run twice, both founder-started, and the ten runs that would
+# earn a schedule start as founder-started ones.
+[triggers.manual]
+
+[quiet_hours]
+# Explicitly none: with no schedule, quiet hours would only fight deliberate
+# manual runs.
+enabled = false
+
+[toolchain]
+# What the caged PATH must carry. The runner resets PATH to a
+# fixed list so a launchd-started run behaves like a hand-started one; that
+# reset is also why `go`, whose own installer puts it in /usr/local/go/bin, is
+# INVISIBLE inside the cage. The first completed run here (20260920-205434)
+# spent 27 minutes building a real fix and then refused at ship step 1,
+# because `tests/test_init.py::test_each_fixtures_verify_scope_passes_and_
+# leaves_the_tree_clean[go]` shells out to `go vet` / `go test` and got exit
+# 127 — so `warden verify --scope tests` recorded FAIL at every HEAD and no
+# session could ever clear it.
+#
+# THE GO CELL IS NOT THE THING TO WEAKEN HERE, and "here" is the whole of the
+# rule. The corpus's ruling on required tools splits the
+# question: a REQUIRED tool absent is a RED suite and a `shutil.which` filter
+# over it is forbidden; an OPTIONAL one absent is a skip whose reason names
+# the gap. What this comment used to get wrong is what puts a tool in the
+# first class. It is not "the suite runs it" — that ruling's own REQUIRED shells are
+# `sh` and `bash`, "the ones every machine has", and their absence is red
+# because it is coverage the environment CONTRACTED to provide. So the split
+# is by CONTRACT, not by tool, and tests/toolchain.py is where this repo's
+# suite executes it: `AGENTOPS_REQUIRE_TOOLCHAIN` (or, as a fallback, `CI`)
+# set to a TRUTHY value means a named FAILURE; unset, empty, or one of
+# `0/false/no/off` means a named SKIP carrying the install command — `=0` is
+# the contributor's escape hatch CONTRIBUTING.md ships, so "set" alone is not
+# the test. Never a bare 127, and the collected count never moves either way.
+# `go` on a contributor's fresh Mac is therefore the SKIP half: that machine
+# promised nothing and is not broken. THIS CAGE IS THE OTHER HALF, by its own
+# declaration — `[toolchain].path` below supplies the directory and `require`
+# names the binary, so an absence in here is a breach of a promise this file
+# makes, and red is the honest word for it. That cell is the only executable
+# proof in this suite that the enrollment surface works for a language the
+# platform is not written in — the portability claim itself — so losing it
+# must cost a red run, never a green one with a quiet line in the summary.
+# Two layers carry that: cage/run.sh exports `AGENTOPS_REQUIRE_TOOLCHAIN=1`
+# into the caged environment BECAUSE this block exists, so every command a
+# session runs inherits the contract (without it a caged `pytest` took the
+# laptop's lenient half and skipped the go cell green); and the toolchain is
+# supplied, so an absence is a pre-flight SKIP that names it, before a bead
+# is claimed.
+path = ["/usr/local/go/bin"]
+# `uv` runs every warden shim; `go` and `npm` are what test_init.py's Go and
+# Node fixtures shell out to; `bd` is what .cage/prompt.md tells the session to
+# run as its first act, and the runner never checks it. Checked with
+# `command -v` on the machine that will run, which is the only place the
+# answer is true. Not listed: `claude`, `gh` and `python3` — the runner probes
+# those three by name itself, in the same pre-flight, a few lines up.
+require = ["uv", "go", "npm", "bd"]

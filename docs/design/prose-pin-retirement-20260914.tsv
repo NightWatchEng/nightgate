@@ -1,0 +1,858 @@
+file	test	action	reason
+test_adopted_rules.py	test_adopted_rule_does_not_scan_its_own_quoted_patterns	KEEP	not a doc read: passes .md path strings to rules.applicable, reads no document
+test_adopted_rules.py	test_adopting_teaches_the_traveling_freshness_mechanism	RETIRE	"wording: pins Adopting.md prose (""travels"", ""freshness mechanism"")"
+test_adopted_rules.py	test_pinned_actions_does_not_scan_its_own_quoted_patterns	KEEP	not a doc read: glob-matching over path strings
+test_adopted_rules.py	test_pinned_actions_rule_names_the_freshness_mechanism	KEEP	not a doc read: reads a .warden/rules rule body, not a doc or skill file; outside the ruling's named set (unsure)
+test_adopted_rules.py	test_pinned_run_invocations_does_not_scan_its_own_quoted_patterns	KEEP	not a doc read: glob-matching over path strings
+test_adopted_rules.py	test_pinned_run_invocations_fires_on_the_floating_form	KEEP	behaviour: drives code: runs the rule over workflow text
+test_adopted_rules.py	test_pinned_run_invocations_is_silent_on_the_pinned_form	KEEP	behaviour: drives code: runs the rule over workflow text
+test_advisor.py	test_a_declarative_recommendation_measures_its_hits_on_this_tree	KEEP	behaviour: writes md fixture: rule_file writes a .warden/rules fixture and drives advisor.recommend
+test_advisor.py	test_a_gate_detection_is_not_counted_as_a_judged_record	KEEP	behaviour: writes md fixture: rule_file writes a .warden/rules fixture and drives advisor.recommend
+test_advisor.py	test_a_judgment_entry_reports_hits_as_unmeasurable	KEEP	behaviour: writes md fixture: rule_file writes a .warden/rules fixture and drives advisor.recommend
+test_advisor.py	test_a_pause_that_reopens_an_entry_is_reported_as_a_limit	KEEP	behaviour: writes md fixture: rule_file writes a .warden/rules fixture and drives advisor.recommend
+test_advisor.py	test_a_paused_rule_does_not_count_its_entry_as_enforced	KEEP	behaviour: writes md fixture: rule_file writes a .warden/rules fixture and drives advisor.recommend
+test_advisor.py	test_a_python_entry_with_a_prose_sketch_is_unmeasurable_too	KEEP	behaviour: writes md fixture: rule_file writes a .warden/rules fixture and drives advisor.recommend
+test_advisor.py	test_a_recommendation_with_corpus_records_is_evidence_based	KEEP	behaviour: writes md fixture: rule_file writes a .warden/rules fixture and drives advisor.recommend
+test_advisor.py	test_a_recommendation_with_no_local_signal_is_prior_art	KEEP	behaviour: writes md fixture: rule_file writes a .warden/rules fixture and drives advisor.recommend
+test_advisor.py	test_a_refuted_class_is_not_counted_as_evidence_for_it	KEEP	behaviour: writes md fixture: rule_file writes a .warden/rules fixture and drives advisor.recommend
+test_advisor.py	test_a_reopened_entry_names_the_rule_that_is_paused	KEEP	behaviour: writes md fixture: rule_file writes a .warden/rules fixture and drives advisor.recommend
+test_advisor.py	test_a_reopened_entry_reports_its_pause_once_not_twice	KEEP	behaviour: writes md fixture: rule_file writes a .warden/rules fixture and drives advisor.recommend
+test_advisor.py	test_a_require_check_is_excluded_rather_than_counted_backwards	KEEP	behaviour: writes md fixture: rule_file writes a .warden/rules fixture and drives advisor.recommend
+test_advisor.py	test_a_rule_declares_which_catalog_entry_it_implements	KEEP	behaviour: writes md fixture: rule_file writes a .warden/rules fixture and drives advisor.recommend
+test_advisor.py	test_a_rule_implementing_an_unknown_entry_is_rejected	KEEP	behaviour: writes md fixture: rule_file writes a .warden/rules fixture and drives advisor.recommend
+test_advisor.py	test_a_rule_whose_only_history_is_refutation_is_unsupported	KEEP	behaviour: writes md fixture: rule_file writes a .warden/rules fixture and drives advisor.recommend
+test_advisor.py	test_a_rule_with_corpus_records_is_not_called_unsupported	KEEP	behaviour: writes md fixture: rule_file writes a .warden/rules fixture and drives advisor.recommend
+test_advisor.py	test_a_rule_with_no_catalog_or_corpus_support_is_listed_separately	KEEP	behaviour: writes md fixture: rule_file writes a .warden/rules fixture and drives advisor.recommend
+test_advisor.py	test_a_scope_added_check_says_its_count_is_an_upper_bound	KEEP	behaviour: writes md fixture: rule_file writes a .warden/rules fixture and drives advisor.recommend
+test_advisor.py	test_a_scope_file_check_counts_one_per_file_like_the_engine_does	KEEP	behaviour: writes md fixture: rule_file writes a .warden/rules fixture and drives advisor.recommend
+test_advisor.py	test_a_second_unpaused_rule_keeps_the_entry_enforced_and_silent	KEEP	behaviour: writes md fixture: rule_file writes a .warden/rules fixture and drives advisor.recommend
+test_advisor.py	test_a_simulated_pause_of_an_unknown_rule_changes_nothing	KEEP	behaviour: writes md fixture: rule_file writes a .warden/rules fixture and drives advisor.recommend
+test_advisor.py	test_an_entry_an_active_rule_also_implements_stays_enforced	KEEP	behaviour: writes md fixture: rule_file writes a .warden/rules fixture and drives advisor.recommend
+test_advisor.py	test_an_implemented_entry_is_reported_enforced_not_recommended	KEEP	behaviour: writes md fixture: rule_file writes a .warden/rules fixture and drives advisor.recommend
+test_advisor.py	test_an_implementing_rule_is_not_called_unsupported	KEEP	behaviour: writes md fixture: rule_file writes a .warden/rules fixture and drives advisor.recommend
+test_advisor.py	test_an_unimplemented_entry_is_recommended	KEEP	behaviour: writes md fixture: rule_file writes a .warden/rules fixture and drives advisor.recommend
+test_advisor.py	test_an_unreadable_ruleset_says_which_rule_and_why	KEEP	behaviour: writes md fixture: broken rule file drives recommend
+test_advisor.py	test_declared_flags_are_honoured_when_measuring	KEEP	behaviour: writes md fixture: rule_file writes a .warden/rules fixture and drives advisor.recommend
+test_advisor.py	test_declared_globs_narrow_the_measurement	KEEP	behaviour: writes md fixture: rule_file writes a .warden/rules fixture and drives advisor.recommend
+test_advisor.py	test_every_recommendation_states_its_rationale_in_one_line	KEEP	behaviour: writes md fixture: rule_file writes a .warden/rules fixture and drives advisor.recommend
+test_advisor.py	test_evidence_outranks_prior_art	KEEP	behaviour: writes md fixture: rule_file writes a .warden/rules fixture and drives advisor.recommend
+test_advisor.py	test_implements_defaults_to_empty	KEEP	behaviour: writes md fixture: rule_file writes a .warden/rules fixture and drives advisor.recommend
+test_advisor.py	test_measurement_never_scans_the_files_that_quote_the_patterns	KEEP	behaviour: writes md fixture: rule fixture plus catalog copy; asserts measured hits
+test_advisor.py	test_only_the_paused_rule_s_entry_reopens	KEEP	behaviour: writes md fixture: rule_file writes a .warden/rules fixture and drives advisor.recommend
+test_advisor.py	test_recommend_can_simulate_a_pause_without_writing_one	KEEP	behaviour: writes md fixture: rule_file writes a .warden/rules fixture and drives advisor.recommend
+test_advisor.py	test_recommend_defaults_to_the_declared_rules_dir	KEEP	behaviour: writes md fixture: rules dir from repo.yaml
+test_advisor.py	test_recommend_fails_closed_on_an_unreadable_rules_dir_declaration	KEEP	behaviour: writes md fixture: rule_file writes a .warden/rules fixture and drives advisor.recommend
+test_advisor.py	test_the_corpus_being_unread_is_stated_in_the_report_not_only_on_stderr	KEEP	behaviour: writes md fixture: rule_file writes a .warden/rules fixture and drives advisor.recommend
+test_advisor.py	test_the_docs_state_the_evidence_threshold_the_code_uses	RETIRE	wording: reads Writing-Rules.md and Adopting.md and asserts they name EVIDENCE_MIN_N
+test_advisor.py	test_the_pause_note_does_not_claim_a_count_that_did_not_happen	KEEP	behaviour: writes md fixture: rule_file writes a .warden/rules fixture and drives advisor.recommend
+test_advisor.py	test_the_pause_reason_survives_into_the_rendered_report	KEEP	behaviour: writes md fixture: rule_file writes a .warden/rules fixture and drives advisor.recommend
+test_advisor.py	test_the_render_says_prior_art_is_not_evidence	KEEP	behaviour: writes md fixture: rule_file writes a .warden/rules fixture and drives advisor.recommend
+test_advisor.py	test_the_render_separates_evidence_from_prior_art	KEEP	behaviour: writes md fixture: rule_file writes a .warden/rules fixture and drives advisor.recommend
+test_advisor.py	test_the_scan_states_what_it_did_not_cover	KEEP	behaviour: writes md fixture: rule_file writes a .warden/rules fixture and drives advisor.recommend
+test_advisor.py	test_zero_hits_is_reported_as_zero_not_as_unknown	KEEP	behaviour: writes md fixture: rule_file writes a .warden/rules fixture and drives advisor.recommend
+test_ambient_git.py	test_both_ambient_config_layers_are_neutralised_for_the_session	KEEP	not a doc read: AST scan of tests/*.py and git env
+test_attest.py	TestRuleIdResolution::test_unmapped_paused_rule_id_still_refused	KEEP	behaviour: writes md fixture: covers-rule fixture, drives attest build
+test_attest.py	TestRuleIdResolution::test_paused_rule_id_still_resolves	KEEP	behaviour: writes md fixture: rule file in tmp, drives attest build
+test_attest.py	test_r1f3_a_dropped_reviewer_is_caught	KEEP	not a doc read: writes reviewer json, drives attest build
+test_attest.py	test_an_out_of_range_finding_is_not_called_a_mistake	KEEP	not a doc read: .md path only as finding data to range_binding
+test_attest.py	test_findings_naming_no_changed_file_are_flagged	KEEP	not a doc read: .md path only as finding data to range_binding
+test_attest.py	test_the_manifest_kind_is_the_same_reading_the_terminal_printed	KEEP	not a doc read: .md path only as finding data
+test_attest_lens_round.py	test_a_finding_cannot_be_attributed_to_a_dispatch_that_did_not_run	KEEP	behaviour: writes md fixture: reviewer report .md files in a minted round drive attest build --review-dir
+test_attest_lens_round.py	test_a_float_round_is_refused_not_silently_unjoined	KEEP	behaviour: writes md fixture: reviewer report .md files in a minted round drive attest build --review-dir
+test_attest_lens_round.py	test_a_refusal_for_a_missing_field_names_the_stale_pack_cause	KEEP	behaviour: writes md fixture: reviewer report .md files in a minted round drive attest build --review-dir
+test_attest_lens_round.py	test_a_trailing_newline_is_not_a_second_spelling	KEEP	behaviour: writes md fixture: reviewer report .md files in a minted round drive attest build --review-dir
+test_attest_lens_round.py	test_a_truthful_attribution_writes_and_is_rendered	KEEP	behaviour: writes md fixture: reviewer report .md files in a minted round drive attest build --review-dir
+test_attest_lens_round.py	test_r2_2_both_accounting_lines_are_taught_by_the_pages_that_teach_stats	RETIRE	wording: reads docs/wiki/Memory.md and Gate-Pipeline.md and asserts they state the render's accounting lines; the render shape stays pinned by test_stats_tally_outcome_per_lens_and_per_round_and_count_the_rest
+test_attest_lens_round.py	test_r2_3_the_round_unrecorded_line_blames_the_finding_not_the_roster	KEEP	behaviour: writes md fixture: reviewer report .md files in a minted round drive attest build --review-dir
+test_attest_lens_round.py	test_r3_1_the_pages_do_not_promise_a_line_the_render_omits	RETIRE	wording: reads the same two wiki pages for 'printed only when' wording; its render premise moved into test_stats_render_nothing_about_lenses_on_a_corpus_with_none as a new absence assert
+test_attest_lens_round.py	test_the_join_is_checked_before_the_verdict	KEEP	behaviour: writes md fixture: reviewer report .md files in a minted round drive attest build --review-dir
+test_attest_lens_round.py	test_under_review_dir_a_role_outside_the_vocabulary_is_refused	KEEP	behaviour: writes md fixture: reviewer report .md files in a minted round drive attest build --review-dir
+test_attest_lens_round.py	test_under_review_dir_every_finding_carries_lens_and_round	KEEP	behaviour: writes md fixture: reviewer report .md files in a minted round drive attest build --review-dir
+test_attest_lens_round.py	test_under_review_dir_every_roster_entry_states_its_round	KEEP	behaviour: writes md fixture: reviewer report .md files in a minted round drive attest build --review-dir
+test_attest_lens_round.py	test_stats_split_zero_yield_into_reviewed_clean_and_no_review	KEEP	not a doc read: docs/design ledger named only in the docstring; drives memory stats
+test_autonomy_adopt.py	test_adopt_refuses_a_high_blocking_rule	KEEP	behaviour: writes md fixture: rule text into adopt_rule
+test_autonomy_adopt.py	test_adopt_refuses_a_malformed_rule	KEEP	behaviour: writes md fixture: malformed rule into adopt_rule
+test_autonomy_adopt.py	test_adopt_writes_into_the_declared_rules_dir	KEEP	behaviour: writes md fixture: adopt into declared rules_dir
+test_autonomy_adopt.py	test_c14_a_dangling_symlink_is_not_an_absent_file	KEEP	behaviour: writes md fixture: dangling symlink named .md
+test_autonomy_adopt.py	test_c14_a_failed_artifact_write_rolls_the_rule_file_back	KEEP	behaviour: writes md fixture: rollback of rule file
+test_autonomy_adopt.py	test_c14_adopt_refuses_an_id_that_is_not_a_plain_file_name	KEEP	behaviour: writes md fixture: refused id writes no .md
+test_autonomy_adopt.py	test_c14_adopt_refuses_to_overwrite_an_existing_backtest	KEEP	behaviour: writes md fixture: overwrite refusal
+test_autonomy_adopt.py	test_the_refusal_keys_on_blocking_severities_not_the_word_high	KEEP	behaviour: writes md fixture: rule text into adopt_rule
+test_autonomy_carve_out.py	test_a_backtest_on_its_own_is_refused	KEEP	behaviour: writes md fixture: tmp repo writes rule .md files and drives the autonomy carve-out
+test_autonomy_carve_out.py	test_a_blocking_severity_adoption_is_refused	KEEP	behaviour: writes md fixture: tmp repo writes rule .md files and drives the autonomy carve-out
+test_autonomy_carve_out.py	test_a_body_edit_dressed_as_a_pause_is_refused	KEEP	behaviour: writes md fixture: tmp repo writes rule .md files and drives the autonomy carve-out
+test_autonomy_carve_out.py	test_a_committed_repo_yaml_cannot_widen_the_carve_out_either	KEEP	behaviour: writes md fixture: tmp repo writes rule .md files and drives the autonomy carve-out
+test_autonomy_carve_out.py	test_a_deleted_rule_is_refused	KEEP	behaviour: writes md fixture: tmp repo writes rule .md files and drives the autonomy carve-out
+test_autonomy_carve_out.py	test_a_negative_count_in_a_pause_artifact_is_refused	KEEP	behaviour: writes md fixture: tmp repo writes rule .md files and drives the autonomy carve-out
+test_autonomy_carve_out.py	test_a_new_non_blocking_rule_is_inside_the_carve_out	KEEP	behaviour: writes md fixture: tmp repo writes rule .md files and drives the autonomy carve-out
+test_autonomy_carve_out.py	test_a_path_outside_the_diff_is_refused	KEEP	behaviour: writes md fixture: tmp repo writes rule .md files and drives the autonomy carve-out
+test_autonomy_carve_out.py	test_a_pause_with_its_backtest_is_inside_the_carve_out	KEEP	behaviour: writes md fixture: tmp repo writes rule .md files and drives the autonomy carve-out
+test_autonomy_carve_out.py	test_a_pause_without_its_backtest_is_refused	KEEP	behaviour: writes md fixture: tmp repo writes rule .md files and drives the autonomy carve-out
+test_autonomy_carve_out.py	test_a_policy_with_no_blocking_severities_refuses	KEEP	behaviour: writes md fixture: tmp repo writes rule .md files and drives the autonomy carve-out
+test_autonomy_carve_out.py	test_a_promote_artifact_beside_an_adoption_is_refused	KEEP	behaviour: writes md fixture: tmp repo writes rule .md files and drives the autonomy carve-out
+test_autonomy_carve_out.py	test_a_rule_edit_riding_along_with_the_pause_is_refused	KEEP	behaviour: writes md fixture: tmp repo writes rule .md files and drives the autonomy carve-out
+test_autonomy_carve_out.py	test_a_rule_edit_that_is_not_a_pause_at_all_is_refused	KEEP	behaviour: writes md fixture: tmp repo writes rule .md files and drives the autonomy carve-out
+test_autonomy_carve_out.py	test_a_rules_dir_that_escapes_the_repo_is_refused	KEEP	behaviour: writes md fixture: tmp repo writes rule .md files and drives the autonomy carve-out
+test_autonomy_carve_out.py	test_a_stub_pause_artifact_is_refused	KEEP	behaviour: writes md fixture: tmp repo writes rule .md files and drives the autonomy carve-out
+test_autonomy_carve_out.py	test_an_added_rule_whose_id_does_not_match_its_file_is_refused	KEEP	behaviour: writes md fixture: tmp repo writes rule .md files and drives the autonomy carve-out
+test_autonomy_carve_out.py	test_an_adoption_that_raises_enforcement_is_refused	KEEP	behaviour: writes md fixture: tmp repo writes rule .md files and drives the autonomy carve-out
+test_autonomy_carve_out.py	test_an_empty_path_list_is_refused	KEEP	behaviour: writes md fixture: tmp repo writes rule .md files and drives the autonomy carve-out
+test_autonomy_carve_out.py	test_an_uncommitted_rules_dir_repoint_cannot_widen_the_carve_out	KEEP	behaviour: writes md fixture: tmp repo writes rule .md files and drives the autonomy carve-out
+test_autonomy_carve_out.py	test_an_unreadable_committed_policy_refuses	KEEP	behaviour: writes md fixture: tmp repo writes rule .md files and drives the autonomy carve-out
+test_autonomy_carve_out.py	test_c2_an_adoption_whose_artifact_is_not_a_forbidden_path_is_cleared	KEEP	behaviour: writes md fixture: tmp repo writes rule .md files and drives the autonomy carve-out
+test_autonomy_carve_out.py	test_c2_an_adoption_whose_rule_file_is_not_a_forbidden_path_is_cleared	KEEP	behaviour: writes md fixture: tmp repo writes rule .md files and drives the autonomy carve-out
+test_autonomy_carve_out.py	test_c3_a_rejected_artifact_does_not_read_as_an_absent_one	KEEP	behaviour: writes md fixture: tmp repo writes rule .md files and drives the autonomy carve-out
+test_autonomy_carve_out.py	test_c4_a_fabricated_precision_tally_beside_judged_zero_is_refused	KEEP	behaviour: writes md fixture: tmp repo writes rule .md files and drives the autonomy carve-out
+test_autonomy_carve_out.py	test_c5_an_adopt_artifact_naming_no_ruleset_is_refused	KEEP	behaviour: writes md fixture: tmp repo writes rule .md files and drives the autonomy carve-out
+test_autonomy_carve_out.py	test_c6_an_adoption_of_a_bom_prefixed_rule_clears_the_carve_out	KEEP	behaviour: writes md fixture: tmp repo writes rule .md files and drives the autonomy carve-out
+test_autonomy_carve_out.py	test_every_other_warden_write_is_refused	KEEP	behaviour: writes md fixture: rewrites .warden/skills-policy.md in a tmp repo and drives the carve-out check
+test_autonomy_carve_out.py	test_a_stub_or_overclaiming_adopt_artifact_is_refused	KEEP	behaviour: writes md fixture: tmp repo writes rule .md files and drives the autonomy carve-out
+test_autonomy_carve_out.py	test_an_adopt_artifact_for_a_rule_this_diff_did_not_add_is_refused	KEEP	behaviour: writes md fixture: tmp repo writes rule .md files and drives the autonomy carve-out
+test_autonomy_carve_out.py	test_an_adoption_without_its_backtest_is_refused	KEEP	behaviour: writes md fixture: tmp repo writes rule .md files and drives the autonomy carve-out
+test_autonomy_carve_out.py	test_what_adopt_rule_actually_writes_clears_the_carve_out	KEEP	behaviour: writes md fixture: tmp repo writes rule .md files and drives the autonomy carve-out
+test_autonomy_carve_out.py	test_a_pause_whose_artifact_is_not_a_forbidden_path_is_cleared	KEEP	behaviour: writes md fixture: tmp repo writes rule .md files and drives the autonomy carve-out
+test_autonomy_carve_out.py	test_a_pause_whose_rule_file_is_not_a_forbidden_path_is_cleared	KEEP	behaviour: writes md fixture: tmp repo writes rule .md files and drives the autonomy carve-out
+test_autonomy_carve_out.py	test_a_stub_pause_artifact_in_the_diff_does_not_evidence_the_pause	KEEP	behaviour: writes md fixture: tmp repo writes rule .md files and drives the autonomy carve-out
+test_autonomy_carve_out.py	test_an_artifact_cannot_bind_to_a_rule_edit_that_is_not_a_pause	KEEP	behaviour: writes md fixture: tmp repo writes rule .md files and drives the autonomy carve-out
+test_autonomy_carve_out.py	test_the_committed_pause_is_re_derived_from_the_merge_base	KEEP	behaviour: writes md fixture: tmp repo writes rule .md files and drives the autonomy carve-out
+test_autonomy_carve_out.py	test_an_uncommitted_repo_yaml_cannot_widen_the_carve_out	KEEP	behaviour: writes md fixture: tmp repo writes rule .md files and drives the autonomy carve-out
+test_autonomy_carve_out.py	test_one_bad_path_refuses_the_whole_set	KEEP	behaviour: writes md fixture: tmp repo writes rule .md files and drives the autonomy carve-out
+test_autonomy_carve_out.py	test_pausing_a_blocking_rule_is_refused	KEEP	behaviour: writes md fixture: tmp repo writes rule .md files and drives the autonomy carve-out
+test_autonomy_carve_out.py	test_what_apply_pause_actually_writes_clears_the_carve_out	KEEP	behaviour: writes md fixture: tmp repo writes rule .md files and drives the autonomy carve-out
+test_autonomy_ladder.py	test_c11_the_charter_names_every_lens_that_is_already_a_rule	RETIRE	wording: pins that charter prose names each promoted rule
+test_autonomy_ladder.py	test_the_ladder_does_not_still_call_the_wiring_pending	RETIRE	wording: pins skills-policy.md phrases present and absent
+test_autonomy_ladder.py	test_a_lens_with_no_rule_keeps_its_full_statement	RETIRE	"wording: pins charter entry shape (ends in ""?"", no pointer)"
+test_autonomy_ladder.py	test_the_charter_keeps_fail_closed_as_a_pointer	RETIRE	wording: pins skills-policy.md Fail-closed entry wording
+test_autonomy_ladder.py	test_the_fail_closed_entry_does_not_restate_the_rule	RETIRE	wording: pins absence of phrases in the charter
+test_autonomy_ladder.py	test_the_charter_entry_does_not_restate_the_rule	RETIRE	wording: pins absence of phrases in the charter
+test_autonomy_ladder.py	test_the_charter_keeps_enforcement_truth_as_a_pointer	RETIRE	wording: pins skills-policy.md Review charter entry wording
+test_autonomy_ladder.py	test_the_human_side_items_sit_on_the_human_side	RETIRE	wording: pins skills-policy.md Autonomy ladder tier phrases
+test_autonomy_ladder.py	test_the_ladder_names_its_implementation_and_its_own_limit	RETIRE	wording: pins skills-policy.md wording and a bead id in prose
+test_autonomy_ladder.py	test_the_machine_side_actions_sit_on_the_machine_side	RETIRE	wording: pins skills-policy.md Autonomy ladder tier phrases
+test_autonomy_ladder.py	test_the_pause_bar_is_counted_in_review_rounds_not_records	RETIRE	wording: pins skills-policy.md bar sentence and autonomy.py docstring wording
+test_autonomy_ladder.py	test_the_three_founder_questions_have_polarity_pinned_answers	RETIRE	wording: pins skills-policy.md answer wording
+test_autonomy_pause.py	test_a_pause_that_reopens_nothing_is_allowed_over_the_ceiling	KEEP	behaviour: writes md fixture: seeded rules, drives apply_pause
+test_autonomy_pause.py	test_a_pause_that_would_breach_the_ceiling_is_refused	KEEP	behaviour: writes md fixture: _ceiling_repo rules, drives apply_pause
+test_autonomy_pause.py	test_a_pause_whose_gap_cannot_be_computed_is_refused	KEEP	behaviour: writes md fixture: _ceiling_repo, drives _ceiling_breach
+test_autonomy_pause.py	test_a_pause_with_headroom_still_applies	KEEP	behaviour: writes md fixture: _ceiling_repo, drives apply_pause
+test_autonomy_pause.py	test_an_already_paused_rule_is_not_re_flagged	KEEP	behaviour: writes md fixture: paused rule, drives pause_candidates
+test_autonomy_pause.py	test_an_unreadable_declared_ceiling_refuses_the_pause	KEEP	behaviour: writes md fixture: _ceiling_repo, drives apply_pause
+test_autonomy_pause.py	test_apply_pause_handles_a_bom_prefixed_rule_file	KEEP	behaviour: writes md fixture: BOM rule file through apply_pause
+test_autonomy_pause.py	test_pause_acts_on_the_declared_rules_dir	KEEP	behaviour: writes md fixture: rule in declared dir
+test_autonomy_pause.py	test_the_auto_paused_rule_then_produces_no_findings	KEEP	behaviour: writes md fixture: rule, pause, run_review
+test_autonomy_pause.py	test_the_c4_round_in_the_committed_corpus_is_not_a_streak	KEEP	not a doc read: reads a committed attest json shard, drives streak code
+test_autonomy_pause.py	test_the_guard_is_cumulative_across_a_batch	KEEP	behaviour: writes md fixture: rule edit, drives _ceiling_breach
+test_backtest.py	test_flag_commits_honours_a_checks_globs	KEEP	not a doc read: .md path as diff data to flag_commits
+test_backtest.py	test_retro_requires_backtesting_a_rule_proposal	RETIRE	wording: pins retro/SKILL.md backtest phrases
+test_build_wiki.py	test_a_browser_that_never_launches_is_not_reported_as_a_diagram_failure	KEEP	behaviour: drives code: runs the workflow step or diagram validator with fixture md pages
+test_build_wiki.py	test_a_diagram_failure_beside_a_launch_failure_is_still_a_diagram_failure	KEEP	behaviour: drives code: runs the workflow step or diagram validator with fixture md pages
+test_build_wiki.py	test_a_large_render_log_does_not_end_the_run_before_its_exit_is_chosen	KEEP	behaviour: drives code: runs the workflow step or diagram validator with fixture md pages
+test_build_wiki.py	test_a_page_name_containing_the_sed_delimiter_is_handled	KEEP	behaviour: drives code: runs build-wiki.sh and asserts its output
+test_build_wiki.py	test_a_parse_error_alone_never_mentions_the_browser	KEEP	behaviour: drives code: runs the workflow step or diagram validator with fixture md pages
+test_build_wiki.py	test_a_run_that_checked_no_diagram_exits_apart_from_a_rejection	KEEP	behaviour: drives code: runs the workflow step or diagram validator with fixture md pages
+test_build_wiki.py	test_build_output_is_gitignored	KEEP	not a doc read: git check-ignore on build output path
+test_build_wiki.py	test_build_produces_one_page_per_source_plus_sidebar	KEEP	behaviour: drives code: runs build-wiki.sh and asserts its output
+test_build_wiki.py	test_build_writes_a_manifest_of_exactly_the_pages_it_owns	KEEP	behaviour: drives code: runs build-wiki.sh and asserts its output
+test_build_wiki.py	test_builder_fails_loudly_when_a_page_is_missing_from_the_order	KEEP	behaviour: drives code: runs build-wiki.sh and asserts its output
+test_build_wiki.py	test_cross_page_anchors_survive_the_rewrite	KEEP	behaviour: drives code: runs build-wiki.sh and asserts its output
+test_build_wiki.py	test_every_source_page_appears_in_the_generated_sidebar	KEEP	behaviour: drives code: runs build-wiki.sh and asserts its output
+test_build_wiki.py	test_home_rows_may_carry_an_anchor	KEEP	behaviour: drives code: runs build-wiki.sh and asserts its output
+test_build_wiki.py	test_no_output_link_points_at_an_unmirrored_md_path	KEEP	behaviour: drives code: runs build-wiki.sh and asserts its output
+test_build_wiki.py	test_out_of_tree_links_become_absolute_repo_urls	KEEP	behaviour: drives code: asserts builder link rewrite over real pages
+test_build_wiki.py	test_page_names_with_regex_metacharacters_are_escaped	KEEP	behaviour: drives code: runs build-wiki.sh and asserts its output
+test_build_wiki.py	test_publish_ignores_a_manifest_entry_that_is_not_a_page_name	KEEP	behaviour: writes md fixture: runs publish-wiki.sh against a fixture wiki clone
+test_build_wiki.py	test_publish_never_touches_a_page_it_did_not_publish	KEEP	behaviour: writes md fixture: runs publish-wiki.sh against a fixture wiki clone
+test_build_wiki.py	test_publish_refuses_to_run_without_a_manifest	KEEP	behaviour: writes md fixture: runs publish-wiki.sh against a fixture wiki clone
+test_build_wiki.py	test_publish_retires_a_page_that_left_the_sources	KEEP	behaviour: writes md fixture: runs publish-wiki.sh against a fixture wiki clone
+test_build_wiki.py	test_publish_stages_everything_it_changed	KEEP	behaviour: writes md fixture: runs publish-wiki.sh against a fixture wiki clone
+test_build_wiki.py	test_repo_root_links_become_absolute_repo_urls	KEEP	behaviour: drives code: runs build-wiki.sh and asserts its output
+test_build_wiki.py	test_sidebar_groups_pages_under_the_home_tables_section_labels	KEEP	behaviour: drives code: derives labels from Home.md, asserts builder sidebar output
+test_build_wiki.py	test_sidebar_order_is_explicit_not_alphabetical	KEEP	behaviour: drives code: asserts builder sidebar order
+test_build_wiki.py	test_the_browser_launch_timeout_is_longer_than_puppeteers_default	KEEP	behaviour: drives code: runs the workflow step or diagram validator with fixture md pages
+test_build_wiki.py	test_the_browser_launch_timeout_is_overridable_and_refuses_a_non_number	KEEP	behaviour: drives code: runs the workflow step or diagram validator with fixture md pages
+test_build_wiki.py	test_the_diagram_validator_is_used_never_forked	KEEP	behaviour: drives code: runs the workflow step or diagram validator with fixture md pages
+test_build_wiki.py	test_the_known_bad_diagram_control_is_red_on_an_exit_1_that_rejected_nothing	KEEP	behaviour: drives code: runs the workflow step or diagram validator with fixture md pages
+test_build_wiki.py	test_the_known_bad_diagram_control_is_red_on_any_exit_but_a_rejection	KEEP	behaviour: drives code: runs the workflow step or diagram validator with fixture md pages
+test_build_wiki.py	test_the_known_bad_diagram_control_is_red_when_the_browser_never_launches	KEEP	behaviour: drives code: runs the workflow step or diagram validator with fixture md pages
+test_build_wiki.py	test_the_known_bad_diagram_control_is_red_when_the_validator_checked_no_diagram	KEEP	behaviour: drives code: runs the workflow step or diagram validator with fixture md pages
+test_build_wiki.py	test_the_known_bad_diagram_control_passes_when_the_gate_rejects_the_diagram	KEEP	behaviour: drives code: runs the workflow step or diagram validator with fixture md pages
+test_build_wiki.py	test_the_known_bad_diagram_control_pauses_between_launch_attempts	KEEP	behaviour: drives code: runs the workflow step or diagram validator with fixture md pages
+test_build_wiki.py	test_the_known_bad_diagram_control_retries_a_launch_then_reads_the_rejection	KEEP	behaviour: drives code: runs the workflow step or diagram validator with fixture md pages
+test_build_wiki.py	test_the_publish_job_neither_retries_nor_relabels_any_other_failure	KEEP	behaviour: drives code: runs the workflow step or diagram validator with fixture md pages
+test_build_wiki.py	test_the_publish_job_pauses_between_launch_attempts	KEEP	behaviour: drives code: runs the workflow step or diagram validator with fixture md pages
+test_build_wiki.py	test_the_publish_job_retries_a_browser_that_did_not_launch	KEEP	behaviour: drives code: runs the workflow step or diagram validator with fixture md pages
+test_build_wiki.py	test_the_publish_jobs_retry_is_bounded_and_its_failure_names_the_browser_launch	KEEP	behaviour: drives code: runs the workflow step or diagram validator with fixture md pages
+test_build_wiki.py	test_workflow_fails_actionably_when_the_wiki_was_never_initialized	KEEP	behaviour: drives code: runs the workflow step or diagram validator with fixture md pages
+test_build_wiki.py	test_workflow_publishes_on_main_and_on_demand	KEEP	behaviour: drives code: runs the workflow step or diagram validator with fixture md pages
+test_build_wiki.py	test_workflow_runs_the_builder_and_the_publisher	KEEP	behaviour: drives code: runs the workflow step or diagram validator with fixture md pages
+test_build_wiki.py	test_workflow_validates_diagrams_before_it_publishes	KEEP	behaviour: drives code: runs the workflow step or diagram validator with fixture md pages
+test_cage.py	test_cli_enroll_renders_cage_dir	KEEP	behaviour: drives code: cage enroll render, warns on missing prompt.md
+test_cage.py	test_runner_preserves_every_hard_stop_around_resume	KEEP	not a doc read: pins rendered runner script stops
+test_cage.py	test_skill_checkpoints_and_resumes	RETIRE	wording: pins autonomous-run/SKILL.md resume phrases
+test_cage_runner.py	test_a_diff_that_fails_under_the_z_read_still_fails_closed	KEEP	behaviour: writes md fixture: prompt.md/SKILL.md/README.md written into a tmp cage and live checkout drive run.sh
+test_cage_runner.py	test_a_forbidden_path_git_would_c_quote_still_closes_the_pr	KEEP	behaviour: drives code: The-Cage.md named only in the docstring; drives the forbidden-path post-check
+test_cage_runner.py	test_a_regex_that_cannot_evaluate_fails_closed	KEEP	behaviour: writes md fixture: prompt.md/SKILL.md/README.md written into a tmp cage and live checkout drive run.sh
+test_cage_runner.py	test_a_second_run_in_the_same_second_still_gets_its_own_id	KEEP	behaviour: writes md fixture: prompt.md/SKILL.md/README.md written into a tmp cage and live checkout drive run.sh
+test_cage_runner.py	test_a_stale_pack_version_does_not_satisfy_the_skill_preflight	KEEP	behaviour: writes md fixture: prompt.md/SKILL.md/README.md written into a tmp cage and live checkout drive run.sh
+test_cage_runner.py	test_an_exhausted_run_id_sequence_stops_the_run_out_loud	KEEP	behaviour: writes md fixture: prompt.md/SKILL.md/README.md written into a tmp cage and live checkout drive run.sh
+test_cage_runner.py	test_an_unrelated_edit_is_not_blocked	KEEP	behaviour: writes md fixture: prompt.md/SKILL.md/README.md written into a tmp cage and live checkout drive run.sh
+test_cage_runner.py	test_a_clean_run_never_consults_the_carve_out	KEEP	behaviour: writes md fixture: prompt.md/SKILL.md/README.md written into a tmp cage and live checkout drive run.sh
+test_cage_runner.py	test_a_diff_that_cannot_be_read_fails_closed	KEEP	behaviour: writes md fixture: prompt.md/SKILL.md/README.md written into a tmp cage and live checkout drive run.sh
+test_cage_runner.py	test_a_regex_that_cannot_evaluate_is_never_carve_out_material	KEEP	behaviour: writes md fixture: prompt.md/SKILL.md/README.md written into a tmp cage and live checkout drive run.sh
+test_cage_runner.py	test_host_artifacts_are_scrubbed_before_the_session	KEEP	behaviour: writes md fixture: prompt.md/SKILL.md/README.md written into a tmp cage and live checkout drive run.sh
+test_cage_runner.py	test_missing_prompt_md_stops_the_run	KEEP	behaviour: writes md fixture: prompt.md/SKILL.md/README.md written into a tmp cage and live checkout drive run.sh
+test_cage_runner.py	test_passing_platform_probe_runs_in_the_live_repo	KEEP	behaviour: drives code: README.md is the tmp live checkout's probe target, not repo docs
+test_cage_runner.py	test_prompt_skill_missing_from_installed_pack_stops_the_run	KEEP	behaviour: writes md fixture: prompt.md/SKILL.md/README.md written into a tmp cage and live checkout drive run.sh
+test_cage_runner.py	test_prompt_skill_present_in_pack_proceeds	KEEP	behaviour: writes md fixture: prompt.md/SKILL.md/README.md written into a tmp cage and live checkout drive run.sh
+test_cage_runner.py	test_prompt_skill_unverifiable_without_cache_logs_and_proceeds	KEEP	behaviour: writes md fixture: prompt.md/SKILL.md/README.md written into a tmp cage and live checkout drive run.sh
+test_cage_runner.py	test_the_live_checkout_is_never_touched	KEEP	behaviour: writes md fixture: prompt.md/SKILL.md/README.md written into a tmp cage and live checkout drive run.sh
+test_cage_runner.py	test_the_session_summary_refines_the_outcome_and_is_filed	KEEP	behaviour: drives code: asserts the run files its reports/<id>.md output
+test_cage_runner.py	test_two_runs_in_one_day_collide_on_nothing	KEEP	behaviour: writes md fixture: prompt.md/SKILL.md/README.md written into a tmp cage and live checkout drive run.sh
+test_catalog.py	test_retro_gathers_catalog_edition_currency	RETIRE	wording: pins retro/SKILL.md currency phrases
+test_catalog.py	test_the_wiki_names_every_catalog_engine_value	RETIRE	wording: pins that Writing-Rules.md mentions each engine value
+test_certify.py	test_a_claimant_beats_convention_even_from_the_generic_slot	KEEP	behaviour: writes md fixture: tmp cage with prompt.md fixture, runs cage discovery/certify
+test_certify.py	test_a_foreign_named_sibling_still_refuses_the_badge	KEEP	behaviour: writes md fixture: tmp cage with prompt.md fixture, runs cage discovery/certify
+test_certify.py	test_a_neighbours_cage_does_not_shadow_the_repos_own	KEEP	behaviour: writes md fixture: tmp cage with prompt.md fixture, runs cage discovery/certify
+test_certify.py	test_an_in_repo_claimant_does_not_beat_a_foreign_sibling	KEEP	behaviour: writes md fixture: tmp cage with prompt.md fixture, runs cage discovery/certify
+test_certify.py	test_an_unreadable_sibling_certify_did_not_choose_still_refuses	KEEP	behaviour: writes md fixture: tmp repo with rule .md and skills-policy.md fixtures, runs certify
+test_certify.py	test_an_unreadable_sibling_counts_in_the_conflict	KEEP	behaviour: writes md fixture: tmp cage with prompt.md fixture, runs cage discovery/certify
+test_certify.py	test_the_badge_is_earned_beside_a_consumers_cage	KEEP	behaviour: writes md fixture: tmp cage with prompt.md fixture, runs cage discovery/certify
+test_certify.py	test_the_named_sibling_is_found_on_its_own	KEEP	behaviour: writes md fixture: tmp cage with prompt.md fixture, runs cage discovery/certify
+test_certify.py	test_two_claimants_refuse_the_badge_naming_both	KEEP	behaviour: writes md fixture: tmp cage with prompt.md fixture, runs cage discovery/certify
+test_certify.py	test_two_unreadable_siblings_are_both_named	KEEP	behaviour: writes md fixture: tmp repo with rule .md and skills-policy.md fixtures, runs certify
+test_certify.py	test_a_claimant_beside_a_no_owner_sibling_refuses	KEEP	behaviour: writes md fixture: tmp cage with prompt.md fixture, runs cage discovery/certify
+test_certify.py	test_a_disproved_sibling_is_not_counted_as_unruled	KEEP	behaviour: writes md fixture: tmp cage with prompt.md fixture, runs cage discovery/certify
+test_certify.py	test_a_no_owner_sibling_beside_an_unreadable_chosen_one_is_named	KEEP	behaviour: writes md fixture: tmp cage with prompt.md fixture, runs certify
+test_certify.py	test_every_named_cage_says_why_it_is_named	KEEP	behaviour: writes md fixture: tmp cage with prompt.md fixture, runs cage discovery/certify
+test_certify.py	test_one_no_owner_sibling_alone_still_earns_the_badge	KEEP	behaviour: writes md fixture: tmp cage with prompt.md fixture, runs certify
+test_certify.py	test_two_no_owner_siblings_refuse_the_badge_naming_both	KEEP	behaviour: writes md fixture: tmp cage with prompt.md fixture, runs certify
+test_certify.py	test_a_reason_no_enumerated_layout_reaches_is_caught	KEEP	behaviour: drives code: harvests _cage_doubt reasons over tmp cage layouts (writes prompt.md fixtures); now also holds the one-shared-tail check
+test_certify.py	test_the_forbidden_paths_refusal_is_harvested_not_typed	RETIRE	wording: doc wording: control for retired wording guard: proves the The-Cage.md page guard reddens on a renamed refusal
+test_certify.py	test_the_cage_page_names_every_reason_certify_can_emit	RETIRE	wording: doc wording: pins docs/wiki/The-Cage.md wording to certify's refusal reasons; the code half (layouts reach every reason, one shared tail) stays in test_a_reason_no_enumerated_layout_reaches_is_caught
+test_certify.py	test_the_page_keeps_the_bound_it_can_measure	RETIRE	wording: doc wording: pins The-Cage.md sentences; lone-candidate behaviour stays covered by test_one_no_owner_sibling_alone_still_earns_the_badge and test_an_unreadable_sibling_counts_in_the_conflict
+test_certify.py	test_a_check_detail_arrives_byte_identical	KEEP	behaviour: writes md fixture: tmp repo with rule .md and skills-policy.md fixtures, runs certify
+test_certify.py	test_a_chosen_cage_declaring_another_checkout_is_labelled_so	KEEP	behaviour: writes md fixture: tmp cage with prompt.md fixture, runs cage discovery/certify
+test_certify.py	test_a_declaration_missing_its_when_clause_is_caught	KEEP	behaviour: writes md fixture: tmp skills-policy.md fixture through R-09
+test_certify.py	test_a_later_section_does_not_leak_into_the_disciplines_block	KEEP	behaviour: writes md fixture: tmp skills-policy.md fixture through R-09
+test_certify.py	test_a_tracked_evidence_run_root_is_caught	KEEP	behaviour: writes md fixture: tmp repo with rule .md and skills-policy.md fixtures, runs certify
+test_certify.py	test_absent_section_passes_because_it_is_optional	KEEP	behaviour: writes md fixture: tmp repo with rule .md and skills-policy.md fixtures, runs certify
+test_certify.py	test_custom_shell_template_earns_no_pipefail_credit	KEEP	behaviour: writes md fixture: tmp repo with rule .md and skills-policy.md fixtures, runs certify
+test_certify.py	test_legit_early_exit_and_status_reraise_still_certify	KEEP	behaviour: writes md fixture: tmp repo (make_repo) through the E-01 ci_step_enforced check
+test_certify.py	test_marker_before_the_gate_command_does_not_flag	KEEP	behaviour: writes md fixture: tmp repo (make_repo) through the E-01 ci_step_enforced check
+test_certify.py	test_marker_inside_a_quoted_argument_does_not_flag	KEEP	behaviour: writes md fixture: tmp repo (make_repo) through the E-01 ci_step_enforced check
+test_certify.py	test_or_echo_is_swallowed	KEEP	behaviour: writes md fixture: tmp repo (make_repo) through the E-01 ci_step_enforced check
+test_certify.py	test_or_exit_0_is_swallowed	KEEP	behaviour: writes md fixture: tmp repo (make_repo) through the E-01 ci_step_enforced check
+test_certify.py	test_pipe_with_pipefail_still_certifies	KEEP	behaviour: writes md fixture: tmp repo (make_repo) through the E-01 ci_step_enforced check
+test_certify.py	test_pipefail_off_and_comment_spellings_do_not_disarm	KEEP	behaviour: writes md fixture: tmp repo (make_repo) through the E-01 ci_step_enforced check
+test_certify.py	test_same_line_semicolon_exit_0_is_swallowed	KEEP	behaviour: writes md fixture: tmp repo (make_repo) through the E-01 ci_step_enforced check
+test_certify.py	test_semicolon_true_is_swallowed	KEEP	behaviour: writes md fixture: tmp repo (make_repo) through the E-01 ci_step_enforced check
+test_certify.py	test_set_plus_e_is_swallowed	KEEP	behaviour: writes md fixture: tmp repo (make_repo) through the E-01 ci_step_enforced check
+test_certify.py	test_set_plus_o_errexit_is_swallowed	KEEP	behaviour: writes md fixture: tmp repo (make_repo) through the E-01 ci_step_enforced check
+test_certify.py	test_spacing_variants_are_swallowed	KEEP	behaviour: writes md fixture: tmp repo (make_repo) through the E-01 ci_step_enforced check
+test_certify.py	test_suffix_marker_on_a_non_gate_line_still_certifies	KEEP	behaviour: writes md fixture: tmp repo (make_repo) through the E-01 ci_step_enforced check
+test_certify.py	test_suffix_marker_split_across_a_continuation_is_caught	KEEP	behaviour: writes md fixture: tmp repo (make_repo) through the E-01 ci_step_enforced check
+test_certify.py	test_unpiped_gate_with_pipe_swallow	KEEP	behaviour: writes md fixture: tmp repo (make_repo) through the E-01 ci_step_enforced check
+test_certify.py	test_attained_level_matches_what_the_repo_actually_has	KEEP	behaviour: writes md fixture: tmp repo with rule .md and skills-policy.md fixtures, runs certify
+test_certify.py	test_attest_rule_ids_resolve_pass_fail_and_absent	KEEP	behaviour: writes md fixture: tmp repo with rule .md and skills-policy.md fixtures, runs certify
+test_certify.py	test_c9_s05_no_artifact_message_names_every_action_it_accepts	KEEP	behaviour: writes md fixture: tmp repo with rule .md and skills-policy.md fixtures, runs certify
+test_certify.py	test_cage_checks_read_the_migrated_cage	KEEP	behaviour: writes md fixture: tmp cage prompt.md for N-03
+test_certify.py	test_cage_config_absent_fails_every_cage_check_closed	KEEP	not a doc read: prompt.md is only a check path; drives the cage checks
+test_certify.py	test_caged_repo_earns_the_badge_at_any_level	KEEP	behaviour: writes md fixture: tmp cage with prompt.md fixture, runs certify
+test_certify.py	test_check_field_malformations_fail_at_load_not_runtime	KEEP	behaviour: writes md fixture: tmp repo with rule .md and skills-policy.md fixtures, runs certify
+test_certify.py	test_ci_step_enforced_pass_fail_and_absent	KEEP	behaviour: writes md fixture: tmp repo with rule .md and skills-policy.md fixtures, runs certify
+test_certify.py	test_the_grandfather_waiver_promises_no_write_side_refusal	KEEP	behaviour: drives code: attest write seam and E-02 over tmp rule files; its prose checks read a code docstring and .warden/certification.yaml, not a listed doc
+test_certify.py	test_cli_capability_gate	KEEP	behaviour: writes md fixture: tmp cage with prompt.md fixture, runs certify
+test_certify.py	test_cli_level_gate	KEEP	behaviour: writes md fixture: tmp repo with rule .md and skills-policy.md fixtures, runs certify
+test_certify.py	test_corpus_min_reviews_pass_fail_and_absent	KEEP	behaviour: writes md fixture: tmp repo with rule .md and skills-policy.md fixtures, runs certify
+test_certify.py	test_corrupt_shard_fails_closed_everywhere	KEEP	behaviour: writes md fixture: tmp repo with rule .md and skills-policy.md fixtures, runs certify
+test_certify.py	test_docs_and_code_agree_on_the_vocabulary	RETIRE	wording: doc wording: reads docs/wiki/Skills-Policy.md and pins its discipline table to the enforced set
+test_certify.py	test_certify_surfaces_the_rules_dir_declaration_problem	KEEP	behaviour: writes md fixture: tmp repo with rule .md and skills-policy.md fixtures, runs certify
+test_certify.py	test_declaration_problem_refuses_even_with_no_shards	KEEP	behaviour: writes md fixture: tmp repo with rule .md and skills-policy.md fixtures, runs certify
+test_certify.py	test_e02_names_the_rule_that_shadowed_the_ids_and_the_remedy	KEEP	behaviour: writes md fixture: tmp repo with rule .md and skills-policy.md fixtures, runs certify
+test_certify.py	test_e02_never_truncates_the_remedy_off_its_own_message	KEEP	behaviour: writes md fixture: tmp repo with rule .md and skills-policy.md fixtures, runs certify
+test_certify.py	test_e02_still_reports_an_ordinary_unresolvable_id_as_itself	KEEP	behaviour: writes md fixture: tmp repo with rule .md and skills-policy.md fixtures, runs certify
+test_certify.py	test_every_heading_rung_is_exactly_anchored	KEEP	behaviour: drives code: runs each level-3 heading rung over a sloppy tmp skills-policy.md; the wiki is only cited in the docstring
+test_certify.py	test_grandfathered_ids_never_satisfy_the_promotion_gate	KEEP	behaviour: writes md fixture: tmp repo with rule .md and skills-policy.md fixtures, runs certify
+test_certify.py	test_grandfathered_rule_ids_are_loud_and_narrow	KEEP	behaviour: writes md fixture: tmp repo with rule .md and skills-policy.md fixtures, runs certify
+test_certify.py	test_an_adoption_and_its_backtest_keep_the_certification_level	KEEP	behaviour: writes md fixture: tmp repo with rule .md and skills-policy.md fixtures, runs certify
+test_certify.py	test_s05_does_not_call_a_zero_judged_adoption_backtested	KEEP	behaviour: writes md fixture: tmp repo with rule .md and skills-policy.md fixtures, runs certify
+test_certify.py	test_a_boolean_is_not_a_judged_case_count	KEEP	behaviour: writes md fixture: tmp repo with rule .md and skills-policy.md fixtures, runs certify
+test_certify.py	test_a_pause_backtest_must_name_a_rule_the_tree_shows_paused	KEEP	behaviour: writes md fixture: pauses a tmp rule .md fixture, runs S-05
+test_certify.py	test_a_standing_pause_is_not_re_evidenced_at_every_ruleset_edit	KEEP	behaviour: writes md fixture: pauses a tmp rule .md fixture, runs S-05
+test_certify.py	test_every_paused_rule_carries_its_own_pause_backtest	KEEP	behaviour: writes md fixture: pauses a tmp rule .md fixture, runs S-05
+test_certify.py	test_s05_says_what_it_bound_and_what_it_did_not	KEEP	behaviour: writes md fixture: tmp repo with rule .md and skills-policy.md fixtures, runs certify
+test_certify.py	test_level5_fixture_repo_yaml_actually_parses	KEEP	behaviour: writes md fixture: tmp repo with rule .md and skills-policy.md fixtures, runs certify
+test_certify.py	test_levels_do_not_skip	KEEP	behaviour: writes md fixture: tmp repo with rule .md and skills-policy.md fixtures, runs certify
+test_certify.py	test_overlay_may_not_reuse_capability_ids_or_extend_badges	KEEP	behaviour: writes md fixture: tmp repo with rule .md and skills-policy.md fixtures, runs certify
+test_certify.py	test_partial_cage_does_not_earn_the_badge	KEEP	behaviour: writes md fixture: tmp repo with rule .md and skills-policy.md fixtures, runs certify
+test_certify.py	test_project_may_extend_the_ladder	KEEP	behaviour: writes md fixture: tmp repo with rule .md and skills-policy.md fixtures, runs certify
+test_certify.py	test_project_may_not_redefine_a_baseline_check	KEEP	behaviour: writes md fixture: tmp repo with rule .md and skills-policy.md fixtures, runs certify
+test_certify.py	test_promotion_bar_honors_the_retro_charter	KEEP	behaviour: writes md fixture: tmp repo with rule .md and skills-policy.md fixtures, runs certify
+test_certify.py	test_promotion_bar_met_counts_candidates_too	KEEP	behaviour: writes md fixture: tmp repo with rule .md and skills-policy.md fixtures, runs certify
+test_certify.py	test_promotion_bar_met_pass_fail_and_absent	KEEP	behaviour: writes md fixture: tmp repo with rule .md and skills-policy.md fixtures, runs certify
+test_certify.py	test_prose_and_blank_lines_do_not_count_as_disciplines	KEEP	behaviour: writes md fixture: tmp skills-policy.md fixture through R-09
+test_certify.py	test_prose_declaring_a_name_outside_a_list_item_is_ignored	KEEP	behaviour: writes md fixture: tmp skills-policy.md fixture through R-09
+test_certify.py	test_r09_accepts_design_approval	KEEP	behaviour: writes md fixture: tmp skills-policy.md through R-09
+test_certify.py	test_recognized_names_pass	KEEP	behaviour: writes md fixture: tmp skills-policy.md fixture through R-09
+test_certify.py	test_render_names_what_blocks_the_next_level	KEEP	behaviour: writes md fixture: tmp repo with rule .md and skills-policy.md fixtures, runs certify
+test_certify.py	test_rule_change_backtested_pass_fail_and_absent	KEEP	behaviour: writes md fixture: tmp repo with rule .md and skills-policy.md fixtures, runs certify
+test_certify.py	test_s04_detail_names_the_restatement_fold_when_one_happened	KEEP	behaviour: writes md fixture: tmp repo with rule .md and skills-policy.md fixtures, runs certify
+test_certify.py	test_s05_accepts_a_reword_action	KEEP	behaviour: writes md fixture: tmp repo with rule .md and skills-policy.md fixtures, runs certify
+test_certify.py	test_s05_bare_promote_at_current_version_fails_naming_validation	KEEP	behaviour: writes md fixture: tmp repo (make_repo) through S-05
+test_certify.py	test_s05_corrupt_artifact_after_a_valid_one_still_fails	KEEP	behaviour: writes md fixture: tmp repo with rule .md and skills-policy.md fixtures, runs certify
+test_certify.py	test_s05_corrupt_artifact_cannot_be_masked_by_a_valid_one	KEEP	behaviour: writes md fixture: tmp repo with rule .md and skills-policy.md fixtures, runs certify
+test_certify.py	test_s05_fails_when_no_backtest_carries_any_rules_version	KEEP	behaviour: writes md fixture: tmp repo with rule .md and skills-policy.md fixtures, runs certify
+test_certify.py	test_s05_microtest_missing_pieces_fail_naming_the_piece	KEEP	behaviour: writes md fixture: tmp repo (make_repo) through S-05
+test_certify.py	test_s05_nonpromote_actions_need_no_validation	KEEP	behaviour: writes md fixture: tmp repo (make_repo) through S-05
+test_certify.py	test_s05_promote_marked_unvalidated_with_reason_passes	KEEP	behaviour: writes md fixture: tmp repo (make_repo) through S-05
+test_certify.py	test_s05_promote_unvalidated_without_reason_fails	KEEP	behaviour: writes md fixture: tmp repo (make_repo) through S-05
+test_certify.py	test_s05_promote_with_full_microtest_passes	KEEP	behaviour: writes md fixture: tmp repo (make_repo) through S-05
+test_certify.py	test_s05_requires_a_backtest_naming_the_current_rules_version	KEEP	behaviour: writes md fixture: tmp repo with rule .md and skills-policy.md fixtures, runs certify
+test_certify.py	test_s05_stale_promote_artifact_is_history_never_revalidated	KEEP	behaviour: writes md fixture: tmp repo (make_repo) through S-05
+test_certify.py	test_s05_variant_named_control_cannot_shadow_the_control_arm	KEEP	behaviour: writes md fixture: tmp repo (make_repo) through S-05
+test_certify.py	test_s05_variant_without_exhibited_count_is_not_validated	KEEP	behaviour: writes md fixture: tmp repo (make_repo) through S-05
+test_certify.py	test_sibling_cage_for_another_repo_does_not_earn	KEEP	behaviour: writes md fixture: tmp repo with rule .md and skills-policy.md fixtures, runs certify
+test_certify.py	test_tracked_derived_cache_is_caught	KEEP	behaviour: writes md fixture: tmp repo with rule .md and skills-policy.md fixtures, runs certify
+test_certify.py	test_uncaged_level5_certifies_without_the_badge	KEEP	behaviour: writes md fixture: tmp repo with rule .md and skills-policy.md fixtures, runs certify
+test_certify.py	test_unknown_check_type_fails_loudly	KEEP	behaviour: writes md fixture: tmp repo with rule .md and skills-policy.md fixtures, runs certify
+test_certify.py	test_unrecognized_discipline_name_is_caught	KEEP	behaviour: writes md fixture: tmp skills-policy.md fixture through R-09
+test_certify.py	test_wrapped_prose_is_not_read_as_a_declaration	KEEP	behaviour: writes md fixture: tmp skills-policy.md fixture through R-09
+test_cli.py	test_autonomy_pause_skips_an_unpausable_candidate_and_exits_1_regression	KEEP	behaviour: writes md fixture: rule file, drives cli autonomy pause
+test_cli.py	test_the_range_binding_survives_the_terminal	KEEP	behaviour: drives code: attest write manifest range_binding
+test_cli.py	test_diff_writes_the_review_package_to_a_file	KEEP	contract: cli output format: warden diff -o writes the review package
+test_commit_lint.py	test_the_exemption_residual_admits_the_typed_title_route	KEEP	behaviour: drives code: lints typed titles first; reads a shell script comment, not a doc
+test_config.py	test_the_repo_fact_scan_fires_on_every_declared_name	KEEP	not a doc read: controls for a warden/*.py scan
+test_config.py	test_the_two_seams_a_reader_edits_carry_the_price	RETIRE	"wording: pins ""322x"" in Roadmap.md and a config.py docstring"
+test_config.py	test_the_roadmap_entry_cites_the_ruling	RETIRE	wording: pins Roadmap.md Stated limitations entry wording
+test_config.py	test_the_standing_ruling_does_not_claim_the_option_space_is_exhausted	RETIRE	wording: pins Roadmap.md entry, ruling text and config.py source wording
+test_config.py	test_certification_overlay_is_high_tier	KEEP	behaviour: drives code: classify of the overlay
+test_config.py	test_classify_first_match_wins_and_defaults_low	KEEP	not a doc read: README.md as a path to classify
+test_config.py	test_wiki_tier_is_declared_before_the_docs_default	KEEP	behaviour: drives code: repo.yaml risk tier ordering and classify
+test_corpus_rules.py	test_corpus_rules_dict_matches_the_tree	KEEP	behaviour: drives code: loads the real ruleset
+test_corpus_rules.py	test_decision_record_exists_for_all_five_findings	RETIRE	wording: pins docs/design/review-shapes.md headings and Decision/Declined wording
+test_corpus_rules.py	test_every_covers_bearing_rule_reports_without_blocking	KEEP	behaviour: drives code: loads rules, asserts severity
+test_declarative.py	test_a_junk_reason_does_not_suppress	KEEP	behaviour: writes md fixture: builds a declarative rule file in tmp and drives the rule loader/checker
+test_declarative.py	test_a_marker_outside_a_comment_does_not_suppress	KEEP	behaviour: writes md fixture: builds a declarative rule file in tmp and drives the rule loader/checker
+test_declarative.py	test_a_substantive_reason_still_suppresses	KEEP	behaviour: writes md fixture: builds a declarative rule file in tmp and drives the rule loader/checker
+test_declarative.py	test_added_scope_flags_only_added_lines	KEEP	behaviour: writes md fixture: builds a declarative rule file in tmp and drives the rule loader/checker
+test_declarative.py	test_allow_for_a_different_check_does_not_suppress	KEEP	behaviour: writes md fixture: builds a declarative rule file in tmp and drives the rule loader/checker
+test_declarative.py	test_allow_marker_on_the_line_above_suppresses	KEEP	behaviour: writes md fixture: builds a declarative rule file in tmp and drives the rule loader/checker
+test_declarative.py	test_allow_marker_with_reason_suppresses_same_line	KEEP	behaviour: writes md fixture: builds a declarative rule file in tmp and drives the rule loader/checker
+test_declarative.py	test_allow_without_a_reason_does_not_suppress	KEEP	behaviour: writes md fixture: builds a declarative rule file in tmp and drives the rule loader/checker
+test_declarative.py	test_bad_declarative_rules_fail_at_load	KEEP	behaviour: writes md fixture: builds a declarative rule file in tmp and drives the rule loader/checker
+test_declarative.py	test_checks_change_rules_version	KEEP	behaviour: writes md fixture: builds a declarative rule file in tmp and drives the rule loader/checker
+test_declarative.py	test_comment_leaders_of_other_languages_work	KEEP	behaviour: writes md fixture: builds a declarative rule file in tmp and drives the rule loader/checker
+test_declarative.py	test_declarative_rule_loads_and_carries_its_checks	KEEP	behaviour: writes md fixture: builds a declarative rule file in tmp and drives the rule loader/checker
+test_declarative.py	test_declarative_rule_needs_a_checker_free_registry	KEEP	behaviour: writes md fixture: builds a declarative rule file in tmp and drives the rule loader/checker
+test_declarative.py	test_deleted_file_asserts_nothing	KEEP	behaviour: writes md fixture: builds a declarative rule file in tmp and drives the rule loader/checker
+test_declarative.py	test_duplicate_check_ids_across_rules_are_refused	KEEP	behaviour: writes md fixture: builds a declarative rule file in tmp and drives the rule loader/checker
+test_declarative.py	test_file_scope_matches_untouched_content_with_line_number	KEEP	behaviour: writes md fixture: builds a declarative rule file in tmp and drives the rule loader/checker
+test_declarative.py	test_file_scope_reports_the_first_unallowed_match	KEEP	behaviour: writes md fixture: builds a declarative rule file in tmp and drives the rule loader/checker
+test_declarative.py	test_flags_apply	KEEP	behaviour: writes md fixture: builds a declarative rule file in tmp and drives the rule loader/checker
+test_declarative.py	test_globs_narrow_within_applies_to	KEEP	behaviour: writes md fixture: builds a declarative rule file in tmp and drives the rule loader/checker
+test_declarative.py	test_require_flags_absence	KEEP	behaviour: writes md fixture: builds a declarative rule file in tmp and drives the rule loader/checker
+test_declare_check.py	test_a_job_whose_review_is_conditional_is_still_a_gate_job	KEEP	behaviour: writes md fixture: _repo tmp repo writes a rule .md and drives declared checks
+test_declare_check.py	test_a_run_after_a_closed_block_is_still_a_run	KEEP	behaviour: writes md fixture: _repo tmp repo writes a rule .md and drives declared checks
+test_declare_check.py	test_an_ordinary_shift_left_does_not_blank_the_rest_of_the_step	KEEP	behaviour: writes md fixture: _repo tmp repo writes a rule .md and drives declared checks
+test_declare_check.py	test_an_unquoted_mention_is_not_a_run	KEEP	behaviour: writes md fixture: _repo tmp repo writes a rule .md and drives declared checks
+test_declare_check.py	test_one_steps_unbalanced_block_does_not_hide_the_next_steps_run	KEEP	behaviour: writes md fixture: _repo tmp repo writes a rule .md and drives declared checks
+test_declare_check.py	test_the_wrapper_spelling_the_docs_prescribe_is_still_a_run	KEEP	behaviour: writes md fixture: _repo tmp repo writes a rule .md and drives declared checks
+test_declare_check.py	test_case_as_an_ordinary_argument_inside_a_substitution_does_not_swallow_the_step	KEEP	behaviour: writes md fixture: _repo tmp repo writes a rule .md and drives declared checks
+test_declare_check.py	test_d01_a_declared_reach_is_clean_even_when_it_narrows	KEEP	behaviour: writes md fixture: _repo tmp repo writes a rule .md and drives declared checks
+test_declare_check.py	test_d01_a_root_cwd_claims_nothing_and_is_not_drift	KEEP	behaviour: writes md fixture: _repo tmp repo writes a rule .md and drives declared checks
+test_declare_check.py	test_d01_catches_a_scope_that_narrows_by_inference	KEEP	behaviour: writes md fixture: _repo tmp repo writes a rule .md and drives declared checks
+test_declare_check.py	test_d01_matches_globs_against_the_warden_tree_files_too	KEEP	behaviour: drives code: tree_paths must include files under .warden/; path membership, not wording
+test_declare_check.py	test_d01_reads_deploy_scopes_too	KEEP	behaviour: writes md fixture: _repo tmp repo writes a rule .md and drives declared checks
+test_declare_check.py	test_d01_refuses_a_covers_glob_that_matches_no_path_in_the_tree	KEEP	behaviour: writes md fixture: _repo tmp repo writes a rule .md and drives declared checks
+test_declare_check.py	test_d02_a_declared_optional_key_this_repo_omits_is_not_drift	KEEP	behaviour: writes md fixture: _repo tmp repo writes a rule .md and drives declared checks
+test_declare_check.py	test_d02_catches_a_hash_claim_that_is_wrong_in_either_direction	KEEP	behaviour: writes md fixture: _repo tmp repo writes a rule .md and drives declared checks
+test_declare_check.py	test_d02_proves_the_hash_claims_by_perturbation	KEEP	behaviour: writes md fixture: _repo tmp repo writes a rule .md and drives declared checks
+test_declare_check.py	test_d02_refuses_a_schema_key_the_inventory_never_heard_of	KEEP	behaviour: writes md fixture: _repo tmp repo writes a rule .md and drives declared checks
+test_declare_check.py	test_d02_the_rules_dir_and_checkers_dir_really_move_the_version	KEEP	behaviour: writes md fixture: _repo tmp repo writes a rule .md and drives declared checks
+test_declare_check.py	test_d03_a_quoted_hash_is_not_a_comment	KEEP	behaviour: writes md fixture: _repo tmp repo writes a rule .md and drives declared checks
+test_declare_check.py	test_d03_catches_a_gate_job_that_skips_a_declared_scope	KEEP	behaviour: writes md fixture: _repo tmp repo writes a rule .md and drives declared checks
+test_declare_check.py	test_d03_does_not_read_a_commented_out_or_echoed_invocation_as_a_run	KEEP	behaviour: writes md fixture: _repo tmp repo writes a rule .md and drives declared checks
+test_declare_check.py	test_d03_is_clean_when_the_gate_job_runs_every_scope	KEEP	behaviour: writes md fixture: _repo tmp repo writes a rule .md and drives declared checks
+test_declare_check.py	test_d03_reads_a_wrapper_prefixed_invocation_the_docs_prescribe	KEEP	behaviour: drives code: D-03 scope-runner check against the real examples/hello-svc workflow; reads no doc
+test_declare_check.py	test_d03_reads_the_spellings_a_shell_actually_runs	KEEP	behaviour: writes md fixture: _repo tmp repo writes a rule .md and drives declared checks
+test_declare_check.py	test_d03_refuses_a_negated_paren_when_the_environment_can_set_extglob	KEEP	behaviour: writes md fixture: _repo tmp repo writes a rule .md and drives declared checks
+test_declare_check.py	test_d03_refuses_a_workflow_it_cannot_parse	KEEP	behaviour: writes md fixture: _repo tmp repo writes a rule .md and drives declared checks
+test_declare_check.py	test_d03_requires_the_scope_in_the_SAME_job_as_the_review	KEEP	behaviour: writes md fixture: _repo tmp repo writes a rule .md and drives declared checks
+test_declare_check.py	test_d03_skips_rather_than_passes_when_no_job_runs_the_review	KEEP	behaviour: writes md fixture: _repo tmp repo writes a rule .md and drives declared checks
+test_declare_check.py	test_d03_still_refuses_a_mention_now_that_quotes_are_stripped	KEEP	behaviour: writes md fixture: _repo tmp repo writes a rule .md and drives declared checks
+test_declare_check.py	test_d04_an_explicit_tier_is_the_exemption_even_at_LOW	KEEP	behaviour: writes md fixture: _repo tmp repo writes a rule .md and drives declared checks
+test_declare_check.py	test_d04_catches_a_gate_surface_path_with_no_tier	KEEP	behaviour: writes md fixture: _repo tmp repo writes a rule .md and drives declared checks
+test_declare_check.py	test_d04_reads_a_policy_that_declares_no_fenced_path_on_the_real_example	KEEP	contract: machine-parsed schema/format: policy_gate_paths and declare check parse the example's skills-policy.md Never-edit paragraph
+test_declare_check.py	test_d04_reads_protected_paths_as_gate_surface_too	KEEP	behaviour: writes md fixture: _repo tmp repo writes a rule .md and drives declared checks
+test_declare_check.py	test_d04_reads_the_first_paragraph_not_the_carve_out_prose	KEEP	behaviour: writes md fixture: tmp skills-policy.md parsed by policy_gate_paths
+test_declare_check.py	test_d04_refuses_a_policy_paragraph_it_cannot_read	KEEP	behaviour: writes md fixture: tmp skills-policy.md the D-04 reader must refuse
+test_declare_check.py	test_d04_skips_when_nothing_declares_a_gate_surface	KEEP	behaviour: writes md fixture: _repo tmp repo writes a rule .md and drives declared checks
+test_declare_check.py	test_declare_check_exit_codes_are_the_contract	KEEP	behaviour: writes md fixture: _repo tmp repo writes a rule .md and drives declared checks
+test_declare_check.py	test_declare_check_exits_2_when_a_check_cannot_evaluate	KEEP	behaviour: writes md fixture: _repo tmp repo writes a rule .md and drives declared checks
+test_declare_check.py	test_declare_check_perturbs_a_copy_and_never_the_real_repo_yaml	KEEP	behaviour: writes md fixture: _repo tmp repo writes a rule .md and drives declared checks
+test_declare_check.py	test_declare_check_reports_as_json_for_a_machine	KEEP	behaviour: writes md fixture: _repo tmp repo writes a rule .md and drives declared checks
+test_declare_check.py	test_a_heredoc_body_is_not_commands	KEEP	behaviour: writes md fixture: _repo tmp repo writes a rule .md and drives declared checks
+test_deploy_cli.py	test_deploy_a_non_json_file_in_the_store_is_not_an_unreadable_shard_regression	KEEP	behaviour: writes md fixture: deploy_repo writes a rule .md and drives warden deploy
+test_deploy_cli.py	test_deploy_a_tag_shadowing_the_branch_does_not_bypass_reachability_regression	KEEP	behaviour: writes md fixture: deploy_repo writes a rule .md and drives warden deploy
+test_deploy_cli.py	test_deploy_accepts_the_squash_commit_that_carries_its_shard	KEEP	behaviour: writes md fixture: deploy_repo writes a rule .md and drives warden deploy
+test_deploy_cli.py	test_deploy_branch_resolves_a_remote_tracking_ref	KEEP	behaviour: writes md fixture: deploy_repo writes a rule .md and drives warden deploy
+test_deploy_cli.py	test_deploy_default_commit_is_head	KEEP	behaviour: writes md fixture: deploy_repo writes a rule .md and drives warden deploy
+test_deploy_cli.py	test_deploy_failing_scope_command_exits_1_and_records_fail	KEEP	behaviour: writes md fixture: deploy_repo writes a rule .md and drives warden deploy
+test_deploy_cli.py	test_deploy_halts_the_scope_at_the_first_failed_step_regression	KEEP	behaviour: writes md fixture: deploy_repo writes a rule .md and drives warden deploy
+test_deploy_cli.py	test_deploy_ignores_an_uncommitted_forged_shard_regression	KEEP	behaviour: writes md fixture: deploy_repo writes a rule .md and drives warden deploy
+test_deploy_cli.py	test_deploy_pass_writes_schema_valid_artifact_bound_to_the_commit	KEEP	behaviour: writes md fixture: deploy_repo writes a rule .md and drives warden deploy
+test_deploy_cli.py	test_deploy_reads_a_non_ascii_shard_filename_regression	KEEP	behaviour: writes md fixture: deploy_repo writes a rule .md and drives warden deploy
+test_deploy_cli.py	test_deploy_refuses_a_dirty_tree_naming_the_reason_regression	KEEP	behaviour: writes md fixture: deploy_repo writes a rule .md and drives warden deploy
+test_deploy_cli.py	test_deploy_refuses_a_merged_commit_with_no_clean_attestation	KEEP	behaviour: writes md fixture: deploy_repo writes a rule .md and drives warden deploy
+test_deploy_cli.py	test_deploy_refuses_a_non_branch_ref_as_the_branch_regression	KEEP	behaviour: writes md fixture: deploy_repo writes a rule .md and drives warden deploy
+test_deploy_cli.py	test_deploy_refuses_an_unmerged_commit_naming_the_reason	KEEP	behaviour: writes md fixture: deploy_repo writes a rule .md and drives warden deploy
+test_deploy_cli.py	test_deploy_refuses_when_the_checkout_is_not_the_commit_regression	KEEP	behaviour: writes md fixture: deploy_repo writes a rule .md and drives warden deploy
+test_deploy_cli.py	test_deploy_refuses_when_the_only_attestation_is_findings_open	KEEP	behaviour: writes md fixture: deploy_repo writes a rule .md and drives warden deploy
+test_deploy_cli.py	test_deploy_unknown_scope_exits_2	KEEP	behaviour: writes md fixture: deploy_repo writes a rule .md and drives warden deploy
+test_deploy_cli.py	test_deploy_unreadable_store_exits_2_even_when_already_refused_regression	KEEP	behaviour: writes md fixture: deploy_repo writes a rule .md and drives warden deploy
+test_deploy_cli.py	test_deploy_unreadable_store_exits_2_when_nothing_else_matches	KEEP	behaviour: writes md fixture: deploy_repo writes a rule .md and drives warden deploy
+test_deploy_cli.py	test_deploy_unresolvable_branch_exits_2_never_a_pass	KEEP	behaviour: writes md fixture: deploy_repo writes a rule .md and drives warden deploy
+test_deploy_cli.py	test_deploy_unresolvable_commit_exits_2_never_a_pass	KEEP	behaviour: writes md fixture: deploy_repo writes a rule .md and drives warden deploy
+test_deploy_cli.py	test_deploy_with_no_declared_scopes_exits_2	KEEP	behaviour: writes md fixture: deploy_repo writes a rule .md and drives warden deploy
+test_deploy_cli.py	test_deploy_refuses_the_shard_attest_check_calls_unreadable	KEEP	behaviour: writes md fixture: deploy_repo writes a rule .md and drives warden deploy
+test_deploy_cli.py	test_first_parent_raises_on_an_unresolvable_commit_regression	KEEP	behaviour: writes md fixture: deploy_repo writes a rule .md and drives warden deploy
+test_design_records.py	test_design_records_relative_links_resolve	RETIRE	wording: reads docs/design/*.md and asserts relative links resolve and the prior-art record links the brief
+test_design_records.py	test_every_artifact_the_brief_hands_over_still_exists	RETIRE	wording: reads docs/design/patent-assessment-brief.md and asserts the paths its prose names are tracked
+test_design_records.py	test_the_brief_grades_the_prior_art_it_restates	RETIRE	wording: reads a docs/design record (prior-art positioning or patent brief) and asserts phrases, sections or heading order survive
+test_design_records.py	test_the_brief_hands_over_the_argument_against_novelty	RETIRE	wording: reads a docs/design record (prior-art positioning or patent brief) and asserts phrases, sections or heading order survive
+test_design_records.py	test_the_brief_leads_with_the_disclosure_clock	RETIRE	wording: reads a docs/design record (prior-art positioning or patent brief) and asserts phrases, sections or heading order survive
+test_design_records.py	test_the_brief_recommends_nothing_and_assesses_nothing	RETIRE	wording: reads a docs/design record (prior-art positioning or patent brief) and asserts phrases, sections or heading order survive
+test_design_records.py	test_the_records_describe_capabilities_this_tree_ACTUALLY_has	RETIRE	wording: reads docs/design/prior-art-positioning.md and asserts its wording matches attest.py/repo.yaml; drives no code
+test_design_records.py	test_the_settled_licence_carveout_is_earned_and_narrow	RETIRE	control for retired wording guard: pins the licence carve-out regex that only the design-record fabrication scan used
+test_design_records.py	test_every_grade_and_the_unverified_asymmetry_survive	RETIRE	wording: reads a docs/design record (prior-art positioning or patent brief) and asserts phrases, sections or heading order survive
+test_design_records.py	test_the_bet_is_stated_as_one_bet	RETIRE	wording: reads a docs/design record (prior-art positioning or patent brief) and asserts phrases, sections or heading order survive
+test_design_records.py	test_the_do_not_claim_list_survives_editing	RETIRE	wording: reads a docs/design record (prior-art positioning or patent brief) and asserts phrases, sections or heading order survive
+test_design_records.py	test_the_near_miss_table_keeps_every_row	RETIRE	wording: reads a docs/design record (prior-art positioning or patent brief) and asserts phrases, sections or heading order survive
+test_design_records.py	test_the_record_states_no_price_and_no_version_number	RETIRE	wording: reads a docs/design record (prior-art positioning or patent brief) and asserts phrases, sections or heading order survive
+test_design_records.py	test_the_unfinished_research_stays_marked_open	RETIRE	wording: reads a docs/design record (prior-art positioning or patent brief) and asserts phrases, sections or heading order survive
+test_design_records.py	test_the_verified_argument_matches_the_page_it_came_from	RETIRE	wording: reads a docs/design record (prior-art positioning or patent brief) and asserts phrases, sections or heading order survive
+test_doc_fidelity.py	test_adopting_teaches_both_halves_of_the_ruleset_probe	RETIRE	wording: Adopting.md bullet phrasing and test citations
+test_doc_fidelity.py	test_the_ruleset_probe_behaves_as_the_table_says	KEEP	behaviour: drives code: drives memory.ingest refusal matrix on real trees and cli exit codes per table row
+test_doc_fidelity.py	test_a_row_relabelled_for_another_input_fails_the_table_guard	KEEP	behaviour: drives code: control for the kept driven table guard; runs cli.main for the rows before the mutated one
+test_doc_fidelity.py	test_swapping_two_rows_with_equal_cells_fails_the_table_guard	KEEP	behaviour: drives code: control certifying the kept driven table guard (label binding)
+test_doc_fidelity.py	test_the_ruleset_is_named_by_its_path_not_by_the_word	KEEP	behaviour: drives code: monkeypatches memory._assert_ruleset_readable and drives the probe through cli.main
+test_doc_fidelity.py	test_every_cli_subaction_is_documented	RETIRE	wording: CLI-Reference.md table names every positional action
+test_doc_fidelity.py	test_every_cli_subcommand_is_documented	RETIRE	wording: CLI-Reference.md table and Adopting.md prose must name each derived subcommand
+test_doc_fidelity.py	test_every_repo_yaml_key_is_documented	RETIRE	wording: Adopting.md must mention every schema key
+test_doc_fidelity.py	test_gate_pipeline_adjudication_count_is_derived	RETIRE	wording: Gate-Pipeline.md count and table rows restated from the catalog
+test_doc_fidelity.py	test_ladder_table_matches_baseline	RETIRE	wording: wiki ladder table and check-id citations restated from baseline.yaml
+test_doc_fidelity.py	test_the_carve_out_claim_is_measured_against_the_store	RETIRE	wording: Adopting.md sentence held to a store count; drives no warden code
+test_doc_fidelity.py	test_retro_record_attributes_the_hnw6_findings_to_the_right_files	RETIRE	wording: retro record E1 section names files
+test_doc_fidelity.py	test_retro_record_never_pairs_a_rank_with_the_other_indexs_count	RETIRE	wording: retro record table row tokens
+test_doc_fidelity.py	test_retro_record_upheld_count_is_derived_from_its_shard	RETIRE	wording: docs/design/retro-20260829.md count
+test_doc_fidelity.py	test_the_run_dir_writer_list_names_no_pure_read	RETIRE	wording: Adopting.md prose list of run-dir writers
+test_doc_fidelity.py	test_wiki_quotes_the_real_constants	RETIRE	wording: Memory/Gate-Pipeline/Writing-Rules/CLI-Reference/Skills-Policy prose restates constants
+test_docs.py	test_claude_md_names_the_live_consumer_in_both_statements	RETIRE	wording: CLAUDE.md live-consumer sentence and portability bullet
+test_docs.py	test_no_tracked_file_names_the_former_consumer_as_the_consumer	RETIRE	wording: consumer-claim proximity scan over tracked files
+test_docs.py	test_the_claim_aggregator_reports_every_branch	RETIRE	control for retired wording guard: consumer-claim aggregator
+test_docs.py	test_the_consumer_claim_scan_fires_and_stays_silent	RETIRE	control for retired wording guard: consumer-claim detector
+test_docs.py	test_the_memory_exclusion_is_pinned_and_not_idle	RETIRE	control for retired wording guard: consumer-claim scan exclusion
+test_docs.py	test_this_modules_two_names_are_the_declared_consumer_set	RETIRE	control for retired wording guard: consumer names the claim scans were built from
+test_docs.py	test_no_reader_facing_page_orphans_an_ordinal	RETIRE	wording: ordinal-consumer vocabulary scan over README and wiki
+test_docs.py	test_nothing_tracked_denies_an_enrollment_that_happened	RETIRE	wording: enrollment-denial vocabulary scan over tracked files
+test_docs.py	test_the_orphan_ordinal_scan_fires_and_stays_silent	RETIRE	control for retired wording guard: ordinal and denial detectors
+test_docs.py	test_the_root_carries_exactly_one_license_and_every_surface_agrees	KEEP	contract: machine-parsed schema/format: one root licence file and agreeing pyproject.toml and marketplace.json licence fields (also carries two README phrase checks)
+test_docs.py	test_gate_pipeline_lists_every_attest_rejection	RETIRE	wording: CLI-Reference.md attest row must contain listed phrases
+test_docs.py	test_the_denial_scan_reads_markdown_as_markdown	RETIRE	control for retired wording guard: denial scan fence and heading handling
+test_docs.py	test_adopting_repo_yaml_snippet_is_the_real_file	KEEP	contract: consumer-copied snippet: Adopting.md repo.yaml block byte-identical to examples/hello-svc/repo.yaml
+test_docs.py	test_adopting_rule_snippet_is_the_real_rule	KEEP	contract: consumer-copied snippet: Writing-Rules.md rule block equals the example's secrets-in-diff rule file
+test_docs.py	test_adopting_workflow_snippet_carries_no_mutable_action_ref	KEEP	contract: consumer-copied snippet: Adopting.md workflow refs checked with the pinned-actions rule's own patterns
+test_docs.py	test_adopting_workflow_snippet_shas_match_the_real_workflow	KEEP	contract: consumer-copied snippet: Adopting.md workflow SHAs equal the ones ci.yml runs
+test_docs.py	test_all_wiki_pages_exist_and_home_links_them	RETIRE	wording: page-link floor: hand-written page lists must equal docs/wiki and each be linked from Home prose
+test_docs.py	test_c4_ladder_pages_exist_and_both_indexes_link_every_level	RETIRE	wording: page-link floor: Architecture.md and Home.md must link each C4 page
+test_docs.py	test_c4_structural_levels_apply_only_the_shared_palette	RETIRE	wording: diagram styling convention (classDef use, palette) on C4 pages
+test_docs.py	test_container_diagram_draws_every_product_the_readme_claims	RETIRE	wording: README product table names must appear as Level 2 diagram node titles
+test_docs.py	test_every_structural_c4_page_explains_how_to_read_it	RETIRE	wording: C4 pages must contain a Reading it paragraph and a table
+test_docs.py	test_example_workflow_pins_match_the_real_workflow	KEEP	not a doc read: example workflow SHAs against root ci.yml
+test_docs.py	test_exempt_set_problems_fire_and_stay_silent	KEEP	not a doc read: control for the home-path exemption set, inline data
+test_docs.py	test_graph_layer_sample_is_real_generated_output	KEEP	contract: cli output format: Graph-Layer.md sample must equal real graph render output (drives warden.graph)
+test_docs.py	test_graph_layer_yaml_sample_is_the_real_graph	KEEP	contract: consumer-copied snippet: Graph-Layer.md yaml block equals graph.yaml
+test_docs.py	test_home_path_detector_fires_and_stays_silent	KEEP	not a doc read: control for the home-path detector, inline strings
+test_docs.py	test_home_path_problems_fires_on_every_branch	KEEP	not a doc read: control for the home-path aggregate, tmp files
+test_docs.py	test_home_publish_status_matches_the_publish_mechanism_in_the_tree	RETIRE	wording: Home.md publish-status sentence against a file-presence probe
+test_docs.py	test_home_table_lists_every_wiki_source_page	KEEP	contract: machine-parsed schema/format: Home.md page table is parsed by scripts/build-wiki.sh as the published nav order
+test_docs.py	test_home_teaches_the_mirror_rule_and_names_no_avoided_wiki_tab	RETIRE	wording: Home.md banner phrases and a banned sentence across wiki pages
+test_docs.py	test_mermaid_fences_balanced_and_nonempty	KEEP	contract: machine-parsed schema/format: mermaid fences are parsed by the renderer; structural parse check, no wording
+test_docs.py	test_no_maintainer_home_path_is_tracked	KEEP	not a doc read: privacy leak scan of every tracked file for real home directories, not doc wording
+test_docs.py	test_no_source_invents_a_definition_of_done_requirement	RETIRE	wording: proximity scan of CLAUDE.md, Memory.md and sources for a DoD phrase
+test_docs.py	test_the_sentinel_pass_never_lengthens_the_text	RETIRE	control for retired wording guard: denial scan sentinel pass
+test_docs.py	test_oss_posture_problems_fire_and_stay_silent	RETIRE	control for retired wording guard: open-source vocabulary detector
+test_docs.py	test_readme_status_keeps_its_proven_vs_built_caveat	RETIRE	wording: README Status admission sentences and a Why page anchor
+test_docs.py	test_relative_links_resolve	KEEP	contract: machine-parsed schema/format: relative links in README and wiki are rewritten by scripts/build-wiki.sh for the published mirror; a dead link is a broken published link, not wording
+test_docs.py	test_scan_paths_fires_on_undecodable_and_reads_symlink_targets	KEEP	not a doc read: control for the tree-wide home-directory leak scan, over tmp files
+test_docs.py	test_structural_diagrams_live_only_on_the_c4_ladder	RETIRE	wording: doc-authoring convention about which pages may carry a diagram
+test_docs.py	test_the_cost_page_states_no_per_pr_price_it_cannot_defend	RETIRE	wording: Cost-and-Throughput.md money mentions and hedge phrases
+test_docs.py	test_the_diagram_toolchain_is_pinned_by_lockfile	KEEP	not a doc read: package.json, lockfile and validate-diagrams.sh
+test_docs.py	test_the_example_invokes_no_local_file_it_does_not_ship	KEEP	not a doc read: example workflow run steps against the git index
+test_docs.py	test_the_fabrication_patterns_fire_and_stay_silent	RETIRE	control for retired wording guard: FIRES/SILENT on conftest FABRICATED_PRICE_RE/FABRICATED_VERSION_RE, whose only page scans (test_docs, test_design_records) are retired
+test_docs.py	test_the_outcome_field_states_both_directions_of_pack_pin_skew	RETIRE	wording: Skill-Pack.md 0.17.0 row and Memory.md no-review paragraph phrases
+test_docs.py	test_the_stats_dispatches_footnote_states_all_three_causes_of_no_review	KEEP	contract: cli output format: drives memory.render_stats and asserts the DISPATCHES footnote it prints; no doc read
+test_docs.py	test_ci_proves_the_gate_bites_on_a_known_bad_diagram	KEEP	not a doc read: reads the broken-diagram test fixture and ci.yml
+test_docs.py	test_ci_runs_the_diagram_parser_enforced	KEEP	not a doc read: reads ci.yml through certify's ci_step_enforced check
+test_docs.py	test_fence_check_accepts_diagrams_the_real_parser_rejects	KEEP	not a doc read: drives the fence checker over inline snippets
+test_docs.py	test_why_page_cites_only_verified_competitive_claims	RETIRE	wording: fabrication vocabulary scan and pinned sentence on Why-This-Exists.md
+test_docs.py	test_why_page_keeps_its_honesty	RETIRE	wording: Why-This-Exists.md must contain pinned admission sentences
+test_docs.py	test_wiki_teaches_the_unload_step_enroll_prints	RETIRE	wording: phrases in The-Cage.md and Adopting.md plus a source-text phrase grep of cage/cli.py; drives no code
+test_docs.py	test_no_tracked_page_calls_this_repo_open_source	RETIRE	wording: open-source vocabulary scan over every tracked markdown page
+test_docs.py	test_the_home_placeholder_set_is_pinned_and_every_name_is_earned	KEEP	not a doc read: pins the home-path leak guard's placeholder allowlist
+test_docs.py	test_the_placeholder_minimality_check_is_not_self_satisfying	KEEP	not a doc read: control for the placeholder minimality subject
+test_gap_answers.py	test_decisions_are_machine_readable_now	KEEP	not a doc read: loads catalog answers and rules
+test_graph.py	test_autonomous_run_records_its_node_and_cage_ledgers_it	KEEP	contract: machine-parsed schema/format: skill's `node:` summary line that run.sh greps
+test_graph.py	test_pre_pr_review_defers_to_the_declared_graph	RETIRE	wording: pins pre-pr-review/SKILL.md phrases
+test_guard_mutations.py	test_a_conftest_guard_is_swept_through_its_witnesses	RETIRE	harness self-test whose subject vocabulary was retired in this change
+test_guard_mutations.py	test_the_exemption_list_is_load_bearing	RETIRE	harness self-test whose subject vocabulary was retired in this change
+test_lifecycle.py	test_a_barely_exercised_rule_is_untested_never_retired	KEEP	behaviour: writes md fixture: rule_file writes a .warden/rules fixture and drives lifecycle.rule_lifecycle
+test_lifecycle.py	test_a_blind_corpus_and_a_blind_history_retire_nothing	KEEP	behaviour: writes md fixture: rule_file writes a .warden/rules fixture and drives lifecycle.rule_lifecycle
+test_lifecycle.py	test_a_corpus_only_silence_is_named_the_weakest_row	KEEP	behaviour: writes md fixture: rule_file writes a .warden/rules fixture and drives lifecycle.rule_lifecycle
+test_lifecycle.py	test_a_corpus_only_silence_needs_a_corpus_big_enough_to_mean_it	KEEP	behaviour: writes md fixture: rule_file writes a .warden/rules fixture and drives lifecycle.rule_lifecycle
+test_lifecycle.py	test_a_gate_detection_counts_as_the_rule_having_fired	KEEP	behaviour: writes md fixture: rule_file writes a .warden/rules fixture and drives lifecycle.rule_lifecycle
+test_lifecycle.py	test_a_hazard_looked_for_in_zero_files_is_not_reported_absent	KEEP	behaviour: writes md fixture: rule_file writes a .warden/rules fixture and drives lifecycle.rule_lifecycle
+test_lifecycle.py	test_a_judged_finding_counts_as_the_rule_having_fired	KEEP	behaviour: writes md fixture: rule_file writes a .warden/rules fixture and drives lifecycle.rule_lifecycle
+test_lifecycle.py	test_a_judgment_rule_gets_no_fabricated_tree_measurement	KEEP	behaviour: writes md fixture: rule_file writes a .warden/rules fixture and drives lifecycle.rule_lifecycle
+test_lifecycle.py	test_a_judgment_rule_is_never_called_over_broad_on_an_unmeasured_rate	KEEP	behaviour: writes md fixture: rule_file writes a .warden/rules fixture and drives lifecycle.rule_lifecycle
+test_lifecycle.py	test_a_mixed_scope_rules_added_only_hits_are_not_credited_to_a_file_check	KEEP	behaviour: writes md fixture: rule_file writes a .warden/rules fixture and drives lifecycle.rule_lifecycle
+test_lifecycle.py	test_a_near_always_dismissed_rule_is_proposed_for_demotion	KEEP	behaviour: writes md fixture: rule_file writes a .warden/rules fixture and drives lifecycle.rule_lifecycle
+test_lifecycle.py	test_a_never_fired_rule_is_proposed_for_retirement_with_its_window	KEEP	behaviour: writes md fixture: rule_file writes a .warden/rules fixture and drives lifecycle.rule_lifecycle
+test_lifecycle.py	test_a_partially_replayable_rule_keeps_its_replay_and_its_caveat	KEEP	behaviour: writes md fixture: rule_file writes a .warden/rules fixture and drives lifecycle.rule_lifecycle
+test_lifecycle.py	test_a_require_true_rule_is_not_called_silent_on_a_replay_that_skipped_it	KEEP	behaviour: writes md fixture: rule_file writes a .warden/rules fixture and drives lifecycle.rule_lifecycle
+test_lifecycle.py	test_a_rule_firing_on_nearly_every_diff_is_proposed_for_narrowing	KEEP	behaviour: writes md fixture: rule_file writes a .warden/rules fixture and drives lifecycle.rule_lifecycle
+test_lifecycle.py	test_a_rule_that_fires_occasionally_is_left_alone	KEEP	behaviour: writes md fixture: rule_file writes a .warden/rules fixture and drives lifecycle.rule_lifecycle
+test_lifecycle.py	test_a_rule_the_corpus_upholds_is_left_alone	KEEP	behaviour: writes md fixture: rule_file writes a .warden/rules fixture and drives lifecycle.rule_lifecycle
+test_lifecycle.py	test_a_silent_rule_whose_pattern_still_matches_the_tree_reads_as_inert	KEEP	behaviour: writes md fixture: rule_file writes a .warden/rules fixture and drives lifecycle.rule_lifecycle
+test_lifecycle.py	test_a_silent_rule_with_a_clean_tree_is_reported_undecidable	KEEP	behaviour: writes md fixture: rule_file writes a .warden/rules fixture and drives lifecycle.rule_lifecycle
+test_lifecycle.py	test_a_thin_dismissal_history_is_not_enough_to_demote	KEEP	behaviour: writes md fixture: rule_file writes a .warden/rules fixture and drives lifecycle.rule_lifecycle
+test_lifecycle.py	test_an_adjudicated_allow_marker_is_not_counted_as_an_unflagged_hazard	KEEP	behaviour: writes md fixture: rule_file writes a .warden/rules fixture and drives lifecycle.rule_lifecycle
+test_lifecycle.py	test_an_already_paused_rule_is_reported_not_re_proposed	KEEP	behaviour: writes md fixture: rule_file writes a .warden/rules fixture and drives lifecycle.rule_lifecycle
+test_lifecycle.py	test_an_unreadable_history_is_stated_never_counted_as_silence	KEEP	behaviour: writes md fixture: rule_file writes a .warden/rules fixture and drives lifecycle.rule_lifecycle
+test_lifecycle.py	test_an_unreadable_ruleset_makes_no_lifecycle_claim	KEEP	behaviour: writes md fixture: broken rule file drives lifecycle
+test_lifecycle.py	test_excluded_paths_are_not_counted_as_selections	KEEP	behaviour: writes md fixture: rule_file writes a .warden/rules fixture and drives lifecycle.rule_lifecycle
+test_lifecycle.py	test_never_selected_is_reported_apart_from_evaluated_and_silent	KEEP	behaviour: writes md fixture: rule_file writes a .warden/rules fixture and drives lifecycle.rule_lifecycle
+test_lifecycle.py	test_never_selected_needs_a_window_long_enough_to_mean_it	KEEP	behaviour: writes md fixture: rule_file writes a .warden/rules fixture and drives lifecycle.rule_lifecycle
+test_lifecycle.py	test_pre_existing_matches_do_not_convict_a_scope_added_rule	KEEP	behaviour: writes md fixture: rule_file writes a .warden/rules fixture and drives lifecycle.rule_lifecycle
+test_lifecycle.py	test_rule_lifecycle_defaults_to_the_declared_rules_dir	KEEP	behaviour: writes md fixture: rules dir from repo.yaml
+test_lifecycle.py	test_rules_lifecycle_reads_the_declared_ruleset_not_a_hardcoded_path	KEEP	behaviour: writes md fixture: custom rules dir
+test_lifecycle.py	test_the_chronic_read_catches_what_the_acute_streak_cannot	KEEP	behaviour: writes md fixture: rule_file writes a .warden/rules fixture and drives lifecycle.rule_lifecycle
+test_lifecycle.py	test_the_dismissal_bound_is_memorys_own_wilson_function	KEEP	behaviour: writes md fixture: rule_file writes a .warden/rules fixture and drives lifecycle.rule_lifecycle
+test_lifecycle.py	test_the_firing_rate_is_measured_within_the_rules_own_applies_to	KEEP	behaviour: writes md fixture: rule_file writes a .warden/rules fixture and drives lifecycle.rule_lifecycle
+test_lifecycle.py	test_the_json_artifact_carries_nulls_where_nothing_was_measured	KEEP	behaviour: writes md fixture: rule_file writes a .warden/rules fixture and drives lifecycle.rule_lifecycle
+test_lifecycle.py	test_the_module_proposes_and_never_edits_a_rule	KEEP	behaviour: writes md fixture: rule_file writes a .warden/rules fixture and drives lifecycle.rule_lifecycle
+test_lifecycle.py	test_the_pack_version_moves_when_a_skills_judgment_contract_does	KEEP	contract: machine-parsed schema/format: compares SKILL.md bytes to base only to require a plugin.json version bump the installer keys on; no wording asserted
+test_lifecycle.py	test_the_reader_facing_pages_teach_the_subtractive_half	RETIRE	wording: reads Skill-Pack.md and asserts the rule-advisor row mentions lifecycle
+test_lifecycle.py	test_the_report_states_both_windows_it_measured_over	KEEP	behaviour: writes md fixture: rule_file writes a .warden/rules fixture and drives lifecycle.rule_lifecycle
+test_lifecycle.py	test_the_report_states_the_absence_of_evidence_case_plainly	KEEP	behaviour: writes md fixture: rule_file writes a .warden/rules fixture and drives lifecycle.rule_lifecycle
+test_lifecycle.py	test_the_rule_advisor_skill_audits_the_set_it_already_has	RETIRE	wording: reads rule-advisor SKILL.md and asserts retire/proposal/absence-of-evidence phrases
+test_lifecycle.py	test_the_tree_scans_own_caveats_reach_the_report	KEEP	behaviour: writes md fixture: rule_file writes a .warden/rules fixture and drives lifecycle.rule_lifecycle
+test_lifecycle.py	test_the_wiki_documents_the_lifecycle_action	RETIRE	wording: reads Writing-Rules.md and asserts it names rules lifecycle
+test_loader_parity.py	test_final_a_non_list_tags_never_becomes_five_fabricated_names	KEEP	behaviour: writes md fixture: _poisonable_repo, drives ingest
+test_loader_parity.py	test_final_the_tags_a_producer_writes_are_still_accepted	KEEP	behaviour: writes md fixture: _poisonable_repo, drives ingest
+test_loader_parity.py	test_a_non_mapping_block_is_a_named_refusal_not_a_false_red	KEEP	behaviour: drives code: check-vocabulary exit and labels; also pins the label Adopting.md promises consumers
+test_loader_parity.py	test_r2_a_non_utf8_shard_sorting_LAST_still_never_crashes_certify	KEEP	behaviour: writes md fixture: rule file, drives certify
+test_loader_parity.py	test_r2_an_unreadable_ruleset_is_not_reported_as_a_malformed_artifact	KEEP	behaviour: writes md fixture: unreadable rule file, drives ingest
+test_loader_parity.py	test_a_poisoned_attestation_never_becomes_a_shard	KEEP	behaviour: writes md fixture: rule file, drives ingest and CLI
+test_loader_parity.py	test_terminal_an_absent_status_is_actually_refused	KEEP	behaviour: drives code: every shard reader refuses
+test_local_gate.py	test_the_ruff_pin_is_the_same_in_all_five_callers	KEEP	contract: consumer-copied snippet: ruff command pinned across ci.yml, pre-push, repo.yaml and the two copied quotations
+test_malformation_matrix.py	test_a_non_utf8_cage_toml_refuses_rather_than_raising	KEEP	behaviour: writes md fixture: tmp repo with a ripe.md rule drives every command over malformed input
+test_malformation_matrix.py	test_the_nothing_to_ingest_precondition_can_fail	KEEP	behaviour: writes md fixture: tmp repo with a ripe.md rule drives every command over malformed input
+test_malformation_matrix.py	test_a_non_string_rule_id_names_the_ruleset_not_the_run_dir	KEEP	behaviour: writes md fixture: tmp repo with a ripe.md rule drives every command over malformed input
+test_malformation_matrix.py	test_a_complaint_is_labelled_for_the_declaration_it_speaks_for	KEEP	behaviour: writes md fixture: tmp repo with a ripe.md rule drives every command over malformed input
+test_malformation_matrix.py	test_a_malformed_cache_degrades_plan_loudly	KEEP	behaviour: writes md fixture: tmp repo with a ripe.md rule drives every command over malformed input
+test_malformation_matrix.py	test_a_malformed_repo_yaml_block_is_refused_by_name	KEEP	behaviour: writes md fixture: tmp repo with a ripe.md rule drives every command over malformed input
+test_malformation_matrix.py	test_co01_plan_renders_a_prior_whose_optional_fields_are_absent	KEEP	behaviour: writes md fixture: tmp repo with a ripe.md rule drives every command over malformed input
+test_malformation_matrix.py	test_co05_an_empty_required_field_is_refused_like_an_absent_one	KEEP	behaviour: writes md fixture: tmp repo with a ripe.md rule drives every command over malformed input
+test_malformation_matrix.py	test_cr01_s04_refuses_to_score_over_any_unfoldable_vocabulary	KEEP	behaviour: writes md fixture: tmp repo with a ripe.md rule drives every command over malformed input
+test_malformation_matrix.py	test_cr05_an_invalid_ruleset_with_nothing_to_ingest_still_exits_zero	KEEP	behaviour: writes md fixture: tmp repo with a ripe.md rule drives every command over malformed input
+test_malformation_matrix.py	test_an_unreadable_rule_file_names_the_ruleset	KEEP	behaviour: writes md fixture: tmp repo with a ripe.md rule drives every command over malformed input
+test_malformation_matrix.py	test_no_malformed_envelope_key_crashes_any_command	KEEP	behaviour: writes md fixture: tmp repo with a ripe.md rule drives every command over malformed input
+test_malformation_matrix.py	test_no_malformed_record_field_crashes_any_command	KEEP	behaviour: writes md fixture: tmp repo with a ripe.md rule drives every command over malformed input
+test_malformation_matrix.py	test_a_refused_declaration_block_stops_certify	KEEP	behaviour: writes md fixture: tmp repo with a ripe.md rule drives every command over malformed input
+test_malformation_matrix.py	test_r201_an_unreadable_ruleset_names_itself_with_nothing_to_ingest	KEEP	behaviour: writes md fixture: tmp repo with a ripe.md rule drives every command over malformed input
+test_malformation_matrix.py	test_the_live_corpus_drives_every_command_clean	KEEP	behaviour: drives code: copies the committed corpus (incl. skills-policy.md) and drives every command over it
+test_malformation_matrix.py	test_the_live_store_is_untouched	KEEP	behaviour: drives code: drives commands in a copy and asserts the real evidence store is unchanged
+test_mechanical.py	TestTestsAccompanyLogic::test_all_files_without_companion_still_flags	KEEP	not a doc read: .md path as diff data
+test_memory_candidates.py	test_a_class_whose_only_covering_rule_is_paused_is_not_covered	KEEP	behaviour: writes md fixture: seeded rule files with covers/pause drive memory stats candidates
+test_memory_candidates.py	test_a_paused_rule_whose_id_is_the_slug_does_not_cover_it	KEEP	behaviour: writes md fixture: seeded rule files with covers/pause drive memory stats candidates
+test_memory_candidates.py	test_a_rule_may_declare_the_candidate_class_it_answers	KEEP	behaviour: writes md fixture: seeded rule files with covers/pause drive memory stats candidates
+test_memory_candidates.py	test_a_skill_file_one_round_refuted_three_times_is_not_proposed	KEEP	not a doc read: retro SKILL.md path is a record field fed to skill_recurrence
+test_memory_candidates.py	test_an_unpaused_covering_rule_still_covers_with_no_pause_note	KEEP	behaviour: writes md fixture: seeded rule files with covers/pause drive memory stats candidates
+test_memory_candidates.py	test_covers_entries_must_be_well_formed_slugs	KEEP	behaviour: writes md fixture: seeded rule files with covers/pause drive memory stats candidates
+test_memory_candidates.py	test_r1_a_covered_class_may_no_longer_be_filed_as_a_candidate	KEEP	behaviour: writes md fixture: seeded rule files with covers/pause drive memory stats candidates
+test_memory_candidates.py	test_r1_an_unreadable_ruleset_is_reported_not_swallowed	KEEP	behaviour: writes md fixture: seeded rule files with covers/pause drive memory stats candidates
+test_memory_candidates.py	test_r1_covers_accepts_the_prefixed_spelling_of_a_slug	KEEP	behaviour: writes md fixture: seeded rule files with covers/pause drive memory stats candidates
+test_memory_candidates.py	test_r1_covers_may_not_name_a_declared_rule	KEEP	behaviour: writes md fixture: seeded rule files with covers/pause drive memory stats candidates
+test_memory_candidates.py	test_the_propose_rule_header_carries_the_recipe_not_just_the_slug	KEEP	contract: cli output format: asserts the memory stats render header and the PROPOSE RULE line the retro quotes
+test_memory_candidates.py	test_the_reproposed_row_names_the_paused_rule_not_a_bare_duplicate	KEEP	behaviour: writes md fixture: seeded rule files with covers/pause drive memory stats candidates
+test_memory_candidates.py	test_two_rules_may_not_cover_the_same_candidate_class	KEEP	behaviour: writes md fixture: seeded rule files with covers/pause drive memory stats candidates
+test_memory_clean_review.py	TestAttestCheckOnACleanRange::test_clean_review_satisfies_attest_check	KEEP	not a doc read: commits a README.md fixture in a tmp repo
+test_memory_clean_review.py	TestAttestCheckOnACleanRange::test_pre_envelope_shard_needs_no_migration	KEEP	not a doc read: tmp repo fixture, drives attest check
+test_memory_identity.py	test_finding_identity_is_routing_independent	KEEP	not a doc read: record identity
+test_memory_identity.py	test_the_protocol_files_every_refuted_candidate	RETIRE	wording: pins pre-pr-review/SKILL.md payload line, a bead id and triage wording (unsure: the status line mirrors the schema enum, which schema tests hold)
+test_memory_lifecycle.py	test_a_broken_rule_file_does_not_escape_as_an_exception	KEEP	behaviour: writes md fixture: broken symlink and non-utf8 rule
+test_memory_lifecycle.py	test_a_ruleset_edit_is_not_answered_from_a_stale_rule_index	KEEP	behaviour: writes md fixture: rule edit mid-process
+test_memory_lifecycle.py	test_alias_named_for_a_covered_class_is_refused	KEEP	behaviour: writes md fixture: covering ruleset
+test_memory_lifecycle.py	test_alias_onto_a_covered_class_is_refused_at_every_seam	KEEP	behaviour: writes md fixture: covering ruleset, drives tags seams
+test_memory_lifecycle.py	test_an_unreadable_declaration_refuses_aliases_rather_than_firing_them	KEEP	behaviour: writes md fixture: rule plus corrupt repo.yaml
+test_memory_lifecycle.py	test_recall_query_on_retired_name_still_hits_merged_key	KEEP	not a doc read: .md path as recall query
+test_memory_lifecycle.py	test_the_rule_namespace_is_read_from_the_declared_rules_dir	KEEP	behaviour: writes md fixture: rule in declared dir
+test_memory_rule_ids.py	test_covered_slug_files_under_its_own_slug_while_paused	KEEP	behaviour: writes md fixture: tmp .warden/rules files with covers/pause drive ingest id migration
+test_memory_rule_ids.py	test_pause_flip_never_double_files_an_event	KEEP	behaviour: writes md fixture: tmp .warden/rules files with covers/pause drive ingest id migration
+test_memory_rule_ids.py	test_tied_distinct_events_survive_routing_sensitive_dedup	KEEP	behaviour: writes md fixture: tmp .warden/rules files with covers/pause drive ingest id migration
+test_memory_rule_ids.py	test_unmapped_declared_id_still_migrates_while_paused	KEEP	behaviour: writes md fixture: tmp .warden/rules files with covers/pause drive ingest id migration
+test_memory_rule_ids.py	test_unpause_flip_never_double_files_an_event	KEEP	behaviour: writes md fixture: tmp .warden/rules files with covers/pause drive ingest id migration
+test_memory_rule_ids.py	test_a_paused_covering_rule_still_receives_its_legacy_ids	KEEP	behaviour: writes md fixture: tmp .warden/rules files with covers/pause drive ingest id migration
+test_memory_rule_ids.py	test_a_paused_rule_still_resolves_at_ingest	KEEP	behaviour: writes md fixture: writes scope-creep.md with a pause and drives ingest
+test_memory_rule_ids.py	test_bare_covered_legacy_id_migrates_to_the_covering_rule	KEEP	behaviour: writes md fixture: tmp .warden/rules files with covers/pause drive ingest id migration
+test_memory_rule_ids.py	test_migration_is_not_reported_for_a_rejected_artifact	KEEP	behaviour: writes md fixture: tmp .warden/rules files with covers/pause drive ingest id migration
+test_memory_rule_ids.py	test_migration_never_double_shards_an_already_sharded_event	KEEP	behaviour: writes md fixture: tmp .warden/rules files with covers/pause drive ingest id migration
+test_memory_rule_ids.py	test_migration_never_rescues_a_genuinely_unknown_id	KEEP	behaviour: writes md fixture: tmp .warden/rules files with covers/pause drive ingest id migration
+test_memory_rule_ids.py	test_migration_report_is_quiet_on_reingest	KEEP	behaviour: writes md fixture: tmp .warden/rules files with covers/pause drive ingest id migration
+test_memory_rule_ids.py	test_shadowed_matches_validator	KEEP	behaviour: writes md fixture: tmp .warden/rules files with covers/pause drive ingest id migration
+test_memory_rule_ids.py	test_unmapped_covered_slug_migrates_the_same_way	KEEP	behaviour: writes md fixture: tmp .warden/rules files with covers/pause drive ingest id migration
+test_memory_skills.py	test_a_refutation_streak_suppresses_a_strong_history	KEEP	not a doc read: skill/policy paths are record file fields fed to skill_recurrence, never opened
+test_memory_skills.py	test_an_even_split_does_not_propose	KEEP	not a doc read: skill/policy paths are record file fields fed to skill_recurrence, never opened
+test_memory_skills.py	test_mostly_refuted_findings_do_not_propose	KEEP	not a doc read: skill/policy paths are record file fields fed to skill_recurrence, never opened
+test_memory_skills.py	test_only_skill_and_policy_files_are_attributed	KEEP	not a doc read: skill/policy paths are record file fields fed to skill_recurrence, never opened
+test_memory_skills.py	test_render_marks_a_recurring_skill_as_a_proposal	KEEP	not a doc read: skill/policy paths are record file fields fed to skill_recurrence, never opened
+test_memory_skills.py	test_render_names_the_streak_reason_not_a_false_rate_claim	KEEP	not a doc read: skill/policy paths are record file fields fed to skill_recurrence, never opened
+test_memory_skills.py	test_rows_rank_by_recurrence	KEEP	not a doc read: skill/policy paths are record file fields fed to skill_recurrence, never opened
+test_memory_skills.py	test_stats_carries_skill_recurrence_and_a_propose_only_list	KEEP	not a doc read: skill/policy paths are record file fields fed to skill_recurrence, never opened
+test_memory_skills.py	test_the_candidate_bar_refuses_a_single_finding	KEEP	not a doc read: skill/policy paths are record file fields fed to skill_recurrence, never opened
+test_memory_skills.py	test_the_gather_reads_skill_recurrence	RETIRE	wording: reads retro SKILL.md '## 1 · Gather' and asserts phrases present and softenings absent
+test_memory_skills.py	test_the_policy_contract_is_attributed	KEEP	not a doc read: skill/policy paths are record file fields fed to skill_recurrence, never opened
+test_memory_skills.py	test_the_propose_section_can_change_a_skill	RETIRE	wording: reads retro SKILL.md '## 3 · Propose' and asserts phrases present and softenings absent
+test_memory_skills.py	test_three_upheld_findings_clear_the_bar	KEEP	not a doc read: skill/policy paths are record file fields fed to skill_recurrence, never opened
+test_memory_skills.py	test_unjudged_findings_do_not_count_toward_the_bar	KEEP	not a doc read: skill/policy paths are record file fields fed to skill_recurrence, never opened
+test_mine.py	test_the_mine_row_does_not_claim_exhaustive_history	RETIRE	wording: pins CLI-Reference.md mine row wording
+test_mine.py	test_the_mine_row_names_every_flag_the_command_accepts	RETIRE	wording: pins that CLI-Reference.md's mine row names three flags (the runnable-docs check covers flag validity)
+test_mine.py	test_the_mine_row_states_the_unread_contract	RETIRE	"wording: pins CLI-Reference.md mine row words ""unread"", ""partial"""
+test_progress.py	test_the_ignore_claim_and_the_rung_that_would_enforce_it_move_together	KEEP	behaviour: drives code: log_path, .gitignore and certify rung R-13; also pins CLI-Reference.md and source wording (unsure: mostly wording)
+test_provenance.py	test_a_malformed_block_is_reported_not_raised	KEEP	behaviour: writes md fixture: SKILL.md in tmp, drives provenance report
+test_provenance.py	test_a_prose_reference_is_checked_even_when_undeclared	KEEP	behaviour: writes md fixture: _mk_skill body ref
+test_provenance.py	test_a_subagents_assumption_is_surfaced_never_verified	KEEP	behaviour: writes md fixture: _mk_skill subagents
+test_provenance.py	test_a_yaml_quoted_frontmatter_name_still_resolves	KEEP	behaviour: writes md fixture: quoted frontmatter
+test_provenance.py	test_an_existing_but_skill_less_pack_is_not_a_pass	KEEP	behaviour: writes md fixture: plugin-root pack, CLI exit 2
+test_provenance.py	test_an_unreadable_declaration_fails_closed	KEEP	behaviour: writes md fixture: _mk_skill bad provenance
+test_provenance.py	test_an_unreadable_skill_file_is_reported_not_raised	KEEP	behaviour: writes md fixture: unreadable SKILL.md
+test_provenance.py	test_cli_skills_preflight_exit_codes	KEEP	contract: cli output format: skills preflight exit codes and STALE ASSUMPTION line
+test_provenance.py	test_file_existence_is_never_accepted_as_resolution	KEEP	behaviour: writes md fixture: _mk_skill frontmatter names
+test_provenance.py	test_preflight_names_the_sibling_the_pack_does_not_serve	KEEP	behaviour: writes md fixture: _mk_skill pack
+test_provenance.py	test_preflight_resolves_a_declared_sibling	KEEP	behaviour: writes md fixture: _mk_skill pack, drives preflight
+test_recall_budget.py	test_all_oversize_corpus_is_not_reported_as_empty	KEEP	not a doc read: .md path as recall query
+test_recall_budget.py	test_lines_carry_the_record_id	KEEP	contract: cli output format: recall line id= pointer and ensure_ascii cache
+test_repair_budget.py	test_the_platform_cap_matches_deliver	RETIRE	"wording: pins deliver/SKILL.md ""capped at 3"" wording"
+test_repair_budget.py	test_the_rung_is_declared_at_level_3	KEEP	not a doc read: reads certification baseline.yaml
+test_repair_budget.py	test_the_rung_wiring_rejects_an_over_cap_policy	KEEP	behaviour: writes md fixture: policy in tmp, drives _run_check
+test_repair_budget.py	test_this_repos_own_budget_is_within_cap	KEEP	contract: machine-parsed schema/format: certify's repair-budget rung parses skills-policy.md
+test_repair_stop.py	test_the_policy_records_that_flat_review_is_deliberate	RETIRE	wording: .warden/skills-policy.md charter figures
+test_repair_stop.py	test_the_re_ruling_carries_the_measurement_that_settled_it	RETIRE	wording: skills-policy charter and docs/design/review-depth-20260910.md phrases
+test_repair_stop.py	test_the_re_ruling_does_not_overwrite_the_ruling_it_answers	RETIRE	wording: skills-policy heading order
+test_repair_stop.py	test_a_by_path_row_beside_an_unrelated_carries_is_refused	RETIRE	control for retired wording guard: row/paragraph scope checker over Skills-Policy.md and skills-policy.md
+test_repair_stop.py	test_deliver_names_the_declared_rounds_refusal_and_mints_every_round	RETIRE	wording: deliver SKILL.md Build section phrases
+test_repair_stop.py	test_a_row_stating_the_skew_backwards_is_refused	RETIRE	control for retired wording guard: Skill-Pack.md row order checker
+test_repair_stop.py	test_a_base_move_the_branch_never_merged_leaves_the_repair_set_intact	KEEP	not a doc read: docstring names wiki pages; fixture writes b.txt
+test_repair_stop.py	test_a_non_ascii_path_is_read_as_the_repair_wrote_it	KEEP	behaviour: writes md fixture: docs/é.md in a git fixture
+test_repair_stop.py	test_a_stale_recorded_base_does_not_make_the_base_branch_the_repair	KEEP	behaviour: writes md fixture: docs.md via _advance_main
+test_repair_stop.py	test_pre_pr_review_mints_against_the_remote_tracking_base	RETIRE	wording: pre-pr-review SKILL.md command spelling
+test_repair_stop.py	test_round_new_refuses_a_base_that_is_behind_its_own_upstream	KEEP	behaviour: writes md fixture: upstream.md; drives warden round new
+test_repair_stop.py	test_the_skill_says_what_the_refusal_covers_and_what_it_does_not	KEEP	"behaviour: drives code: asserts diffs.stale_base(root, ""origin/main"") is None, tested nowhere else (mixed; SKILL.md wording asserts kept intact)"
+test_repair_stop.py	test_the_cli_reference_row_defines_repair_with_both_subtractions	RETIRE	wording: CLI-Reference.md round classify row phrases
+test_repair_stop.py	test_a_path_git_quotes_whatever_quotepath_says_is_read_as_the_repair_wrote_it	KEEP	behaviour: writes md fixture: quoted .md paths in a git fixture
+test_repair_stop.py	test_a_base_branch_commit_the_base_later_undid_is_still_not_the_repair	KEEP	behaviour: writes md fixture: transient.md in a git fixture
+test_repair_stop.py	test_a_low_on_a_file_only_the_repair_wrote_is_scaffolding	KEEP	not a doc read: docstring mentions a wiki page; drives repair.classify
+test_repair_stop.py	test_a_round_head_minted_on_the_base_branch_is_not_the_repair	KEEP	behaviour: writes md fixture: docs.md in a git fixture
+test_repair_stop.py	test_a_side_branch_merged_into_the_repair_is_not_first_parent	KEEP	behaviour: writes md fixture: side.md in a git fixture
+test_repair_stop.py	test_an_unclassifiable_finding_is_original_and_counts	KEEP	not a doc read: `docs/never-touched.md` is a finding path parameter
+test_repair_stop.py	test_deliver_counts_change_defect_rounds_and_names_the_checker	RETIRE	wording: deliver SKILL.md Build section phrases
+test_repair_stop.py	test_no_sync_route_makes_the_base_branch_read_as_the_repair	KEEP	behaviour: writes md fixture: docs.md committed on the base branch in a git fixture
+test_repair_stop.py	test_the_policy_defines_an_attempt_as_a_change_defect_round	KEEP	"contract: machine-parsed schema/format: pins the one ""Iteration budget before a run reverts: 3 attempts"" line certify parses (mixed; also pins paragraph wording, kept intact)"
+test_repair_stop.py	test_the_report_names_both_ranges_so_a_reader_can_recompute	KEEP	not a doc read: md path is a finding in repair.render output
+test_repair_stop.py	test_the_wiki_restates_the_stop_condition_where_it_restates_the_cap	RETIRE	wording: three wiki rows restate the cap
+test_repair_stop.py	test_the_pages_state_the_subtraction_the_fixtures_measure	RETIRE	wording: four pages restate the subtraction; its driven regime is asserted strongly by the kept an earlier repair-range fix base-move and verbatim-carry tests
+test_repair_stop.py	test_the_skill_pack_row_names_the_warden_pin_skew	RETIRE	wording: Skill-Pack.md 0.10.0 row; regime covered by the kept an earlier repair-range fix tests
+test_repair_stop.py	test_a_ref_base_that_has_not_absorbed_the_branch_feeds_the_file_subtraction	KEEP	not a doc read: docs.md fixture via _advance_main; drives _repair_files
+test_review.py	test_artifact_is_schema_valid_and_deterministic	KEEP	behaviour: drives code: run_review determinism
+test_review.py	test_claude_rules_deferred_not_run	KEEP	behaviour: drives code: run_review deferral
+test_review.py	test_companion_prefix_param_is_exempt_from_the_excludes_check	KEEP	behaviour: drives code: run_review excludes exemption
+test_review.py	test_g2_11_per_rule_excludes_do_not_blind_other_rules	KEEP	behaviour: drives code: rules.applicable
+test_review.py	test_g2_1_2_excludes_hiding_params_fail_closed	KEEP	behaviour: drives code: run_review excludes check
+test_review.py	test_python_rule_finding_is_blocking	KEEP	behaviour: drives code: rule fixture through run_review
+test_review.py	test_python_rule_without_checker_fails_closed	KEEP	behaviour: drives code: run_review fail-closed
+test_review.py	test_severity_stamped_from_rule_file	KEEP	behaviour: drives code: rule fixture through run_review
+test_review.py	test_unmatched_rules_neither_run_nor_deferred	KEEP	behaviour: drives code: run_review matching
+test_review_round_isolation.py	test_r1f8_the_skill_degrades_on_a_warden_that_predates_the_check	RETIRE	wording: SKILL.md fallback phrases
+test_review_round_isolation.py	test_the_skill_teaches_the_structured_roster_and_the_check	RETIRE	wording: SKILL.md invocation and phrases
+test_review_round_isolation.py	test_the_skill_has_every_round_minted_including_the_first	RETIRE	wording: SKILL.md sentence
+test_review_round_isolation.py	test_the_conjunct_residual_is_pinned_rather_than_discovered	RETIRE	control for retired wording guard: judged-alone suppressor residual
+test_review_round_isolation.py	test_a_broken_fence_narrows_the_guard_and_the_floor_says_so	RETIRE	control for retired wording guard: fence reader and claim floor over SKILL.md
+test_review_round_isolation.py	test_the_guard_fires_inside_the_fence_and_on_a_page_it_used_to_skip	RETIRE	control for retired wording guard: plants into SKILL.md, Skill-Pack.md, README.md
+test_review_round_isolation.py	test_every_file_a_round_writes_is_named_inside_the_round_dir	RETIRE	wording: pre-pr-review SKILL.md paths and sentences
+test_review_round_isolation.py	test_no_skill_calls_the_shared_scratchpad_fine	RETIRE	wording: pre-pr-review and orchestrate SKILL.md phrases
+test_review_round_isolation.py	test_orchestrate_isolates_scratch_where_it_fans_builders_out	RETIRE	wording: orchestrate SKILL.md phrases
+test_review_round_isolation.py	test_range_binding_is_not_offered_as_the_backstop	RETIRE	wording: SKILL.md phrase window
+test_review_round_isolation.py	test_the_collision_reason_is_stated_once_and_names_both_incidents	RETIRE	wording: SKILL.md cites incidents
+test_review_round_isolation.py	test_every_unit_break_and_selector_alternative_carries_a_control	RETIRE	control for retired wording guard: judged-alone scanner controls
+test_review_round_isolation.py	test_the_skill_says_a_round_does_not_survive_a_commit_with_the_count	RETIRE	wording: SKILL.md and Gate-Pipeline.md sentences
+test_review_round_isolation.py	test_the_skill_carries_exactly_one_instruction_about_earlier_rounds	RETIRE	wording: SKILL.md mandate scan and pinned sentences; its detector controls moved to test_the_carry_forward_detector_certifies_every_negator_verb_and_round_spelling because the kept schema guard still runs that detector
+test_review_round_isolation.py	test_the_skill_requires_a_round_be_attested_before_the_next_commit	RETIRE	wording: SKILL.md sentences
+test_review_round_isolation.py	test_r2_no_page_claims_judged_alone_prevents_an_honest_collision	RETIRE	wording: judged-alone claim scan over every wiki, skill and README page
+test_review_round_isolation.py	test_r2_the_shape_separates_both_reviewers_and_both_rounds	RETIRE	wording: SKILL.md step contents
+test_review_round_isolation.py	test_the_skill_forbids_copying_reviewers_forward_and_names_the_check	RETIRE	wording: SKILL.md sentences
+test_review_round_isolation.py	test_the_skill_has_every_report_name_the_head_it_judged	RETIRE	wording: SKILL.md step phrases
+test_review_round_isolation.py	test_the_round_directory_is_minted_by_a_command_not_by_prose	RETIRE	wording: SKILL.md command order and labels
+test_review_round_isolation.py	test_the_round_probe_cannot_mistake_a_refusal_for_an_old_warden	RETIRE	wording: SKILL.md shell lines
+test_round_isolation.py	test_round_new_prints_only_the_path_on_stdout	KEEP	contract: cli output format: round new prints only the path on stdout
+test_rule_pause.py	test_pause_without_reason_is_refused	KEEP	behaviour: writes md fixture: rules_dir, drives load_rules
+test_rule_pause.py	test_paused_rule_loads_with_its_reason	KEEP	behaviour: writes md fixture: rules_dir, drives load_rules
+test_rule_pause.py	test_paused_rule_produces_no_findings_but_is_recorded	KEEP	behaviour: writes md fixture: run_review skips paused
+test_rule_pause.py	test_pausing_moves_the_gate_cohort	KEEP	behaviour: writes md fixture: rules_version changes on pause
+test_rule_pause.py	test_reason_without_pause_is_refused	KEEP	behaviour: writes md fixture: rules_dir, drives load_rules
+test_rule_pause.py	test_stats_never_promotes_or_re_pauses_an_already_paused_rule	KEEP	behaviour: writes md fixture: memory stats
+test_rules.py	TestApplicable::test_maps_rules_to_hit_files_and_omits_misses	KEEP	behaviour: writes md fixture: tmp rule files drive rules parsing, applicability and rules_version
+test_rules.py	TestParsing::test_bad_severity_rejected	KEEP	behaviour: writes md fixture: tmp rule files drive rules parsing, applicability and rules_version
+test_rules.py	TestParsing::test_bom_rule_file_parses_regression	KEEP	behaviour: writes md fixture: tmp rule files drive rules parsing, applicability and rules_version
+test_rules.py	TestParsing::test_duplicate_ids_rejected	KEEP	behaviour: writes md fixture: tmp rule files drive rules parsing, applicability and rules_version
+test_rules.py	TestParsing::test_empty_body_rejected	KEEP	behaviour: writes md fixture: tmp rule files drive rules parsing, applicability and rules_version
+test_rules.py	TestParsing::test_missing_frontmatter_rejected	KEEP	behaviour: writes md fixture: tmp rule files drive rules parsing, applicability and rules_version
+test_rules.py	TestParsing::test_non_string_applies_to_rejected	KEEP	behaviour: writes md fixture: tmp rule files drive rules parsing, applicability and rules_version
+test_rules.py	TestParsing::test_valid_rule_parses	KEEP	behaviour: writes md fixture: tmp rule files drive rules parsing, applicability and rules_version
+test_rules.py	TestRulesVersion::test_changes_when_any_rule_byte_changes	KEEP	behaviour: writes md fixture: tmp rule files drive rules parsing, applicability and rules_version
+test_rules.py	TestRulesVersion::test_changes_when_rule_added	KEEP	behaviour: writes md fixture: tmp rule files drive rules parsing, applicability and rules_version
+test_rules.py	TestRulesVersion::test_file_boundary_collision_regression	KEEP	behaviour: writes md fixture: tmp rule files drive rules parsing, applicability and rules_version
+test_rules.py	TestRulesVersion::test_stable_across_calls	KEEP	behaviour: writes md fixture: tmp rule files drive rules parsing, applicability and rules_version
+test_rules.py	TestRulesVersionHashesEnforcement::test_presence_of_a_review_block_moves_it	KEEP	behaviour: writes md fixture: tmp rule files drive rules parsing, applicability and rules_version
+test_rules.py	test_rules_version_still_computes_over_an_unreadable_repo_yaml	KEEP	behaviour: writes md fixture: tmp rule files drive rules parsing, applicability and rules_version
+test_ruleset_surfaces.py	test_a_non_utf8_rule_file_with_a_sweep_refuses_and_names_it	KEEP	behaviour: writes md fixture: non-utf8 rule, drives ingest
+test_ruleset_surfaces.py	test_a_non_utf8_rule_file_with_nothing_to_ingest_still_exits_zero	KEEP	behaviour: writes md fixture: non-utf8 rule, drives ingest
+test_ruleset_surfaces.py	test_an_unreadable_checker_plugin_refuses_by_name_not_by_traceback	KEEP	behaviour: writes md fixture: _repo, drives every CLI caller
+test_ruleset_surfaces.py	test_ingest_refuses_before_it_writes_anything	KEEP	behaviour: writes md fixture: _repo, drives ingest
+test_ruleset_surfaces.py	test_rules_version_refuses_by_name_on_every_surface_it_reads	KEEP	behaviour: writes md fixture: unreadable surfaces, rules_version
+test_ruleset_surfaces.py	test_the_hash_over_a_readable_tree_is_unchanged	KEEP	behaviour: writes md fixture: listing parity
+test_schema_description_drift.py	test_the_skill_no_longer_states_the_divergence_in_the_present_tense	RETIRE	wording: pins pre-pr-review/SKILL.md phrases and a test name in prose
+test_self_cage.py	test_the_runner_reads_the_diff_quoting_free_so_a_raw_probe_is_what_grep_sees	KEEP	behaviour: drives code: grep -E over raw and quoted probes
+test_self_cage.py	test_forbidden_paths_are_the_policys_and_nothing_else	KEEP	contract: machine-parsed schema/format: skills-policy Forbidden paths list in lockstep with cage.toml regex
+test_self_cage.py	test_forbidden_regex_leaves_ordinary_work_alone	KEEP	not a doc read: .md paths as probe lines to grep -E
+test_self_cage.py	test_the_prompt_invokes_the_run_protocol_and_restates_every_fence	KEEP	contract: machine-parsed schema/format: run.sh greps the prompt's skill name; fences parsed from policy
+test_self_cage.py	test_the_prompt_names_the_self_cage_source_as_off_limits	KEEP	not a doc read: .cage/prompt.md is the runtime prompt fence, not documentation (unsure: pure wording)
+test_self_cage.py	test_the_self_cage_earns_the_badge_beside_a_consumers_cage	KEEP	behaviour: drives code: certify earns N-01..N-03 from the real source
+test_self_cage.py	test_the_self_cage_source_is_fenced_and_tiered_gate_surface	KEEP	behaviour: drives code: classify tiers; fence parsed from policy
+test_ship.py	test_a_branch_the_remote_does_not_carry_is_refused	KEEP	behaviour: writes md fixture: shipping_repo writes a rule .md / PR body .md and drives warden ship
+test_ship.py	test_a_branch_with_no_attestation_is_refused	KEEP	behaviour: writes md fixture: shipping_repo writes a rule .md / PR body .md and drives warden ship
+test_ship.py	test_a_closed_or_merged_pr_on_the_branch_is_not_the_one_to_update	KEEP	behaviour: writes md fixture: shipping_repo writes a rule .md / PR body .md and drives warden ship
+test_ship.py	test_a_failed_verify_artifact_is_refused_and_says_so	KEEP	behaviour: writes md fixture: shipping_repo writes a rule .md / PR body .md and drives warden ship
+test_ship.py	test_a_findings_open_tip_attestation_is_refused	KEEP	behaviour: writes md fixture: shipping_repo writes a rule .md / PR body .md and drives warden ship
+test_ship.py	test_a_gate_that_did_not_run_is_never_reported_as_a_refusal	KEEP	behaviour: writes md fixture: shipping_repo writes a rule .md / PR body .md and drives warden ship
+test_ship.py	test_a_gh_banner_on_a_successful_call_never_rides_into_the_url	KEEP	behaviour: writes md fixture: shipping_repo writes a rule .md / PR body .md and drives warden ship
+test_ship.py	test_a_passing_parity_step_records_a_progress_boundary	KEEP	behaviour: writes md fixture: shipping_repo writes a rule .md / PR body .md and drives warden ship
+test_ship.py	test_a_pr_with_no_body_file_cannot_be_evaluated	KEEP	behaviour: writes md fixture: shipping_repo writes a rule .md / PR body .md and drives warden ship
+test_ship.py	test_a_range_that_will_not_resolve_cannot_be_evaluated	KEEP	behaviour: writes md fixture: shipping_repo writes a rule .md / PR body .md and drives warden ship
+test_ship.py	test_a_title_nothing_could_lint_is_never_reported_as_linted	KEEP	behaviour: writes md fixture: shipping_repo writes a rule .md / PR body .md and drives warden ship
+test_ship.py	test_a_title_off_the_convention_is_refused	KEEP	behaviour: writes md fixture: shipping_repo writes a rule .md / PR body .md and drives warden ship
+test_ship.py	test_a_title_over_the_budget_is_refused_before_the_pr_exists	KEEP	behaviour: writes md fixture: shipping_repo writes a rule .md / PR body .md and drives warden ship
+test_ship.py	test_a_verify_artifact_for_an_earlier_commit_is_refused	KEEP	behaviour: writes md fixture: shipping_repo writes a rule .md / PR body .md and drives warden ship
+test_ship.py	test_a_verify_artifact_from_a_dirty_tree_is_refused	KEEP	behaviour: writes md fixture: shipping_repo writes a rule .md / PR body .md and drives warden ship
+test_ship.py	test_a_verify_artifact_with_no_recorded_tree_state_is_refused	KEEP	behaviour: writes md fixture: shipping_repo writes a rule .md / PR body .md and drives warden ship
+test_ship.py	test_an_empty_title_is_refused	KEEP	behaviour: writes md fixture: shipping_repo writes a rule .md / PR body .md and drives warden ship
+test_ship.py	test_an_existing_pr_is_updated_rather_than_duplicated	KEEP	behaviour: writes md fixture: shipping_repo writes a rule .md / PR body .md and drives warden ship
+test_ship.py	test_an_open_pr_into_another_base_is_refused_not_retargeted	KEEP	behaviour: writes md fixture: shipping_repo writes a rule .md / PR body .md and drives warden ship
+test_ship.py	test_an_unreadable_shard_store_is_not_an_absent_attestation	KEEP	behaviour: writes md fixture: shipping_repo writes a rule .md / PR body .md and drives warden ship
+test_ship.py	test_an_unverifiable_push_cannot_be_evaluated	KEEP	behaviour: writes md fixture: shipping_repo writes a rule .md / PR body .md and drives warden ship
+test_ship.py	test_checks_only_never_reaches_push_or_pr	KEEP	behaviour: writes md fixture: shipping_repo writes a rule .md / PR body .md and drives warden ship
+test_ship.py	test_every_step_prints_what_it_checked_and_what_it_found	KEEP	behaviour: writes md fixture: shipping_repo writes a rule .md / PR body .md and drives warden ship
+test_ship.py	test_opening_a_pr_with_no_body_file_cannot_be_evaluated	KEEP	behaviour: writes md fixture: shipping_repo writes a rule .md / PR body .md and drives warden ship
+test_ship.py	test_ship_builds_no_merge_argv_and_names_no_merge_literal	KEEP	behaviour: writes md fixture: shipping_repo writes a rule .md / PR body .md and drives warden ship
+test_ship.py	test_ship_refuses_to_push_the_default_branch	KEEP	behaviour: writes md fixture: shipping_repo writes a rule .md / PR body .md and drives warden ship
+test_ship.py	test_ship_writes_its_evidence_either_way	KEEP	behaviour: writes md fixture: shipping_repo writes a rule .md / PR body .md and drives warden ship
+test_ship.py	test_the_age_of_the_artifact_is_not_provenance	KEEP	behaviour: writes md fixture: shipping_repo writes a rule .md / PR body .md and drives warden ship
+test_ship.py	test_the_gh_dependency_is_described_where_a_consumer_reads_it	RETIRE	wording: asserts the System Context wiki page's GitHub row names warden ship; the AST caller count exists only to force that page edit
+test_ship.py	test_the_narration_reaches_a_piped_reader_in_order	KEEP	behaviour: writes md fixture: shipping_repo writes a rule .md / PR body .md and drives warden ship
+test_ship.py	test_the_required_scopes_come_from_the_shipped_reach_derivation	KEEP	behaviour: writes md fixture: shipping_repo writes a rule .md / PR body .md and drives warden ship
+test_ship.py	test_the_review_pairing_and_the_ship_refusal_share_one_definition	KEEP	behaviour: writes md fixture: shipping_repo writes a rule .md / PR body .md and drives warden ship
+test_ship.py	test_the_tail_stops_at_the_first_refusal	KEEP	behaviour: writes md fixture: shipping_repo writes a rule .md / PR body .md and drives warden ship
+test_skillpack.py	test_pre_pr_review_attributes_every_finding_to_a_lens_and_round	KEEP	consumer-run snippet (contract pin)
+test_skillpack.py	test_the_audit_label_proof_fires_and_stays_silent	KEEP	behaviour: drives code: drives the renderers and the label-extraction helpers
+test_skillpack.py	test_the_retro_names_every_audit_line_stats_can_print	KEEP	behaviour: drives code: drives tags.render_audit/_render_ceiling and counts emit statements; also pins retro bullet wording
+test_skillpack.py	test_the_retro_names_every_unreadable_declaration_label	KEEP	behaviour: drives code: labels derived from tags._LABELS; retro bullet must name them
+test_skillpack.py	test_pre_pr_review_teaches_a_resolvable_rule_id	RETIRE	wording: reads a skill/doc file and asserts on its wording: pre-pr-review prose phrases about rule_id
+test_skillpack.py	test_a_backtest_from_a_candidate_keeps_that_class_covered	KEEP	contract: machine-parsed schema/format: .warden/rules frontmatter covers vs backtest JSON
+test_skillpack.py	test_a_guardrail_proposal_distinguishes_unmeasured_from_zero	RETIRE	wording: reads a skill/doc file and asserts on its wording: retro Propose section phrases
+test_skillpack.py	test_a_rule_covering_a_class_grandfathers_that_class_committed_ids	KEEP	contract: machine-parsed schema/format: .warden/rules frontmatter covers vs attest shards and certification.yaml
+test_skillpack.py	test_deliver_ships_through_warden_ship_and_keeps_the_hand_run_fallback	RETIRE	wording: reads a skill/doc file and asserts on its wording: deliver Ship section phrases
+test_skillpack.py	test_every_flag_the_wired_sections_name_exists_in_the_parser	KEEP	contract: cli output format: skill argv flags checked against warden.cli.build_parser
+test_skillpack.py	test_orchestrate_collects_with_checks_only_and_keeps_the_mergeable_check	RETIRE	wording: reads a skill/doc file and asserts on its wording: orchestrate Collect section phrases
+test_skillpack.py	test_the_boundary_the_repair_loop_records_is_in_the_vocabulary	KEEP	contract: cli output format: boundaries named for `warden progress record` checked against progress.BOUNDARIES
+test_skillpack.py	test_an_inline_span_that_wraps_a_line_break_is_still_scanned	KEEP	behaviour: writes md fixture: inline markdown fixture drives the span scanner the kept spelling guard uses
+test_skillpack.py	test_autonomous_run_delegates_rather_than_duplicating	RETIRE	wording: reads a skill/doc file and asserts on its wording: autonomous-run prose phrases
+test_skillpack.py	test_autonomous_run_honors_legacy_eligibility_markers	RETIRE	wording: reads a skill/doc file and asserts on its wording: legacy bead-comment markers in prose; no code parses them
+test_skillpack.py	test_autonomous_run_keeps_the_current_eligibility_and_handoff_names	KEEP	contract: machine-parsed schema/format: .run-summary/.run-progress/.run-resume are the files cage/run.sh reads
+test_skillpack.py	test_autonomous_run_keeps_the_platform_hard_stops	RETIRE	wording: reads a skill/doc file and asserts on its wording: autonomous-run hard-stop phrases
+test_skillpack.py	test_build_disciplines_is_optional_never_required	RETIRE	wording: reads a skill/doc file and asserts on its wording: Skills-Policy.md documents the optional section
+test_skillpack.py	test_build_disciplines_names_a_method_not_an_executor	RETIRE	wording: reads a skill/doc file and asserts on its wording: Skills-Policy.md mentions dev-executor
+test_skillpack.py	test_contract_documented_and_example_satisfies_it	KEEP	contract: machine-parsed schema/format: required policy sections are certify baseline patterns R-03..R-05; hello-svc example must carry them
+test_skillpack.py	test_craft_layer_is_discoverable_from_reader_facing_docs	RETIRE	wording: reads a skill/doc file and asserts on its wording: README and wiki mention build disciplines
+test_skillpack.py	test_deliver_and_autonomous_run_honor_declared_disciplines	RETIRE	wording: reads a skill/doc file and asserts on its wording: skill prose phrases about build disciplines
+test_skillpack.py	test_deliver_has_a_design_gate_for_high_tier_changes	RETIRE	wording: reads a skill/doc file and asserts on its wording: deliver Design section phrases and heading order
+test_skillpack.py	test_deliver_owns_the_chain_and_never_hands_work_back	RETIRE	wording: reads a skill/doc file and asserts on its wording: deliver prose phrases
+test_skillpack.py	test_every_backtest_artifact_is_internally_consistent	KEEP	not a doc read: backtest JSON arithmetic
+test_skillpack.py	test_every_grandfathered_id_is_actually_covered_by_a_rule	KEEP	contract: machine-parsed schema/format: .warden/rules frontmatter covers
+test_skillpack.py	test_every_pack_skill_declares_provenance_with_a_valid_as_of	KEEP	contract: machine-parsed schema/format: ## Provenance block parsed by warden.provenance
+test_skillpack.py	test_every_probe_fence_branches_with_two_distinct_arms_of_the_right_polarity	KEEP	contract: consumer-copied snippet: if/then/else/fi probe fences agents execute; polarity and arms parsed structurally
+test_skillpack.py	test_every_provenance_evidence_ref_is_well_formed	KEEP	contract: machine-parsed schema/format: provenance evidence refs classified by warden.provenance
+test_skillpack.py	test_every_repo_policy_budget_is_within_the_platform_cap	KEEP	contract: machine-parsed schema/format: the 'Iteration budget' line certify parses, in every shipped policy file
+test_skillpack.py	test_every_restatement_of_the_platform_cap_agrees_with_it	RETIRE	wording: reads a skill/doc file and asserts on its wording: cap number restated in skill, wiki and design prose
+test_skillpack.py	test_every_sibling_reference_is_a_declared_assumption	KEEP	contract: machine-parsed schema/format: provenance assumes.skills vs sibling references
+test_skillpack.py	test_every_skill_self_documents_its_boundaries	RETIRE	wording: reads a skill/doc file and asserts on its wording: every SKILL.md carries a '## Boundaries' prose section
+test_skillpack.py	test_every_warden_invocation_in_the_pack_is_spelled_from_the_consumer_bin	KEEP	contract: consumer-copied snippet: shell argv agents run verbatim in consumer repos must use .warden/bin/warden (bare exits 127)
+test_skillpack.py	test_exactly_one_skill_claims_to_be_the_entry_point	RETIRE	wording: reads a skill/doc file and asserts on its wording: Skill-Pack.md 'one you invoke' line
+test_skillpack.py	test_example_carries_the_optional_section_as_fixture	KEEP	contract: consumer-copied snippet: hello-svc skills-policy.md is the consumer-copied example
+test_skillpack.py	test_generic_skills_read_the_policy_contract	RETIRE	wording: reads a skill/doc file and asserts on its wording: skill prose mentions the policy path and names no consumer repo
+test_skillpack.py	test_every_stale_spelling_the_class_catches_still_goes_red	RETIRE	control for retired wording guard: retyped-enum scanner stale spellings
+test_skillpack.py	test_the_comment_describes_the_bound_the_code_actually_has	RETIRE	control for retired wording guard: pins the wording of the scanner's own comment
+test_skillpack.py	test_the_residual_separators_including_the_house_arrow_go_red	RETIRE	control for retired wording guard: retyped-enum scanner separators
+test_skillpack.py	test_the_word_anchor_clears_the_measured_false_positives	RETIRE	control for retired wording guard: retyped-enum scanner false positives
+test_skillpack.py	test_no_skill_retypes_the_backtest_action_enum	RETIRE	wording: reads a skill/doc file and asserts on its wording: prose scan for a retyped action enum
+test_skillpack.py	test_the_rule_advisor_sends_the_agent_to_its_own_warden	RETIRE	wording: reads a skill/doc file and asserts on its wording: rule-advisor prose phrases
+test_skillpack.py	test_intake_files_work_it_can_state_acceptance_for	RETIRE	wording: reads a skill/doc file and asserts on its wording: intake prose phrases
+test_skillpack.py	test_marketplace_manifest_shape	KEEP	not a doc read: marketplace.json shape
+test_skillpack.py	test_nothing_is_grandfathered_that_the_corpus_does_not_contain	KEEP	not a doc read: certification.yaml vs attest shards
+test_skillpack.py	test_orchestrate_collection_reverifies_the_ship_tail	RETIRE	wording: reads a skill/doc file and asserts on its wording: orchestrate prose phrases
+test_skillpack.py	test_orchestrate_forbids_briefs_that_restate_the_protocol	RETIRE	wording: reads a skill/doc file and asserts on its wording: orchestrate prose phrases
+test_skillpack.py	test_orchestrate_keeps_the_hard_stops_and_the_founder_merge	RETIRE	wording: reads a skill/doc file and asserts on its wording: orchestrate hard-stop phrases
+test_skillpack.py	test_pack_skills_present_with_valid_frontmatter	KEEP	contract: machine-parsed schema/format: SKILL.md frontmatter name/description the plugin loader reads, and the shipped skill set
+test_skillpack.py	test_plugin_dirs_resolve_and_names_match	KEEP	not a doc read: plugin.json manifests
+test_skillpack.py	test_pre_pr_review_closes_the_memory_loop	RETIRE	wording: reads a skill/doc file and asserts on its wording: pre-pr-review prose phrases
+test_skillpack.py	test_pre_pr_review_forbids_pre_judging	RETIRE	wording: reads a skill/doc file and asserts on its wording: pre-pr-review prose phrases
+test_skillpack.py	test_pre_pr_review_re_dispatches_a_no_review_lens_once_and_records_it	KEEP	consumer-run snippet (contract pin)
+test_skillpack.py	test_reader_facing_docs_state_the_real_skill_count	RETIRE	wording: reads a skill/doc file and asserts on its wording: skill-count words in README and wiki
+test_skillpack.py	test_refused_skills_stay_refused_with_their_reasons	RETIRE	wording: reads a skill/doc file and asserts on its wording: docs/design/methodology.md phrases
+test_skillpack.py	test_repair_path_has_a_method_not_only_a_budget	RETIRE	wording: reads a skill/doc file and asserts on its wording: deliver prose says 'root cause'
+test_skillpack.py	test_retro_can_propose_adopting_a_guardrail	RETIRE	wording: reads a skill/doc file and asserts on its wording: retro Propose section phrases
+test_skillpack.py	test_retro_drops_a_skill_step_only_with_the_fail_open_caveat	RETIRE	wording: reads a skill/doc file and asserts on its wording: retro Propose section phrases
+test_skillpack.py	test_retro_gathers_the_guardrail_gap_not_only_its_own_scars	RETIRE	wording: reads a skill/doc file and asserts on its wording: retro Gather section phrases
+test_skillpack.py	test_retro_gathers_the_skill_step_provenance_report	RETIRE	wording: reads a skill/doc file and asserts on its wording: retro Gather section phrases
+test_skillpack.py	test_retro_ingests_before_it_reads_stats	RETIRE	wording: reads a skill/doc file and asserts on its wording: retro Gather phrase order
+test_skillpack.py	test_retro_keeps_the_design_gates	RETIRE	wording: reads a skill/doc file and asserts on its wording: retro prose phrases
+test_skillpack.py	test_retro_never_auto_adopts_a_guardrail	RETIRE	wording: reads a skill/doc file and asserts on its wording: retro Propose section phrases
+test_skillpack.py	test_retro_points_at_the_rule_advisor	RETIRE	wording: reads a skill/doc file and asserts on its wording: retro prose names rule-advisor
+test_skillpack.py	test_retro_treats_an_unread_gap_as_unread	RETIRE	wording: reads a skill/doc file and asserts on its wording: retro Gather section phrases
+test_skillpack.py	test_rule_advisor_owns_the_chain_and_never_auto_adopts	RETIRE	wording: reads a skill/doc file and asserts on its wording: rule-advisor prose phrases
+test_skillpack.py	test_ship_is_the_only_entry_point_a_founder_needs	RETIRE	wording: reads a skill/doc file and asserts on its wording: ship prose phrases
+test_skillpack.py	test_skill_pack_page_lists_every_skill_the_pack_ships	RETIRE	wording: reads a skill/doc file and asserts on its wording: Skill-Pack.md names every skill
+test_skillpack.py	test_skills_consult_the_policy_section_by_its_real_name	RETIRE	wording: reads a skill/doc file and asserts on its wording: skill prose names '## Autonomy scope'
+test_skillpack.py	test_skills_teach_the_enforced_microtest_rep_floor	RETIRE	wording: reads a skill/doc file and asserts on its wording: retro/rule-advisor prose states the rep floor
+test_skillpack.py	test_stats_surfaces_the_quiet_step_section	KEEP	behaviour: drives code: memory.stats and render_stats over the real pack
+test_skillpack.py	test_subagent_dependent_skills_declare_it	KEEP	contract: machine-parsed schema/format: provenance assumes.subagents flag
+test_skillpack.py	test_the_pack_cites_at_least_one_measurable_class	KEEP	contract: machine-parsed schema/format: provenance tag refs the quiet-step report measures
+test_skillpack.py	test_the_pack_is_night_free_except_the_live_legacy_markers	RETIRE	wording: reads a skill/doc file and asserts on its wording: vocabulary ban on 'night' in skill prose
+test_skillpack.py	test_the_packs_own_assumptions_preflight_clean	KEEP	behaviour: drives code: warden.provenance preflight over the real pack
+test_skillpack.py	test_the_reopened_refusal_is_recorded_not_silently_reversed	RETIRE	wording: reads a skill/doc file and asserts on its wording: docs/design/methodology.md phrases
+test_skillpack.py	test_the_skill_genericity_checks_fire_and_stay_silent	RETIRE	control for retired wording guard: FIRES/SILENT for the skill-genericity prose scan
+test_skillpack.py	test_the_skill_table_lists_exactly_the_pack	RETIRE	wording: reads a skill/doc file and asserts on its wording: Skill-Pack.md table rows
+test_tag_vocabulary_guards.py	test_alias_guard_holds_a_paused_rules_covered_class	KEEP	behaviour: writes md fixture: paused covering rule
+test_tag_vocabulary_guards.py	test_folding_a_covered_class_detaches_its_records	KEEP	behaviour: writes md fixture: covering rule, drives alias fold
+test_unknown_key_render.py	test_an_unknown_key_refusal_names_a_heterogeneous_key_set	KEEP	behaviour: drives code: loaders refuse unknown keys by name
+test_verify.py	test_both_covers_descriptions_state_the_trailing_slash_rule	KEEP	contract: machine-parsed schema/format: repo.schema.json covers descriptions; also one Configuration.md line
+test_vocabulary_check.py	test_the_wiki_names_the_shipped_enforcement	RETIRE	wording: pins Memory.md and Adopting.md mentions of check-vocabulary

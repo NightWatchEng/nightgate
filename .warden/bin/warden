@@ -1,0 +1,6 @@
+#!/bin/sh
+# Nightgate's own shim: the platform repo runs the package it contains.
+# Consumers use the pinned form from docs/wiki/Installation.md instead, which
+# resolves an immutable SHA and retries once before declaring the platform gone.
+ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+exec uv run --locked --project "$ROOT" warden "$@"
