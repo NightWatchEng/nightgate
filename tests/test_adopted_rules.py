@@ -28,6 +28,7 @@ from warden.diffs import DiffContext
 from warden.review import applicable
 
 from conftest import tracked
+from private_evidence import EXPORT, publish_excludes
 
 ROOT = Path(__file__).parent.parent
 
@@ -513,6 +514,8 @@ def test_the_shipped_tree_carries_zero_unallowed_hits():
 
 # ---------- pin freshness is a mechanism, not a memory ----------------------
 
+@pytest.mark.skipif(EXPORT and publish_excludes(".github/dependabot.yml"),
+                    reason="public export: publish.yaml leaves .github/dependabot.yml out")
 def test_dependabot_watches_the_action_pins():
     """The decided answer to pin freshness: a SHA
     nobody updates decays into an unpatched dependency, and a trailing

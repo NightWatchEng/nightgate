@@ -11,7 +11,10 @@ top_level:
             scripts, skills, tests, uv.lock, warden]
   exclude: [.beads]
 
-exclude: [.warden/memory/, docs/design/retro-2*.md, docs/design/newcomer-trace-*.md,
+# .github/dependabot.yml: bumps land here and reach the public repo through the
+# export, so a Dependabot PR opened there could only go stale or be closed by hand.
+exclude: [.github/dependabot.yml, .warden/memory/, docs/design/retro-2*.md,
+          docs/design/newcomer-trace-*.md,
           docs/design/cost-per-pr-*.md, docs/design/patent-assessment-brief.md,
           docs/design/prior-art-positioning.md]
 keep: [.warden/memory/tags.yaml]

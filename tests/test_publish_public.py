@@ -268,3 +268,15 @@ def test_this_repos_head_exports_without_the_tracker_or_the_corpus(tmp_path):
     assert not (out / ".beads").exists() and not (out / ".warden/memory/attest").exists()
     assert (out / ".warden/memory/tags.yaml").is_file()
     assert result.stdout.endswith(f"Source: {_git(ROOT, 'rev-parse', 'HEAD')}\n")
+
+
+@needs_tracker
+def test_the_exported_tree_carries_no_dependabot_config(tmp_path):
+    """GitHub reads Dependabot config from a repo's root .github/, so an exported
+    one opens bump PRs on the public repo, where nothing lands: bumps land here."""
+    result = _run(ROOT, out := tmp_path / "public")
+    assert result.returncode == 0, result.stderr
+    assert not (out / ".github/dependabot.yml").exists()
+    assert (out / ".github/workflows/ci.yml").is_file()
+    # the example's copy is inert below the root and travels with hello-svc
+    assert (out / "examples/hello-svc/.github/dependabot.yml").is_file()
