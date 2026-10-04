@@ -89,7 +89,16 @@ RULES_DIR = config_mod.DEFAULT_RULES_DIR
 GITIGNORE_ENTRIES = (".warden/out/", ".warden/memory/findings.jsonl",
                      ".warden/memory/gate/")
 BUILD_OUTPUT_IGNORES = {"python": ("*.egg-info/",), "node": ("node_modules/",)}
-DEPLOY_KEY_SECRET = "AGENTOPS_DEPLOY_KEY"
+# The repository the emitted gate installs the platform from, with a read-only
+# deploy key stored as DEPLOY_KEY_SECRET. A consumer that stored only the old
+# secret name still installs, from the repository its key was added to, with a
+# warning; the emitted build step refuses that fallback at a platform.pin of
+# DEPLOY_KEY_ALIAS_ENDS or later, so a workflow written now ends it unedited.
+PLATFORM_REPO = "NightWatchEng/nightgate"
+DEPLOY_KEY_SECRET = "NIGHTGATE_DEPLOY_KEY"
+PLATFORM_REPO_BEFORE = "NightWatchEng/agentops"
+DEPLOY_KEY_SECRET_ALIAS = "AGENTOPS_DEPLOY_KEY"
+DEPLOY_KEY_ALIAS_ENDS = "v4.0.0"
 GATE_CHECK = "warden gate"
 
 

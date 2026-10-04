@@ -25,7 +25,7 @@ from pathlib import Path
 
 MARKETPLACE = "nightgate"
 PLUGIN = "nightgate-skills"
-MARKETPLACE_URL = "https://github.com/NightWatchEng/agentops"
+MARKETPLACE_URL = "https://github.com/NightWatchEng/nightgate"
 
 PINNED, UNPINNED, UNREADABLE = "pinned", "unpinned", "unreadable"
 EXIT = {PINNED: 0, UNPINNED: 1, UNREADABLE: 2}

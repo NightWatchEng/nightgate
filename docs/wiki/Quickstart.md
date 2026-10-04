@@ -87,8 +87,8 @@ platform CI enrolls on **every PR**.
 out is also the honest demo: it is what a consumer does.
 
 ```sh
-git clone https://github.com/NightWatchEng/agentops
-export NIGHTGATE=$PWD/agentops                 # the platform checkout
+git clone https://github.com/NightWatchEng/nightgate
+export NIGHTGATE=$PWD/nightgate                # the platform checkout
 
 cp -r "$NIGHTGATE/examples/hello-svc" .
 cd hello-svc && rm -rf .warden/out

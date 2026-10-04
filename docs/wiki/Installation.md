@@ -7,8 +7,8 @@ if the CLI is missing.
 
 ## Access comes first
 
-The repository is private and enrollment is invite-only, so you must be a
-collaborator on `NightWatchEng/agentops`. What each install needs on top:
+Every install below reads `NightWatchEng/nightgate`, so your account needs
+read access to it. What each install needs on top:
 
 - **The CLI from a tag** (section 1) fetches over https with your git
   credentials. `gh auth setup-git` makes `gh` git's credential helper for
@@ -23,7 +23,7 @@ For the CLI:
 ```sh
 gh auth login
 gh auth setup-git
-git ls-remote --tags https://github.com/NightWatchEng/agentops v3.0.0
+git ls-remote --tags https://github.com/NightWatchEng/nightgate v3.0.0
 ```
 
 The `ls-remote` line prints one line when `v3.0.0` is published, whether the
@@ -37,7 +37,7 @@ prints `Invalid username or token` and `Authentication failed`; run
 account that has no access, it prints `Repository not found`.
 
 To check an ssh key, such as a deploy key, run the same line against
-`git@github.com:NightWatchEng/agentops.git`. With no key GitHub accepts, it
+`git@github.com:NightWatchEng/nightgate.git`. With no key GitHub accepts, it
 fails with `Permission denied (publickey)`; with a key whose account has no
 access, it prints `ERROR: Repository not found.`
 
@@ -67,7 +67,7 @@ GitHub-only limit*.
 ## 1. The CLI, from a release tag
 
 ```sh
-uv tool install git+https://github.com/NightWatchEng/agentops@v3.0.0
+uv tool install git+https://github.com/NightWatchEng/nightgate@v3.0.0
 warden --version
 ```
 
@@ -128,17 +128,17 @@ exec warden "$@"
 
 ## CI access to the platform
 
-The workflow `warden init` writes installs the platform over ssh, so each
-consumer repository needs its own read-only deploy key. Set it up once per
-repository: the founder adds the public half to `NightWatchEng/agentops` as a
-deploy key, with write access left off, and the consumer stores the private
-half as the `AGENTOPS_DEPLOY_KEY` repository secret.
+The workflow `warden init` writes installs the platform over ssh with a
+read-only deploy key per consumer repository: the founder adds the public half
+to `NightWatchEng/nightgate`, write access off, and the consumer stores the
+private half as the `NIGHTGATE_DEPLOY_KEY` secret. Until v4.0.0, while it is
+empty, the old `AGENTOPS_DEPLOY_KEY` installs from `NightWatchEng/agentops` and warns.
 
 ```sh
-ssh-keygen -t ed25519 -N '' -C 'OWNER/REPO CI' -f agentops_deploy_key
-gh repo deploy-key add agentops_deploy_key.pub --repo NightWatchEng/agentops --title 'OWNER/REPO CI'
-gh secret set AGENTOPS_DEPLOY_KEY --repo OWNER/REPO < agentops_deploy_key
-rm agentops_deploy_key agentops_deploy_key.pub
+ssh-keygen -t ed25519 -N '' -C 'OWNER/REPO CI' -f nightgate_deploy_key
+gh repo deploy-key add nightgate_deploy_key.pub --repo NightWatchEng/nightgate --title 'OWNER/REPO CI'
+gh secret set NIGHTGATE_DEPLOY_KEY --repo OWNER/REPO < nightgate_deploy_key
+rm nightgate_deploy_key nightgate_deploy_key.pub
 ```
 
 Only the workflow's `install` job reads the key. It checks out `repo.yaml`
@@ -167,14 +167,14 @@ cwd only, so a worktree or a headless session cannot see them, while
 user-scope plugin skills resolve everywhere.
 
 ```bash
-claude plugin marketplace add 'https://github.com/NightWatchEng/agentops#v3.0.0'
+claude plugin marketplace add 'https://github.com/NightWatchEng/nightgate#v3.0.0'
 claude plugin install nightgate-skills@nightgate
 ```
 
 Then check it with `warden skills pin`, which v3.0.0 carries.
 
 Claude Code clones the marketplace with your git credentials, so the https
-URL uses the `gh auth setup-git` helper above; the `NightWatchEng/agentops`
+URL uses the `gh auth setup-git` helper above; the `NightWatchEng/nightgate`
 shorthand would clone over ssh instead. The `#v3.0.0` is `platform.pin`:
 neither command takes a version flag, but a ref on the URL clones the
 marketplace at that tag and the pack installs from that clone. `warden skills
@@ -188,6 +188,9 @@ serves the same pack under its earlier names: the marketplace is `agentops`
 and the pack `agentops-skills`, so a repository pinned there installs
 `agentops-skills@agentops`, removes the marketplace as `agentops`, and invokes
 `/agentops-skills:<name>` ([release notes v3.0.0](../design/release-notes-v3.0.0.md)).
+Its tag exists only on `NightWatchEng/agentops`, since `NightWatchEng/nightgate`
+carries tags from v3.0.0 on, so every command on this page that names
+`NightWatchEng/nightgate` names `NightWatchEng/agentops` for that pin.
 
 Invoke namespaced — every skill directly, not only through `ship`:
 

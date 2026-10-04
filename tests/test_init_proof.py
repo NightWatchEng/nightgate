@@ -30,7 +30,7 @@ TRY_IT = ROOT / "scripts" / "readme-try-it.sh"
 ISOLATION = ROOT / "scripts" / "init-proof-isolation.sh"
 GRAPH = ROOT / "scripts" / "workflow-graph-check.py"
 VENV_BIN = Path(sys.executable).parent
-INSTALL = f"uv tool install git+https://github.com/NightWatchEng/agentops@v{__version__}"
+INSTALL = f"uv tool install git+https://github.com/NightWatchEng/nightgate@v{__version__}"
 
 
 def _try_it(readme: str) -> list[str]:
@@ -64,7 +64,7 @@ def _fake_warden(tmp_path: Path, body: str) -> Path:
 def test_readme_try_it_is_install_init_certify_after_the_access_requirement():
     readme = (ROOT / "README.md").read_text()
     assert _try_it(readme) == [INSTALL, "warden init", "warden certify --level 3"]
-    access = readme.index("Nightgate is private and invite-only")
+    access = readme.index("You need read access to `NightWatchEng/nightgate`")
     assert access < readme.index("\n## Try it\n"), "access is stated after Try it"
     try_it = readme.split("\n## Try it\n", 1)[1].split("```sh", 1)[0]
     assert "Access comes first" in try_it
@@ -428,19 +428,19 @@ def _isolation(tmp_path: Path, *, tool_warden: bool = True, config: str = ""):
 # leading slash, and the network transports git ships a URL scheme for:
 # https, http, ftps, ftp, ssh (scp form, ssh:// and git+ssh://) and git://.
 SPELLINGS = (
-    "https://github.com/NightWatchEng/agentops",
-    "https://github.com/nightwatcheng/agentops",
-    "http://github.com/NightWatchEng/agentops",
-    "ftps://github.com/NightWatchEng/agentops.git",
-    "ftp://github.com/NightWatchEng/agentops.git",
-    "git@github.com:NightWatchEng/agentops.git",
-    "git@github.com:nightwatcheng/agentops.git",
-    "git@github.com:/NightWatchEng/agentops.git",
-    "ssh://git@github.com/NightWatchEng/agentops.git",
-    "ssh://git@github.com/nightwatcheng/agentops.git",
-    "ssh://git@github.com:22/NightWatchEng/agentops.git",
-    "git+ssh://git@github.com/NightWatchEng/agentops.git",
-    "git://github.com/NightWatchEng/agentops.git",
+    "https://github.com/NightWatchEng/nightgate",
+    "https://github.com/nightwatcheng/nightgate",
+    "http://github.com/NightWatchEng/nightgate",
+    "ftps://github.com/NightWatchEng/nightgate.git",
+    "ftp://github.com/NightWatchEng/nightgate.git",
+    "git@github.com:NightWatchEng/nightgate.git",
+    "git@github.com:nightwatcheng/nightgate.git",
+    "git@github.com:/NightWatchEng/nightgate.git",
+    "ssh://git@github.com/NightWatchEng/nightgate.git",
+    "ssh://git@github.com/nightwatcheng/nightgate.git",
+    "ssh://git@github.com:22/NightWatchEng/nightgate.git",
+    "git+ssh://git@github.com/NightWatchEng/nightgate.git",
+    "git://github.com/NightWatchEng/nightgate.git",
 )
 
 
@@ -493,19 +493,19 @@ def test_isolation_fails_when_a_spelling_still_reaches_a_repository(tmp_path):
     reachable = tmp_path / "platform"
     subprocess.run(["git", "init", "-q", "-b", "main", str(reachable)], check=True, capture_output=True)
     config = (f'[protocol "file"]\n\tallow = always\n'
-              f'[url "{reachable}"]\n\tinsteadOf = ssh://git@github.com/NightWatchEng/agentops.git\n')
+              f'[url "{reachable}"]\n\tinsteadOf = ssh://git@github.com/NightWatchEng/nightgate.git\n')
     result, _ = _isolation(tmp_path, config=config)
     assert result.returncode == 1, result.stdout + result.stderr
-    assert "git reached the platform through ssh://git@github.com/NightWatchEng/agentops.git" \
+    assert "git reached the platform through ssh://git@github.com/NightWatchEng/nightgate.git" \
         in result.stderr, result.stderr
 
 
 def test_isolation_fails_when_a_spelling_fails_without_gits_transport_refusal(tmp_path):
     config = (f'[protocol "file"]\n\tallow = always\n'
-              f'[url "{tmp_path / "absent"}"]\n\tinsteadOf = git@github.com:NightWatchEng/agentops.git\n')
+              f'[url "{tmp_path / "absent"}"]\n\tinsteadOf = git@github.com:NightWatchEng/nightgate.git\n')
     result, _ = _isolation(tmp_path, config=config)
     assert result.returncode == 1, result.stdout + result.stderr
-    assert "git failed on git@github.com:NightWatchEng/agentops.git without refusing its " \
+    assert "git failed on git@github.com:NightWatchEng/nightgate.git without refusing its " \
         "transport" in result.stderr, result.stderr
 
 

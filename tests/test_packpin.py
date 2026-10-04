@@ -264,7 +264,7 @@ def _skills_pin_drift(pin: str, pages: dict[str, str]) -> list[str]:
             drift.append(f"{name}: offers warden skills pin without '{since}'")
         if carries and "by hand" in flat:
             drift.append(f"{name}: still gives the by-hand check {pin} replaces")
-        for tag in re.findall(r"agentops#(v[0-9][0-9.]*[0-9])|<url>#(v[0-9][0-9.]*[0-9])", text):
+        for tag in re.findall(r"(?:agentops|nightgate)#(v[0-9][0-9.]*[0-9])|<url>#(v[0-9][0-9.]*[0-9])", text):
             if (tag[0] or tag[1]) != pin:
                 drift.append(f"{name}: names #{tag[0] or tag[1]}, not {pin}")
     return drift

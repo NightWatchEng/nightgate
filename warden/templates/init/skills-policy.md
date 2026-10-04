@@ -2,7 +2,7 @@
 
 Written by `warden init`. The Nightgate skill pack reads this file, and each
 section below is required
-(https://github.com/NightWatchEng/agentops/blob/main/docs/wiki/Skills-Policy.md).
+(https://github.com/NightWatchEng/nightgate/blob/main/docs/wiki/Skills-Policy.md).
 Replace the defaults as the project's practice settles.
 
 ## Verify

@@ -14,19 +14,18 @@ Enrolling a repo means writing config. Nobody forks the tooling.
 
 ## Install
 
-Nightgate is private and invite-only. You need collaborator access to
-`NightWatchEng/agentops` and git credentials that can read it over https;
-`gh auth setup-git` sets those up. Then one command installs both `warden` and
-`cage`, with no clone of the platform:
+You need read access to `NightWatchEng/nightgate` and git credentials that
+can read it over https; `gh auth setup-git` sets those up. Then one command
+installs both `warden` and `cage`, with no clone of the platform:
 
 ```sh
-uv tool install git+https://github.com/NightWatchEng/agentops@v3.0.0
+uv tool install git+https://github.com/NightWatchEng/nightgate@v3.0.0
 warden --version
 ```
 
 `warden --version` prints the tag's version, `warden 3.0.0`. If `uv` cannot
 find `v3.0.0`, run
-`git ls-remote --tags https://github.com/NightWatchEng/agentops v3.0.0`.
+`git ls-remote --tags https://github.com/NightWatchEng/nightgate v3.0.0`.
 A published tag, lightweight or annotated, prints one line: an object id, a
 tab, and `refs/tags/v3.0.0`. No output means the release tag is not published
 yet. Without access, git fails instead. Over https it asks
@@ -34,7 +33,7 @@ yet. Without access, git fails instead. Over https it asks
 `Invalid username or token` and `Authentication failed` when a stored token
 is invalid or expired, and prints `Repository not found` when valid
 credentials belong to an account without access. Over ssh
-(`git@github.com:NightWatchEng/agentops.git`) it prints
+(`git@github.com:NightWatchEng/nightgate.git`) it prints
 `Permission denied (publickey)` when GitHub accepts no key you offer, and
 `ERROR: Repository not found.` when the key's account has no access.
 **[Installation](docs/wiki/Installation.md)** has the access check, the skill
@@ -42,12 +41,12 @@ pack, and the pinned form an enrolled repo commits.
 
 ## Try it
 
-Access comes first: the install line needs the collaborator access and git
-credentials described under Install. Then, from the root of your own Python,
-Node or Go git repository:
+Access comes first: the install line needs the read access and git credentials
+described under Install. Then, from the root of your own Python, Node or Go git
+repository:
 
 ```sh
-uv tool install git+https://github.com/NightWatchEng/agentops@v3.0.0
+uv tool install git+https://github.com/NightWatchEng/nightgate@v3.0.0
 warden init
 warden certify --level 3
 ```

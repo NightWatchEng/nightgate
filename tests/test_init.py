@@ -387,7 +387,9 @@ def test_credential_step_exits_2_with_the_fork_message_when_the_secret_is_empty(
     assert step["env"][enroll.DEPLOY_KEY_SECRET] == (
         "${{ secrets.%s }}" % enroll.DEPLOY_KEY_SECRET)
     result = _run_step(doc, "install", step, {enroll.DEPLOY_KEY_SECRET: "",
-                                             "RUNNER_TEMP": str(tmp_path)}, tmp_path)
+                                             enroll.DEPLOY_KEY_SECRET_ALIAS: "",
+                                             "RUNNER_TEMP": str(tmp_path),
+                                             "GITHUB_OUTPUT": str(tmp_path / "out")}, tmp_path)
     assert result.returncode == 2, result
     assert "fork" in result.stderr
     assert enroll.DEPLOY_KEY_SECRET in result.stderr
@@ -399,14 +401,113 @@ def test_credential_step_writes_an_owner_only_key_when_the_secret_is_set(tmp_pat
     doc = _workflow()
     step = _step(doc, "install", CREDENTIAL)
     key = "-----BEGIN OPENSSH PRIVATE KEY-----\nabc\n-----END OPENSSH PRIVATE KEY-----"
+    runner = tmp_path / "runner"
+    runner.mkdir()
     result = _run_step(doc, "install", step, {enroll.DEPLOY_KEY_SECRET: key,
-                                             "RUNNER_TEMP": str(tmp_path)}, tmp_path)
+                                             enroll.DEPLOY_KEY_SECRET_ALIAS: "",
+                                             "RUNNER_TEMP": str(runner),
+                                             "GITHUB_OUTPUT": str(tmp_path / "out")}, tmp_path)
     assert result.returncode == 0, result
     assert key not in result.stdout + result.stderr
-    written = tmp_path / "agentops_deploy_key"
+    written = runner / "nightgate_deploy_key"
     assert written.read_text() == key + "\n"
     assert written.stat().st_mode & 0o777 == 0o600
-    assert "github.com ssh-ed25519" in (tmp_path / "agentops_known_hosts").read_text()
+    assert "github.com ssh-ed25519" in (runner / "nightgate_known_hosts").read_text()
+
+
+def _credential(tmp_path: Path, new: str, old: str) -> tuple[subprocess.CompletedProcess, str]:
+    doc = _workflow()
+    output = tmp_path / "github_output"
+    result = _run_step(doc, "install", _step(doc, "install", CREDENTIAL), {
+        enroll.DEPLOY_KEY_SECRET: new, enroll.DEPLOY_KEY_SECRET_ALIAS: old,
+        "RUNNER_TEMP": str(tmp_path), "GITHUB_OUTPUT": str(output)}, tmp_path)
+    return result, output.read_text() if output.exists() else ""
+
+
+def test_the_emitted_gate_reads_the_new_deploy_key_secret(tmp_path):
+    step = _step(_workflow(), "install", CREDENTIAL)
+    assert enroll.DEPLOY_KEY_SECRET == "NIGHTGATE_DEPLOY_KEY"
+    assert list(step["env"]) == [enroll.DEPLOY_KEY_SECRET, enroll.DEPLOY_KEY_SECRET_ALIAS]
+    for name in step["env"]:
+        assert step["env"][name] == "${{ secrets.%s }}" % name
+    # Both set: the new name wins, and nothing warns.
+    result, output = _credential(tmp_path, "new-key", "old-key")
+    assert result.returncode == 0, result
+    assert (tmp_path / "nightgate_deploy_key").read_text() == "new-key\n"
+    assert output == f"repo={enroll.PLATFORM_REPO}\n"
+    assert "::warning" not in result.stdout + result.stderr
+
+
+def test_the_emitted_gate_falls_back_to_the_old_secret_and_warns(tmp_path):
+    """A consumer that stored only the old secret (shortfall) keeps a working
+    gate until the alias leaves: its key is a deploy key on the repository the
+    platform was installed from before, so the fallback installs from there."""
+    result, output = _credential(tmp_path, "", "old-key")
+    assert result.returncode == 0, result
+    assert (tmp_path / "nightgate_deploy_key").read_text() == "old-key\n"
+    assert output == f"repo={enroll.PLATFORM_REPO_BEFORE}\n"
+    warning = [line for line in result.stdout.splitlines() if line.startswith("::warning")]
+    assert len(warning) == 1, result.stdout
+    for phrase in (enroll.DEPLOY_KEY_SECRET_ALIAS, enroll.DEPLOY_KEY_SECRET,
+                   enroll.DEPLOY_KEY_ALIAS_ENDS, enroll.PLATFORM_REPO):
+        assert phrase in warning[0], phrase
+    assert "old-key" not in result.stdout + result.stderr
+
+
+def test_the_emitted_gate_installs_the_platform_from_the_public_repo(tmp_path, monkeypatch):
+    repo = _repo(tmp_path, FIXTURES["python"])
+    assert _warden(repo, monkeypatch, "init") == 0
+    doc = yaml.safe_load((repo / enroll.WORKFLOW_PATH).read_text())
+    naming_old = [s.get("name") for job in doc["jobs"] for s in _steps(doc, job)
+                  if enroll.PLATFORM_REPO_BEFORE in yaml.safe_dump(s)]
+    assert naming_old == [CREDENTIAL, BUILD], "the old repository outside the alias"
+    assert _step(doc, "install", CREDENTIAL)["id"] == "credential"
+    build = _step(doc, "install", BUILD)
+    assert build["env"] == {"PLATFORM_REPO": "${{ steps.credential.outputs.repo }}"}
+    result, log, _ = _build(repo, tmp_path)
+    assert result.returncode == 0, result
+    assert "git@github.com:NightWatchEng/nightgate.git platform-src" in log, log
+    assert enroll.PLATFORM_REPO == "NightWatchEng/nightgate"
+
+
+@pytest.mark.parametrize("pin, clones", [("v3.9.9", True), ("v4.0.0", False), ("v12.0.0", False)])
+def test_build_step_clones_the_old_repository_for_the_old_secret_until_the_alias_ends(
+        pin, clones, tmp_path):
+    """The fallback's clone is the old repository, where the old key is a
+    deploy key, and the committed workflow itself ends the alias at
+    DEPLOY_KEY_ALIAS_ENDS: a pin bump rewrites no workflow, so nothing else could."""
+    assert enroll.DEPLOY_KEY_ALIAS_ENDS == "v4.0.0"
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "repo.yaml").write_text(f"version: 1\nplatform:\n  pin: {pin}\n")
+    result, log, output = _build(repo, tmp_path, platform=enroll.PLATFORM_REPO_BEFORE)
+    if clones:
+        assert result.returncode == 0, result
+        assert (f"--branch {pin} git@github.com:{enroll.PLATFORM_REPO_BEFORE}.git "
+                "platform-src") in log, log
+    else:
+        assert result.returncode == 2, result
+        assert log == "" and output == ""
+        for phrase in ("DID NOT RUN", enroll.DEPLOY_KEY_SECRET_ALIAS, enroll.DEPLOY_KEY_SECRET):
+            assert phrase in result.stderr, phrase
+    # The new secret is unaffected by the alias's end.
+    shutil.rmtree(tmp_path / "runner")
+    result, log, _ = _build(repo, tmp_path, platform=enroll.PLATFORM_REPO)
+    assert result.returncode == 0, result
+    assert f"git@github.com:{enroll.PLATFORM_REPO}.git" in log, log
+
+
+@pytest.mark.parametrize("platform", ["", "NightWatchEng/other", "x;touch pwned"])
+def test_build_step_refuses_a_platform_repository_the_credential_step_did_not_name(
+        platform, tmp_path):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "repo.yaml").write_text("version: 1\nplatform:\n  pin: v1.2.3\n")
+    result, log, output = _build(repo, tmp_path, platform=platform)
+    assert result.returncode == 2, result
+    assert "DID NOT RUN" in result.stderr and "platform repository" in result.stderr
+    assert log == "" and output == ""
+    assert not (repo / "pwned").exists()
 
 
 def test_the_install_job_executes_nothing_from_the_checkout(tmp_path):
@@ -433,10 +534,10 @@ def test_the_install_job_executes_nothing_from_the_checkout(tmp_path):
     remove = _step(doc, "install", REMOVE)
     assert remove["if"] == "always()"
 
-    (tmp_path / "agentops_deploy_key").write_text("secret\n")
+    (tmp_path / "nightgate_deploy_key").write_text("secret\n")
     result = _run_step(doc, "install", remove, {"RUNNER_TEMP": str(tmp_path)}, tmp_path)
     assert result.returncode == 0, result
-    assert not (tmp_path / "agentops_deploy_key").exists()
+    assert not (tmp_path / "nightgate_deploy_key").exists()
 
 
 def test_no_job_but_install_references_a_secret():
@@ -450,7 +551,8 @@ def test_no_job_but_install_references_a_secret():
 
     assert referenced({k: v for k, v in doc.items() if k != "jobs"}) == []
 
-    assert referenced(doc["jobs"]["install"]) == [enroll.DEPLOY_KEY_SECRET]
+    assert sorted(referenced(doc["jobs"]["install"])) == sorted(
+        [enroll.DEPLOY_KEY_SECRET, enroll.DEPLOY_KEY_SECRET_ALIAS])
     assert referenced(doc["jobs"]["verify"]) == []
     gate = doc["jobs"]["gate"]
     assert referenced(gate) == ["GITHUB_TOKEN"]
@@ -544,7 +646,8 @@ def _fakes(tmp_path: Path) -> tuple[Path, Path]:
 
 
 def _build(repo: Path, tmp_path: Path, *, shell=None, wheels: int = 1,
-           doc: dict | None = None) -> tuple[subprocess.CompletedProcess, str, str]:
+           doc: dict | None = None, platform: str = enroll.PLATFORM_REPO
+           ) -> tuple[subprocess.CompletedProcess, str, str]:
     bindir, log = _fakes(tmp_path)
     runner_temp = tmp_path / "runner"
     runner_temp.mkdir(exist_ok=True)
@@ -554,7 +657,7 @@ def _build(repo: Path, tmp_path: Path, *, shell=None, wheels: int = 1,
         **_AMBIENT_GIT_CONFIG,
         "PATH": f"{bindir}{os.pathsep}{os.environ['PATH']}", "FAKE_LOG": str(log),
         "FAKE_WHEELS": str(wheels), "RUNNER_TEMP": str(runner_temp),
-        "GITHUB_OUTPUT": str(output)}, repo, shell)
+        "GITHUB_OUTPUT": str(output), "PLATFORM_REPO": platform}, repo, shell)
     return (result, log.read_text() if log.exists() else "",
             output.read_text() if output.exists() else "")
 
@@ -567,10 +670,10 @@ def test_build_step_reads_the_tag_from_repo_yaml_platform_pin(tmp_path, monkeypa
     assert result.returncode == 0, result
     runner = tmp_path / "runner"
     assert (f"git args=clone --quiet --depth 1 --branch v{enroll.__version__} "
-            "git@github.com:NightWatchEng/agentops.git platform-src") in log, log
+            "git@github.com:NightWatchEng/nightgate.git platform-src") in log, log
     assert f"git cwd={runner}" in log, (
         "the clone ran inside the checkout, where a pull request's files are read")
-    assert f"-i {runner}/agentops_deploy_key" in log
+    assert f"-i {runner}/nightgate_deploy_key" in log
     assert "StrictHostKeyChecking=yes" in log
     assert "uv args=build --no-config --no-cache --wheel --out-dir warden-wheel platform-src" in log
     assert f"uv cwd={runner}" in log
@@ -587,7 +690,7 @@ def test_build_step_reads_the_tag_from_repo_yaml_platform_pin(tmp_path, monkeypa
     (tmp_path / "github_output").unlink()
     result, log, _ = _build(repo, tmp_path)
     assert result.returncode == 0, result
-    assert "--branch v9.8.7 git@github.com:NightWatchEng/agentops.git" in log
+    assert "--branch v9.8.7 git@github.com:NightWatchEng/nightgate.git" in log
 
 
 def test_build_step_refuses_unless_the_build_leaves_exactly_one_wheel(tmp_path):
@@ -934,7 +1037,8 @@ def _section(page: str, heading: str) -> str:
 def test_installation_documents_the_deploy_key_setup_in_one_short_section():
     body = _section("Installation.md", "CI access to the platform")
     assert len(body.strip().splitlines()) <= 30, "the section is meant to be short"
-    for phrase in (enroll.DEPLOY_KEY_SECRET, "NightWatchEng/agentops",
+    for phrase in (enroll.DEPLOY_KEY_SECRET, enroll.DEPLOY_KEY_SECRET_ALIAS,
+                   enroll.PLATFORM_REPO, enroll.DEPLOY_KEY_ALIAS_ENDS,
                    "read-only", "deploy key", "platform.pin", "fork",
                    "push ruleset", "required reviewers"):
         assert phrase in body, phrase
@@ -972,7 +1076,9 @@ def test_the_empty_secret_message_names_the_dependabot_route(tmp_path):
     doc = _workflow()
     step = _step(doc, "install", CREDENTIAL)
     result = _run_step(doc, "install", step, {enroll.DEPLOY_KEY_SECRET: "",
-                                             "RUNNER_TEMP": str(tmp_path)}, tmp_path)
+                                             enroll.DEPLOY_KEY_SECRET_ALIAS: "",
+                                             "RUNNER_TEMP": str(tmp_path),
+                                             "GITHUB_OUTPUT": str(tmp_path / "out")}, tmp_path)
     assert result.returncode == 2
     assert "--app dependabot" in result.stderr
     assert "--app dependabot" in _section("Installation.md", "CI access to the platform")
@@ -1500,7 +1606,9 @@ def test_repo_yaml_platform_pin_is_the_one_version_source_the_install_job_clones
     workflow = next(p for p in written if p.suffix == ".yml")
     # `v1.2.3` is the example in the build step's refusal message, not a tag.
     others = [line for line in workflow.read_text().splitlines()
-              if semver.search(line.replace("like v1.2.3 written", ""))
+              if semver.search(line.replace("like v1.2.3 written", "")
+                               .replace(f"of {enroll.DEPLOY_KEY_ALIAS_ENDS}", "")
+                               .replace(f"from {enroll.DEPLOY_KEY_ALIAS_ENDS}", ""))
               and not tool_version_line.match(line)]
     assert others == [], "a platform version written into the workflow: " + repr(others)
 
@@ -1510,7 +1618,7 @@ def test_repo_yaml_platform_pin_is_the_one_version_source_the_install_job_clones
     assert cwd.resolve() == where.resolve()
     result, log, _ = _build(cwd, tmp_path, doc=doc)
     assert result.returncode == 0, result
-    assert "--branch v7.13.29 git@github.com:NightWatchEng/agentops.git" in log, log
+    assert "--branch v7.13.29 git@github.com:NightWatchEng/nightgate.git" in log, log
 
     repo_yaml = where / "repo.yaml"
     repo_yaml.write_text(repo_yaml.read_text().replace("pin: v7.13.29", "pin: v9.8.7"))
@@ -1519,7 +1627,7 @@ def test_repo_yaml_platform_pin_is_the_one_version_source_the_install_job_clones
     (tmp_path / "github_output").unlink()
     result, log, _ = _build(cwd, tmp_path, doc=doc)
     assert result.returncode == 0, result
-    assert "--branch v9.8.7 git@github.com:NightWatchEng/agentops.git" in log, log
+    assert "--branch v9.8.7 git@github.com:NightWatchEng/nightgate.git" in log, log
 
 
 def test_every_doc_adds_the_skill_pack_marketplace_by_its_github_url():

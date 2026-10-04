@@ -78,7 +78,8 @@ v2.3.0's is [release-notes-v2.3.0](../design/release-notes-v2.3.0.md).
    commit: at any other commit the next run fails, naming the tag.
 
 9. **Consumers bump their pin**, each in its own repository (shortfall is
-   the live one). The bump PR moves `platform.pin` in `repo.yaml` to
+   the live one), once step 8's `NightWatchEng/nightgate` check prints the
+   tag: a gate `warden init` writes installs from there. The bump PR moves `platform.pin` in `repo.yaml` to
    `vX.Y.Z`, plus any key the new schema requires or now admits. A bump does
    not rewrite a gate workflow, so a step the generator added since (v2.3.0's
    `proportionate review tier`) is the consumer's to add, and a step it has

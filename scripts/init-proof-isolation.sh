@@ -26,19 +26,19 @@ git config --global protocol.allow never
 
 export GIT_TERMINAL_PROMPT=0
 export GIT_SSH_COMMAND="ssh -o BatchMode=yes -o ConnectTimeout=5"
-for url in https://github.com/NightWatchEng/agentops \
-           https://github.com/nightwatcheng/agentops \
-           http://github.com/NightWatchEng/agentops \
-           ftps://github.com/NightWatchEng/agentops.git \
-           ftp://github.com/NightWatchEng/agentops.git \
-           git@github.com:NightWatchEng/agentops.git \
-           git@github.com:nightwatcheng/agentops.git \
-           git@github.com:/NightWatchEng/agentops.git \
-           ssh://git@github.com/NightWatchEng/agentops.git \
-           ssh://git@github.com/nightwatcheng/agentops.git \
-           ssh://git@github.com:22/NightWatchEng/agentops.git \
-           git+ssh://git@github.com/NightWatchEng/agentops.git \
-           git://github.com/NightWatchEng/agentops.git; do
+for url in https://github.com/NightWatchEng/nightgate \
+           https://github.com/nightwatcheng/nightgate \
+           http://github.com/NightWatchEng/nightgate \
+           ftps://github.com/NightWatchEng/nightgate.git \
+           ftp://github.com/NightWatchEng/nightgate.git \
+           git@github.com:NightWatchEng/nightgate.git \
+           git@github.com:nightwatcheng/nightgate.git \
+           git@github.com:/NightWatchEng/nightgate.git \
+           ssh://git@github.com/NightWatchEng/nightgate.git \
+           ssh://git@github.com/nightwatcheng/nightgate.git \
+           ssh://git@github.com:22/NightWatchEng/nightgate.git \
+           git+ssh://git@github.com/NightWatchEng/nightgate.git \
+           git://github.com/NightWatchEng/nightgate.git; do
   if out="$(git ls-remote --tags "$url" 2>&1)"; then
     echo "git reached the platform through $url; it must be unreachable here" >&2
     exit 1

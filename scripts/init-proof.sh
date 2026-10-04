@@ -29,7 +29,7 @@ set -euo pipefail
 
 workdir="${1:?usage: scripts/init-proof.sh WORKDIR}"
 readme="${INIT_PROOF_README:-$(cd "$(dirname "$0")/.." && pwd)/README.md}"
-platform="https://github.com/NightWatchEng/agentops"
+platform="https://github.com/NightWatchEng/nightgate"
 
 fail() {
   echo "init proof: $1: $2" >&2

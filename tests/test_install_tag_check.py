@@ -26,8 +26,8 @@ from warden import __version__
 ROOT = Path(__file__).resolve().parent.parent
 PAGES = {"README.md": ROOT / "README.md",
          "Installation.md": ROOT / "docs" / "wiki" / "Installation.md"}
-REMOTES = ("https://github.com/NightWatchEng/agentops",
-           "git@github.com:NightWatchEng/agentops.git")
+REMOTES = ("https://github.com/NightWatchEng/nightgate",
+           "git@github.com:NightWatchEng/nightgate.git")
 TAG = f"v{__version__}"
 LS_REMOTE = re.compile(r"git ls-remote[^`\n]*")
 
@@ -64,7 +64,7 @@ def _run(argv: list[str], remote: Path, tag: str) -> subprocess.CompletedProcess
                           env={**os.environ, **_AMBIENT_GIT_CONFIG})
 
 
-INSTALL = re.compile(r"uv tool install git\+https://github\.com/NightWatchEng/agentops@(v[^\s`]+)")
+INSTALL = re.compile(r"uv tool install git\+https://github\.com/NightWatchEng/nightgate@(v[^\s`]+)")
 VERSION_LINE = re.compile(r"`warden ([0-9][0-9.]*[0-9])`")
 
 
