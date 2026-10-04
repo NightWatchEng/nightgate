@@ -5,8 +5,9 @@ A release is a tag on `main` whose name is
 `platform.pin` names one, and every `warden` command compares that pin
 against the running version and fails closed on a mismatch
 (`warden/config.py` `enforce_platform_pin`). A builder prepares the release PR;
-the founder merges it and pushes the tag. What v2.3.0 carries is in
-[release-notes-v2.3.0](../design/release-notes-v2.3.0.md).
+the founder merges it and pushes the tag. What v3.0.0 carries is in
+[release-notes-v3.0.0](../design/release-notes-v3.0.0.md), a breaking release;
+v2.3.0's is [release-notes-v2.3.0](../design/release-notes-v2.3.0.md).
 
 ## The procedure
 
@@ -65,6 +66,16 @@ the founder merges it and pushes the tag. What v2.3.0 carries is in
    prints one line, and
    `uv tool install git+https://github.com/NightWatchEng/agentops@vX.Y.Z`
    followed by `warden --version` prints `warden X.Y.Z`.
+
+   From v3.0.0 on, the tag also reaches the public repository,
+   NightWatchEng/nightgate, but not at step 6. `publish-public.yml` runs on a
+   push to `main` only, and `scripts/publish-sync.py` `mirror_tags` places a
+   tag that exists when that run starts, on the public commit whose `Source:`
+   trailer names the tagged commit. The step 5 merge runs before the tag
+   exists, so the first push to `main` after step 6 mirrors it. Until then
+   `git ls-remote --tags https://github.com/NightWatchEng/nightgate vX.Y.Z`
+   prints nothing. A tag pushed there directly must sit on that public
+   commit: at any other commit the next run fails, naming the tag.
 
 9. **Consumers bump their pin**, each in its own repository (shortfall is
    the live one). The bump PR moves `platform.pin` in `repo.yaml` to

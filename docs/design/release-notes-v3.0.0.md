@@ -1,9 +1,10 @@
 # v3.0.0 release notes
 
-The product is now called Nightgate. v3.0.0 is a major release because two
-things a consumer installs change name: the plugin marketplace and the skill
-pack. The procedure that cuts the release is [Releasing](../wiki/Releasing.md).
-The per-PR list since v2.3.0 is added when the release is cut.
+The product is now called Nightgate. v3.0.0 is a breaking, major release
+because two things a consumer installs change name: the plugin marketplace and
+the skill pack. What it carries since v2.3.0: 16 commits on `main`, one PR
+each, PR #381 to PR #396, listed below by the scope each commit names. The
+procedure that cuts the release is [Releasing](../wiki/Releasing.md).
 
 ## For a consumer moving its pin from v2.3.0
 
@@ -52,3 +53,39 @@ Unchanged: the install URL (`github.com/NightWatchEng/agentops`), the
   - the default log becomes `~/Library/Logs/nightgate-cage.log`.
 
   The checkout and worktree paths have not changed.
+
+## repo
+
+- #396 the product is Nightgate: marketplace `nightgate`, pack
+  `nightgate-skills` 0.23.0
+- #388 the toolchain switch is `NIGHTGATE_REQUIRE_TOOLCHAIN` and the table
+  `[tool.nightgate.toolchain]`; the old names are read until v4.0.0
+- #389 `publish.yaml` and one script export the public tree and its message
+- #392 each main push carries its commits to the public repository,
+  fail-closed; a tag from v3.0.0 on is mirrored by the first main push after
+  the tag exists ([Releasing](../wiki/Releasing.md) step 8)
+- #394 the export commit message passes the commit-lint the public repository
+  runs
+- #383 names and comments say what the code does
+- docs: #381, #386
+
+## ci
+
+- #382 the emitted gate reads the base ref from a quoted env var, with no fork
+  exit 0 (a consumer re-copies the step at its next bump: Releasing step 9)
+- #393 the exported public tree skips the evidence it cannot carry, naming why
+- #384 `astral-sh/setup-uv` 10.0.1 to 10.2.0 (dependabot)
+
+## memory
+
+- #387 `warden memory stats` scores each reviewer seat graph.yaml declares
+- #385 rule comments say what they check
+
+## skills
+
+- #391 deliver and ship take `--no-tracker`; the cage stays tracker-bound
+
+## docs
+
+- #390 the GitHub-only CI limit and the manual gate steps
+- #395 Cost-and-Throughput states a PR's review rounds, tokens and CI minutes

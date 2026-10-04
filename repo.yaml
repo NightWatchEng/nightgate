@@ -3,7 +3,7 @@ version: 1
 repo: nightgate
 
 platform:
-  pin: v2.3.0   # this repo runs the version it IS; consumers pin releases
+  pin: v3.0.0   # this repo runs the version it IS; consumers pin releases
 
 components:
   warden:  {path: warden/,  lang: python, description: "the repo-control CLI (gate, verify, attest, memory, graph)"}
