@@ -589,8 +589,8 @@ platform's own CI (`.github/workflows/ci.yml`) does not ask for one, because
 the review cannot run on it there: a maintainer applies the change to the
 private repository, where it earns its attestation (CONTRIBUTING.md,
 *Contributing from outside*). The gate `warden init` writes for a consumer
-runs the same fail-closed check, with the same fork exemption, though it
-stops a fork PR earlier, at the install job that has no deploy key to read.
+runs the same fail-closed check, with the same fork exemption; a fork PR,
+which gets no secret, installs the public platform with no key and reaches it.
 
 A **clean** review is still a review. A findings-free attestation files a shard
 recording the event (SHAs, `rules_version`, reviewers, verdict) and adds no

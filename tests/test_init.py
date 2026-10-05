@@ -111,7 +111,6 @@ WHEEL_INSTALL = "install warden from the install job's wheel"
 REQUIRE = "require the install job"
 TAKE = "take the verify results"
 TAKE_RUN = 'warden take --from "$RUNNER_TEMP/warden-verify"'
-PRIVATE = "require a private repository"
 REPO_YAML = "require repo.yaml"
 
 
@@ -381,22 +380,6 @@ def test_every_run_step_declares_bash_so_actions_runs_it_with_pipefail():
     assert undeclared == []
 
 
-def test_credential_step_exits_2_with_the_fork_message_when_the_secret_is_empty(tmp_path):
-    doc = _workflow()
-    step = _step(doc, "install", CREDENTIAL)
-    assert step["env"][enroll.DEPLOY_KEY_SECRET] == (
-        "${{ secrets.%s }}" % enroll.DEPLOY_KEY_SECRET)
-    result = _run_step(doc, "install", step, {enroll.DEPLOY_KEY_SECRET: "",
-                                             enroll.DEPLOY_KEY_SECRET_ALIAS: "",
-                                             "RUNNER_TEMP": str(tmp_path),
-                                             "GITHUB_OUTPUT": str(tmp_path / "out")}, tmp_path)
-    assert result.returncode == 2, result
-    assert "fork" in result.stderr
-    assert enroll.DEPLOY_KEY_SECRET in result.stderr
-    assert "DID NOT RUN" in result.stderr
-    assert list(tmp_path.iterdir()) == []
-
-
 def test_credential_step_writes_an_owner_only_key_when_the_secret_is_set(tmp_path):
     doc = _workflow()
     step = _step(doc, "install", CREDENTIAL)
@@ -463,7 +446,8 @@ def test_the_emitted_gate_installs_the_platform_from_the_public_repo(tmp_path, m
     assert naming_old == [CREDENTIAL, BUILD], "the old repository outside the alias"
     assert _step(doc, "install", CREDENTIAL)["id"] == "credential"
     build = _step(doc, "install", BUILD)
-    assert build["env"] == {"PLATFORM_REPO": "${{ steps.credential.outputs.repo }}"}
+    assert build["env"] == {"PLATFORM_REPO": "${{ steps.credential.outputs.repo }}",
+                            "PLATFORM_ANONYMOUS": "${{ steps.credential.outputs.anonymous }}"}
     result, log, _ = _build(repo, tmp_path)
     assert result.returncode == 0, result
     assert "git@github.com:NightWatchEng/nightgate.git platform-src" in log, log
@@ -518,10 +502,9 @@ def test_the_install_job_executes_nothing_from_the_checkout(tmp_path):
         if "uses" in s:
             assert s["uses"].startswith(allowed_actions), s["uses"]
     names = [s.get("name") for s in steps if "run" in s]
-    assert names == [PRIVATE, REPO_YAML, CREDENTIAL, BUILD, REMOVE], (
-        "a step in the job holding the key that is not the visibility check, "
-        "the repo.yaml check, the credential, the build or the removal")
-    assert steps[0]["name"] == PRIVATE
+    assert names == [REPO_YAML, CREDENTIAL, BUILD, REMOVE], (
+        "a step in the job holding the key that is not the repo.yaml check, "
+        "the credential, the build or the removal")
     checkout = _uses(doc, "install", "actions/checkout")
     assert len(checkout) == 1
     assert checkout[0]["with"]["sparse-checkout"] == "/repo.yaml"
@@ -633,9 +616,12 @@ def _fakes(tmp_path: Path) -> tuple[Path, Path]:
 
 
 def _build(repo: Path, tmp_path: Path, *, shell=None, wheels: int = 1,
-           doc: dict | None = None, platform: str = enroll.PLATFORM_REPO
+           doc: dict | None = None, platform: str = enroll.PLATFORM_REPO,
+           anonymous: str = "", bindir: Path | None = None
            ) -> tuple[subprocess.CompletedProcess, str, str]:
-    bindir, log = _fakes(tmp_path)
+    """ANONYMOUS is the credential step's output, empty on the key path."""
+    fakes, log = _fakes(tmp_path)
+    bindir = bindir or fakes
     runner_temp = tmp_path / "runner"
     runner_temp.mkdir(exist_ok=True)
     output = tmp_path / "github_output"
@@ -644,7 +630,8 @@ def _build(repo: Path, tmp_path: Path, *, shell=None, wheels: int = 1,
         **_AMBIENT_GIT_CONFIG,
         "PATH": f"{bindir}{os.pathsep}{os.environ['PATH']}", "FAKE_LOG": str(log),
         "FAKE_WHEELS": str(wheels), "RUNNER_TEMP": str(runner_temp),
-        "GITHUB_OUTPUT": str(output), "PLATFORM_REPO": platform}, repo, shell)
+        "GITHUB_OUTPUT": str(output), "PLATFORM_REPO": platform,
+        "PLATFORM_ANONYMOUS": anonymous}, repo, shell)
     return (result, log.read_text() if log.exists() else "",
             output.read_text() if output.exists() else "")
 
@@ -1027,8 +1014,9 @@ def test_installation_documents_the_deploy_key_setup_in_one_short_section():
     for phrase in (enroll.DEPLOY_KEY_SECRET, enroll.DEPLOY_KEY_SECRET_ALIAS,
                    enroll.PLATFORM_REPO, enroll.DEPLOY_KEY_ALIAS_ENDS,
                    "read-only", "deploy key", "platform.pin", "fork",
-                   "push ruleset", "required reviewers"):
-        assert phrase in body, phrase
+                   "push ruleset", "required reviewers", "--app dependabot",
+                   "only if you pin a private build"):
+        assert phrase in " ".join(body.split()), phrase
 
 
 def test_quickstart_and_adopting_lead_with_warden_init():
@@ -1057,18 +1045,6 @@ def test_no_job_restores_or_keeps_a_uv_cache(tmp_path, monkeypatch):
     assert result.returncode == 0, result
     assert "uv args=build --no-config --no-cache" in log, log
     assert "--no-config --no-cache" in _step(doc, "gate", WHEEL_INSTALL)["run"]
-
-
-def test_the_empty_secret_message_names_the_dependabot_route(tmp_path):
-    doc = _workflow()
-    step = _step(doc, "install", CREDENTIAL)
-    result = _run_step(doc, "install", step, {enroll.DEPLOY_KEY_SECRET: "",
-                                             enroll.DEPLOY_KEY_SECRET_ALIAS: "",
-                                             "RUNNER_TEMP": str(tmp_path),
-                                             "GITHUB_OUTPUT": str(tmp_path / "out")}, tmp_path)
-    assert result.returncode == 2
-    assert "--app dependabot" in result.stderr
-    assert "--app dependabot" in _section("Installation.md", "CI access to the platform")
 
 
 @pytest.mark.parametrize("blocker, named", [
@@ -1460,10 +1436,9 @@ def test_the_subdirectory_gate_runs_every_step_in_the_enrollment():
     the prefix themselves."""
     doc = _workflow(("python", "go"), "svc/api")
     assert doc["name"] == "warden (svc/api)"
-    # The two install steps that must not need the enrollment directory run at
-    # the workspace root: the private check runs before the checkout, and the
-    # repo.yaml check is what finds the directory missing.
-    at_the_workspace = {("install", PRIVATE), ("install", REPO_YAML)}
+    # The install step that must not need the enrollment directory runs at
+    # the workspace root: the repo.yaml check is what finds it missing.
+    at_the_workspace = {("install", REPO_YAML)}
     for name, job in doc["jobs"].items():
         assert job["defaults"] == {"run": {"working-directory": "svc/api"}}, name
         assert job["name"].endswith(" (svc/api)"), name
@@ -1793,37 +1768,161 @@ def test_init_does_not_warn_about_tests_a_repo_has(tmp_path, monkeypatch, capsys
     assert "no python test" not in out and "no go test" not in out, out
 
 
-# ── a consumer repository must be private ───────────────────────────────────
+# ── a public platform, installed with no secret ─────────────────────────────
 
-def test_init_next_steps_say_the_repository_must_be_private(tmp_path, monkeypatch, capsys):
+def _bare_platform(tmp_path: Path, tag: str) -> Path:
+    """A local bare repository standing in for the public platform, with TAG."""
+    work = _repo(tmp_path, {"pyproject.toml": '[project]\nname = "warden"\n'}, "platform-work")
+    _git(work, "tag", tag)
+    bare = tmp_path / "platform.git"
+    _git(tmp_path, "init", "-q", "--bare", "-b", "main", str(bare))
+    _git(work, "push", "-q", str(bare), "main", tag)
+    return bare
+
+
+def _url_line(url: str) -> str:
+    return f"platform_url={url}\n"
+
+
+def _cloning_from(doc: dict, url: str) -> dict:
+    """DOC with the build step's public platform URL replaced by URL, so the
+    clone needs no network. The step assigns the URL on exactly one line and
+    clones "$platform_url", so the substitution reaches the clone and nothing
+    else."""
+    doc = json.loads(json.dumps(doc))
+    build = _step(doc, "install", BUILD)
+    line = _url_line(enroll.PLATFORM_PUBLIC_URL)
+    assert build["run"].count(line) == 1, build["run"]
+    build["run"] = build["run"].replace(line, _url_line(url))
+    return doc
+
+
+def _uv_only(tmp_path: Path) -> Path:
+    """A PATH entry holding the fake uv and no fake git, so git is the real one."""
+    fakes, _ = _fakes(tmp_path)
+    bindir = tmp_path / "uv-only"
+    bindir.mkdir()
+    shutil.copy2(fakes / "uv", bindir / "uv")
+    return bindir
+
+
+def _pinned(tmp_path: Path, pin: str) -> Path:
+    repo = tmp_path / "repo"
+    repo.mkdir(exist_ok=True)
+    (repo / "repo.yaml").write_text(f"version: 1\nplatform:\n  pin: {pin}\n")
+    return repo
+
+
+def test_the_build_steps_url_substitution_replaces_only_the_public_url():
+    doc = _workflow()
+    assert enroll.PLATFORM_PUBLIC_URL == f"https://github.com/{enroll.PLATFORM_REPO}"
+    before = _step(doc, "install", BUILD)["run"]
+    after = _step(_cloning_from(doc, "file:///stand-in.git"), "install", BUILD)["run"]
+    assert after.count("file:///stand-in.git") == 1
+    assert _url_line(enroll.PLATFORM_PUBLIC_URL) not in after
+    assert after.replace(_url_line("file:///stand-in.git"),
+                         _url_line(enroll.PLATFORM_PUBLIC_URL)) == before
+    assert _step(doc, "install", BUILD)["run"] == before, "the substitution edited its input"
+    # The one clone that reads the assignment is the anonymous one.
+    assert before.count('"$platform_url" platform-src') == 1
+    assert [s.get("name") for job in doc["jobs"] for s in _steps(doc, job)
+            if "platform_url=" in (s.get("run") or "")] == [BUILD]
+
+
+def test_the_emitted_gate_installs_without_a_secret_when_none_is_set(tmp_path):
+    # The credential step writes no key and names the anonymous route.
+    result, output = _credential(tmp_path, "", "")
+    assert result.returncode == 0, result
+    assert output == f"repo={enroll.PLATFORM_REPO}\nanonymous=true\n"
+    assert not (tmp_path / "nightgate_deploy_key").exists()
+    assert "::warning" not in result.stdout + result.stderr
+
+    # The build step clones the public URL over https, with no ssh command.
+    fake = tmp_path / "fake"
+    fake.mkdir()
+    repo = _pinned(tmp_path, "v1.2.3")
+    result, log, built = _build(repo, fake, anonymous="true")
+    assert result.returncode == 0, result
+    assert (f"clone --quiet --depth 1 --branch v1.2.3 {enroll.PLATFORM_PUBLIC_URL} "
+            "platform-src") in log, log
+    assert "git ssh=\n" in log and "git@github.com" not in log, log
+    assert "wheel=warden-9.9.0-py3-none-any.whl\n" in built
+
+    # The same step, run by real git against a local stand-in for the public
+    # repository: the clone is what the wheel is built from.
+    real = tmp_path / "real"
+    real.mkdir()
+    doc = _cloning_from(_workflow(), _bare_platform(tmp_path, "v1.2.3").as_uri())
+    result, _, built = _build(repo, real, doc=doc, anonymous="true", bindir=_uv_only(real))
+    assert result.returncode == 0, result
+    assert (real / "runner" / "platform-src" / "pyproject.toml").is_file()
+    assert "wheel=warden-9.9.0-py3-none-any.whl\n" in built
+
+    # A pin the platform does not carry: exit 2, naming the pin and the reason.
+    missing = tmp_path / "missing"
+    missing.mkdir()
+    repo = _pinned(missing, "v9.9.9")
+    result, _, built = _build(repo, missing, doc=doc, anonymous="true",
+                              bindir=_uv_only(missing))
+    assert result.returncode == 2, result
+    for phrase in ("DID NOT RUN", "v9.9.9", enroll.PLATFORM_PUBLIC_URL,
+                   "without credentials", enroll.DEPLOY_KEY_SECRET):
+        assert phrase in result.stderr, (phrase, result.stderr)
+    assert built == ""
+
+
+def test_the_emitted_gate_keeps_the_key_path_when_the_secret_is_set(tmp_path):
+    result, output = _credential(tmp_path, "new-key", "")
+    assert result.returncode == 0, result
+    assert output == f"repo={enroll.PLATFORM_REPO}\n", "the key path's output changed"
+    assert (tmp_path / "nightgate_deploy_key").read_text() == "new-key\n"
+
+    build = tmp_path / "build"
+    build.mkdir()
+    result, log, _ = _build(_pinned(build, "v1.2.3"), build, anonymous="")
+    assert result.returncode == 0, result
+    assert f"--branch v1.2.3 git@github.com:{enroll.PLATFORM_REPO}.git platform-src" in log
+    assert "nightgate_deploy_key -o IdentitiesOnly=yes" in log
+    assert enroll.PLATFORM_PUBLIC_URL not in log
+    # The ssh clone is the command it was before the anonymous route existed.
+    run = [line.strip() for line in _step(_workflow(), "install", BUILD)["run"].splitlines()]
+    at = run.index('if [ "$PLATFORM_ANONYMOUS" != true ]; then')
+    assert run[at + 1:at + 3] == [
+        'GIT_SSH_COMMAND="ssh -i $RUNNER_TEMP/nightgate_deploy_key -o IdentitiesOnly=yes '
+        '-o UserKnownHostsFile=$RUNNER_TEMP/nightgate_known_hosts '
+        '-o StrictHostKeyChecking=yes" \\',
+        'git clone --quiet --depth 1 --branch "v${pin#v}" '
+        '"git@github.com:$PLATFORM_REPO.git" platform-src']
+
+
+@pytest.mark.parametrize("anonymous", ["false", "TRUE", "1", "true; touch pwned"])
+def test_build_step_refuses_an_anonymous_output_it_does_not_know(anonymous, tmp_path):
+    repo = _pinned(tmp_path, "v1.2.3")
+    result, log, output = _build(repo, tmp_path, anonymous=anonymous)
+    assert result.returncode == 2, result
+    assert "DID NOT RUN" in result.stderr and "anonymous" in result.stderr
+    assert log == "" and output == ""
+    assert not (repo / "pwned").exists()
+
+
+def test_the_emitted_gate_no_longer_requires_a_private_consumer(tmp_path, monkeypatch, capsys):
+    for prefix in ("", "svc/api"):
+        doc = _workflow(("python", "node", "go"), prefix)
+        text = yaml.safe_dump(doc, width=10_000)
+        assert "repository.private" not in text and "REPOSITORY_PRIVATE" not in text
+        assert _steps(doc, "install")[0].get("uses", "").startswith("astral-sh/setup-uv@")
     repo = _repo(tmp_path, FIXTURES["go"])
     assert _warden(repo, monkeypatch, "init") == 0
-    steps = capsys.readouterr().out.split("Next steps:", 1)[1]
-    assert "must be private" in steps and "wheel" in steps, steps
-
-
-def test_installation_says_a_consumer_repository_must_be_private():
-    body = " ".join(_section("Installation.md", "CI access to the platform").split())
-    assert "consumer repository must be private" in body, body
-    assert "one-day wheel artifact" in body
-
-
-@pytest.mark.parametrize("private, code", [("true", 0), ("false", 2), ("", 2)])
-def test_the_install_job_refuses_a_repository_that_is_not_private(private, code, tmp_path):
-    doc = _workflow()
-    step = _step(doc, "install", PRIVATE)
-    assert step["env"] == {"REPOSITORY_PRIVATE": "${{ github.event.repository.private }}"}
-    assert "${{" not in step["run"]
-    result = _run_step(doc, "install", step, {"REPOSITORY_PRIVATE": private}, tmp_path)
-    assert result.returncode == code, result
-    if code:
-        assert "not private" in result.stderr and "DID NOT RUN" in result.stderr, result.stderr
-    assert list(tmp_path.iterdir()) == []
-
-
-def test_installation_says_the_gate_checks_the_repository_is_private():
-    body = " ".join(_section("Installation.md", "CI access to the platform").split())
-    assert "install job refuses" in body and "not private" in body, body
+    sources = {"warden init's output": capsys.readouterr().out,
+               "the workflow template": (enroll.TEMPLATES / "workflow.yml").read_text(),
+               "warden/enroll.py": Path(enroll.__file__).read_text()}
+    sources.update({f"docs/wiki/{p.name}": p.read_text() for p in sorted(WIKI.glob("*.md"))})
+    privacy = re.compile(r"must be private|not private|repository private|"
+                         r"require a private", re.IGNORECASE)
+    stating = {where: privacy.findall(" ".join(text.split()))
+               for where, text in sources.items()
+               if privacy.search(" ".join(text.split()))}
+    assert stating == {}, stating
 
 
 # ── warden take ─────────────────────────────────────────────────────────────
@@ -3803,9 +3902,9 @@ def test_no_run_block_pastes_a_github_expression_into_the_shell(prefix):
 
 @pytest.mark.parametrize("prefix", ["", "svc/api"])
 def test_the_classify_step_has_no_fork_branch_and_no_exit_0_path(prefix):
-    """The classify step had a fork branch that exited 0: dead in the emitted
-    gate, where the install job's credential step exits 2 on a fork PR before
-    this step runs, and a pass path in the hello-svc and ci.yml copies, where
+    """The classify step had a fork branch that exited 0: a pass path in the
+    emitted gate, where a fork PR installs the public platform with no secret,
+    and in the hello-svc and ci.yml copies, where
     the verdict needs no credential and a fork PR is classified like any
     other. A step that cannot run does not get to claim a pass, so no copy
     carries the branch or any `exit 0`."""

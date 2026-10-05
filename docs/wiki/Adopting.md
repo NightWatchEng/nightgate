@@ -10,8 +10,8 @@ root*), it writes step 1 (`repo.yaml`), step 2 (starter rules), the
 `.gitignore` half of step 3, and step 5 (`.warden/skills-policy.md`). It writes
 no shim, the other half of step 3, and sets no branch protection. Its CI
 workflow, which installs the tag `platform.pin` names, is not step 4's job: it
-installs the pinned platform with a read-only deploy key in a job that runs no
-repository code, runs verify in a job with no secret, and runs `warden review`,
+installs the pinned platform, with no secret unless the pin is a private build,
+in a job that runs no repository code, runs verify in a job with no secret, and runs `warden review`,
 `warden attest check` and `warden certify` in a third, each whether or not
 verify passed ([Installation](Installation.md), *CI access to the platform*). It is a
 GitHub Actions workflow and there is no other: on any other CI, read
@@ -375,8 +375,8 @@ triggered by the event your forge raises for a merge request or pull
 request. Replace `<scope>` with each name under `verify:` in `repo.yaml` and
 `<target>` with the branch the change merges into.
 
-1. **install** is the only job that holds the deploy key, and it runs
-   nothing from the repository. It builds the platform wheel at
+1. **install** is the only job that can hold a secret, the deploy key a pin
+   of a private build needs, and it runs nothing from the repository. It builds the platform wheel at
    `platform.pin` and passes the wheel and its hash on.
 2. **verify** runs with no secret. It installs that wheel, runs every scope,
    and passes the `.warden/out/*-verify/verify-result.json` files on:
@@ -431,9 +431,6 @@ What each assumes:
   forge's settings. If `graph.yaml` declares `review.delegation`, turn off
   your forge's merge-when-the-pipeline-succeeds setting by hand. D-05 cannot
   read it.
-- **A private repository.** Anyone who can read the pipeline can download
-  the wheel artifact, so the repository must be private
-  ([Installation](Installation.md), *CI access to the platform*).
 
 ## 5 · Day one, before anything has recorded itself
 

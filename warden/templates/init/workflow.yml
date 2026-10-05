@@ -2,13 +2,14 @@
 # repo.yaml; this file only orchestrates it, in three jobs on separate runners.
 #
 # install  The only job that reads NIGHTGATE_DEPLOY_KEY, a read-only deploy key
-#          for NightWatchEng/nightgate ("CI access to the platform" in
+#          for NightWatchEng/nightgate that only a private pin needs ("CI
+#          access to the platform" in
 #          https://github.com/NightWatchEng/nightgate/blob/main/docs/wiki/Installation.md).
+#          With no key it clones the public repository over https with no
+#          credential, and refuses only when that clone fails.
 #          It falls back, with a warning, to AGENTOPS_DEPLOY_KEY, the
 #          secret's old name, and installs from the repository that key was
 #          added to; the build step refuses that fallback at a pin of v4.0.0.
-#          It refuses a repository that is not private, since any reader of
-#          the run can download the wheel it uploads.
 #          It checks out repo.yaml alone, refuses a commit without one, reads
 #          platform.pin from it as text,
 #          builds the platform wheel at that tag and uploads it. It executes
@@ -58,16 +59,6 @@ jobs:
       wheel: ${{ steps.build.outputs.wheel }}
       sha256: ${{ steps.build.outputs.sha256 }}
     steps:
-      - name: require a private repository
-        shell: bash
-        env:
-          REPOSITORY_PRIVATE: ${{ github.event.repository.private }}
-        run: |
-          if [ "$REPOSITORY_PRIVATE" != true ]; then
-            echo "warden gate: this repository is not private (github.event.repository.private is ${REPOSITORY_PRIVATE:-empty}), and the install job uploads the private platform wheel as an artifact any reader of the run can download, so the wheel was not built and the gate DID NOT RUN." >&2
-            echo "A consumer repository must be private (\"CI access to the platform\" in https://github.com/NightWatchEng/nightgate/blob/main/docs/wiki/Installation.md)." >&2
-            exit 2
-          fi
       - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7  # v10.2.0
         with:
           version: "0.12.1"
@@ -99,11 +90,10 @@ jobs:
             repo=NightWatchEng/agentops
           fi
           if [ -z "$key" ]; then
-            echo "warden gate: the NIGHTGATE_DEPLOY_KEY secret is empty, so the platform cannot be installed and the gate DID NOT RUN." >&2
-            echo "A pull request from a fork receives no repository secrets: push the branch to this repository and open the pull request from there." >&2
-            echo "A Dependabot pull request reads Dependabot secrets: store the same key with gh secret set NIGHTGATE_DEPLOY_KEY --app dependabot." >&2
-            echo "Otherwise, store the read-only deploy key for NightWatchEng/nightgate as the NIGHTGATE_DEPLOY_KEY repository secret (\"CI access to the platform\" in https://github.com/NightWatchEng/nightgate/blob/main/docs/wiki/Installation.md)." >&2
-            exit 2
+            echo "NIGHTGATE_DEPLOY_KEY is empty, so the platform is cloned from the public NightWatchEng/nightgate over https with no credential."
+            echo "repo=$repo" >> "$GITHUB_OUTPUT"
+            echo "anonymous=true" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
           umask 077
           printf '%s\n' "$key" > "$RUNNER_TEMP/nightgate_deploy_key"
@@ -117,6 +107,7 @@ jobs:
         shell: bash
         env:
           PLATFORM_REPO: ${{ steps.credential.outputs.repo }}
+          PLATFORM_ANONYMOUS: ${{ steps.credential.outputs.anonymous }}
         run: |
           pin="$(awk '/^platform:/ {inside = 1; next} inside && /^[^[:space:]#]/ {inside = 0} inside && $1 == "pin:" {print $2; exit}' repo.yaml | tr -d "\"'\r")" || pin=""
           if ! printf '%s\n' "$pin" | grep -Eqx 'v?[0-9]+\.[0-9]+\.[0-9]+'; then
@@ -130,6 +121,13 @@ jobs:
               exit 2
               ;;
           esac
+          case "$PLATFORM_ANONYMOUS" in
+            "" | true) ;;
+            *)
+              echo "warden gate: the platform credential step's anonymous output is neither empty nor true; the gate DID NOT RUN." >&2
+              exit 2
+              ;;
+          esac
           major="${pin#v}"
           major="${major%%.*}"
           if [ "$PLATFORM_REPO" = NightWatchEng/agentops ] && [ "$major" -ge 4 ]; then
@@ -138,8 +136,17 @@ jobs:
             exit 2
           fi
           cd "$RUNNER_TEMP"
-          GIT_SSH_COMMAND="ssh -i $RUNNER_TEMP/nightgate_deploy_key -o IdentitiesOnly=yes -o UserKnownHostsFile=$RUNNER_TEMP/nightgate_known_hosts -o StrictHostKeyChecking=yes" \
-            git clone --quiet --depth 1 --branch "v${pin#v}" "git@github.com:$PLATFORM_REPO.git" platform-src
+          if [ "$PLATFORM_ANONYMOUS" != true ]; then
+            GIT_SSH_COMMAND="ssh -i $RUNNER_TEMP/nightgate_deploy_key -o IdentitiesOnly=yes -o UserKnownHostsFile=$RUNNER_TEMP/nightgate_known_hosts -o StrictHostKeyChecking=yes" \
+              git clone --quiet --depth 1 --branch "v${pin#v}" "git@github.com:$PLATFORM_REPO.git" platform-src
+          else
+            platform_url=https://github.com/NightWatchEng/nightgate
+            if ! GIT_TERMINAL_PROMPT=0 git -c credential.helper= clone --quiet --depth 1 --branch "v${pin#v}" "$platform_url" platform-src; then
+              echo "warden gate: $platform_url could not be cloned at repo.yaml platform.pin $pin with no credential; the gate DID NOT RUN." >&2
+              echo "With NIGHTGATE_DEPLOY_KEY empty the platform must be reachable without credentials at that tag. A pin of a private build needs the deploy key (\"CI access to the platform\" in https://github.com/NightWatchEng/nightgate/blob/main/docs/wiki/Installation.md)." >&2
+              exit 2
+            fi
+          fi
           uv build --no-config --no-cache --wheel --out-dir warden-wheel platform-src
           wheels=(warden-wheel/warden-*.whl)
           if [ "${#wheels[@]}" -ne 1 ] || [ ! -f "${wheels[0]}" ]; then

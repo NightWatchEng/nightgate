@@ -30,12 +30,11 @@ satisfied — which is why a PYTHON-ONLY enrollment carries no pre-flight step
 at all rather than one that cannot fail. `render_toolchain_step` has the
 reasoning for declare over install.
 
-A consumer repository must be private: the generated gate uploads the private
-platform wheel as a one-day artifact any reader of the run can download. Init
-cannot tell a public repository without the network, so the gate checks
-instead: the install job reads `github.event.repository.private` from the
-event and exits 2 before it touches the credential or builds the wheel when
-the repository is not private.
+The generated gate installs the platform with no secret: with
+`DEPLOY_KEY_SECRET` empty, its install job clones `PLATFORM_PUBLIC_URL` at
+`platform.pin` over https with no credential, and exits 2 naming the pin only
+when that clone fails. The deploy key is for a pin of a private build; when it
+is set, the install job clones over ssh with it, as it always has.
 
 Init writes only files that do not exist. If any of them is already there it
 writes nothing, names every one, and exits 1. `.gitignore` is the one file it
@@ -89,12 +88,14 @@ RULES_DIR = config_mod.DEFAULT_RULES_DIR
 GITIGNORE_ENTRIES = (".warden/out/", ".warden/memory/findings.jsonl",
                      ".warden/memory/gate/")
 BUILD_OUTPUT_IGNORES = {"python": ("*.egg-info/",), "node": ("node_modules/",)}
-# The repository the emitted gate installs the platform from, with a read-only
-# deploy key stored as DEPLOY_KEY_SECRET. A consumer that stored only the old
+# The repository the emitted gate installs the platform from: anonymously from
+# PLATFORM_PUBLIC_URL with no secret, or over ssh with a read-only deploy key
+# stored as DEPLOY_KEY_SECRET when a pin needs one. A consumer that stored only the old
 # secret name still installs, from the repository its key was added to, with a
 # warning; the emitted build step refuses that fallback at a platform.pin of
 # DEPLOY_KEY_ALIAS_ENDS or later, so a workflow written now ends it unedited.
 PLATFORM_REPO = "NightWatchEng/nightgate"
+PLATFORM_PUBLIC_URL = f"https://github.com/{PLATFORM_REPO}"
 DEPLOY_KEY_SECRET = "NIGHTGATE_DEPLOY_KEY"
 PLATFORM_REPO_BEFORE = "NightWatchEng/agentops"
 DEPLOY_KEY_SECRET_ALIAS = "AGENTOPS_DEPLOY_KEY"
@@ -390,8 +391,8 @@ def render_classify_step(pin: str) -> str:
     range reads FULL, so light attestations are refused there. PINNED to the
     release the gate installs: a pin without the command gets no step. The
     base ref reaches the shell through a quoted env var, never pasted into
-    `run:`. No fork branch: the install job exits 2 when a fork PR gets no
-    deploy key, and a fork that does get one is classified like any PR.
+    `run:`. No fork branch: a fork PR, which gets no secret, installs the
+    public platform and is classified like any PR.
     """
     if not carries_classify_command(pin):
         return ""
@@ -442,15 +443,12 @@ def render_workflow(langs: tuple[Language, ...], prefix: str = "",
     if not prefix:
         return text
     defaults = f"    defaults:\n      run:\n        working-directory: {_q(prefix)}\n"
-    # Two install steps run at the workspace root: the private check runs
-    # before the checkout, when PREFIX does not exist, and the repo.yaml check
-    # is the step that finds PREFIX missing. A runner refuses to start a `run:`
+    # One install step runs at the workspace root: the repo.yaml check is the
+    # step that finds PREFIX missing, and a runner refuses to start a `run:`
     # step whose working directory does not exist.
-    private = "      - name: require a private repository\n        shell: bash\n"
     repo_yaml = "      - name: require repo.yaml\n        shell: bash\n"
     at_workspace = f"        working-directory: {_q('.')}\n"
     for old, new, count in (
-            (private, private + at_workspace, 1),
             (repo_yaml, repo_yaml + at_workspace, 1),
             ("if [ ! -f repo.yaml ]; then", f"if [ ! -f {prefix}/repo.yaml ]; then", 1),
             ("warden gate: repo.yaml is missing", f"warden gate: {prefix}/repo.yaml is missing", 1),
@@ -640,17 +638,15 @@ def run(root: Path) -> int:
 Next steps:
   1. Read the verify commands in repo.yaml, then run them: {scopes.rstrip(';')}
   2. Commit the enrollment: git add -A && git commit -m "enroll in warden"
-  3. Keep this repository private. The gate uploads the private platform wheel as
-     a one-day artifact any reader of a run can download, so a consumer
-     repository must be private: its install job refuses one that is not.
-  4. Ask the Nightgate owner for a read-only deploy key for this repository and
-     store it as the {DEPLOY_KEY_SECRET} secret (Installation, "CI access to the platform").
-  5. Make "{gate_check(enrollment.prefix)}" a required status check on your default branch.
+  3. The gate needs no secret: its install job clones {PLATFORM_PUBLIC_URL} at
+     platform.pin over https. Only a pin of a private build needs a read-only
+     deploy key, stored as the {DEPLOY_KEY_SECRET} secret (Installation, "CI access to the platform").
+  4. Make "{gate_check(enrollment.prefix)}" a required status check on your default branch.
      It runs warden attest check: a pull request from this repository stays red
-     until it carries a committed pre-PR review attestation (step 8's pack writes one).
-  6. warden certify --level 3
-  7. warden rules recommend: the catalog entries that depend on what your code does.
-  8. To run the skill pack, install it at the same tag, once per machine:
+     until it carries a committed pre-PR review attestation (step 7's pack writes one).
+  5. warden certify --level 3
+  6. warden rules recommend: the catalog entries that depend on what your code does.
+  7. To run the skill pack, install it at the same tag, once per machine:
      {"; ".join(packpin_mod.install_commands("v" + __version__))}
      {textwrap.fill(packpin_mod.check_step("v" + __version__), 78, subsequent_indent="     ",
                     break_on_hyphens=False, break_long_words=False)}""")

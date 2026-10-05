@@ -13,8 +13,9 @@ read access to it. What each install needs on top:
 - **The CLI from a tag** (section 1) fetches over https with your git
   credentials. `gh auth setup-git` makes `gh` git's credential helper for
   github.com, which is what `uv` uses for a `git+https` source.
-- **CI in an enrolled repo** installs over ssh with a read-only deploy key
-  per repository (*CI access to the platform*).
+- **CI in an enrolled repo** clones the platform over https with no secret,
+  and over ssh with a read-only deploy key only for a pin of a private build
+  (*CI access to the platform*).
 - **The skill pack** (section 3) is cloned from the same https URL with the
   same credentials.
 
@@ -101,8 +102,8 @@ refuses to start a `run:` step whose working directory is missing, so that
 install job fails at its first step; the verify and gate jobs `need` it, and
 the gate never runs at all. Raising `platform.pin` alone repairs nothing. The
 repair is to replace the whole workflow file with the one the generator now
-writes, whose two steps `require a private repository` and `require repo.yaml`
-carry `working-directory: "."`: *Upgrading an enrolled repository* below says
+writes, whose `require repo.yaml` step carries `working-directory: "."`:
+*Upgrading an enrolled repository* below says
 how. Re-running `warden init` in place is not a route: it refuses when any
 file it would write already exists, and an enrolled directory still holds
 `repo.yaml` and its rules, so it writes nothing and leaves you as you were.
@@ -118,6 +119,9 @@ the failing tests into the step summary, and the header comment that
 describes the gate. The new `warden attest check` step is fail-closed: a pull
 request from your repository that carries no committed pre-PR review
 attestation is red, a Dependabot one included, and a fork's is exempt.
+
+A gate `warden init` 3.0.2 or earlier wrote exits 2 at `install` in a public repository or with no `NIGHTGATE_DEPLOY_KEY`,
+and raising `platform.pin` repairs neither: replace the whole workflow file with the one 3.0.3 writes.
 
 **Trust note.** `warden explain`, `warden review` and `warden rules lifecycle` load
 `.warden/checkers/*.py` from the repo they run in, executing that code at the
@@ -146,11 +150,12 @@ exec warden "$@"
 
 ## CI access to the platform
 
-The workflow `warden init` writes installs the platform over ssh with a
-read-only deploy key per consumer repository: the founder adds the public half
-to `NightWatchEng/nightgate`, write access off, and the consumer stores the
-private half as the `NIGHTGATE_DEPLOY_KEY` secret. Until v4.0.0, while it is
-empty, the old `AGENTOPS_DEPLOY_KEY` installs from `NightWatchEng/agentops` and warns.
+The workflow `warden init` writes needs no secret: its `install` job clones
+`https://github.com/NightWatchEng/nightgate` at `platform.pin` over https with no credential,
+and exits 2 naming the pin only if that clone fails. A deploy key is optional, only if you pin
+a private build: a read-only key per repository, public half added to `NightWatchEng/nightgate`
+(write access off), private half stored as the `NIGHTGATE_DEPLOY_KEY` secret; `install` then
+clones over ssh. Until v4.0.0 an `AGENTOPS_DEPLOY_KEY` alone installs from `NightWatchEng/agentops` and warns.
 
 ```sh
 ssh-keygen -t ed25519 -N '' -C 'OWNER/REPO CI' -f nightgate_deploy_key
@@ -159,17 +164,16 @@ gh secret set NIGHTGATE_DEPLOY_KEY --repo OWNER/REPO < nightgate_deploy_key
 rm nightgate_deploy_key nightgate_deploy_key.pub
 ```
 
-Only the workflow's `install` job reads the key. It checks out `repo.yaml`
-alone, builds the platform wheel at `platform.pin` with no uv cache, and runs
-nothing from your repository. `verify` runs your verify commands with no
-secret. `gate` runs `warden review`, `warden attest check` and `warden certify`, each whether or not
-verify passed, with no code from your repository, on the wheel whose hash `install` recorded;
-verify results reach it as pull request output that decides nothing. It reads `repo.yaml` and
-`.warden/rules` from the pull request, which can change both. Pull request code
-can read the platform at the pinned tag, as can any reader of the run's one-day
-wheel artifact, so a consumer repository must be private; the install job refuses one that is
-not private (`github.event.repository.private`) with exit 2. A fork's pull request gets no
-secrets, so the gate exits 2 and says so; Dependabot reads Dependabot secrets, so add `--app dependabot` to the `gh secret set` line. Deleting the deploy key revokes that one repository.
+Only the workflow's `install` job reads the key. It checks out `repo.yaml` alone,
+builds the platform wheel at `platform.pin` with no uv cache, and runs nothing from
+your repository. `verify` runs your verify commands with no secret. `gate` runs `warden
+review`, `warden attest check` and `warden certify`, each whether or not verify passed,
+with no code from your repository, on the wheel whose hash `install` recorded; verify
+results reach it as pull request output that decides nothing. It reads `repo.yaml` and
+`.warden/rules` from the pull request, which can change both. A private pin's build is
+readable by pull request code and any reader of the run's one-day wheel artifact. A fork's
+pull request gets no secrets and installs with no key, as does a Dependabot one unless the
+key is also set with `--app dependabot`. Deleting the deploy key revokes that one repository.
 
 None of this stops a writer who edits the workflow: a same-repository pull
 request runs its own copy, with secrets, when it opens, and a pushed branch can
