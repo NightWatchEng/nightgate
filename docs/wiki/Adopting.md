@@ -11,9 +11,9 @@ root*), it writes step 1 (`repo.yaml`), step 2 (starter rules), the
 no shim, the other half of step 3, and sets no branch protection. Its CI
 workflow, which installs the tag `platform.pin` names, is not step 4's job: it
 installs the pinned platform with a read-only deploy key in a job that runs no
-repository code, runs verify in a job with no secret, and runs `warden review`
-and `warden certify` in a third, with no `attest check` step
-([Installation](Installation.md), *CI access to the platform*). It is a
+repository code, runs verify in a job with no secret, and runs `warden review`,
+`warden attest check` and `warden certify` in a third, each whether or not
+verify passed ([Installation](Installation.md), *CI access to the platform*). It is a
 GitHub Actions workflow and there is no other: on any other CI, read
 *Another CI: the GitHub-only limit* below before you enroll. A fresh
 repository reaches Level 3 once you commit the files
@@ -242,8 +242,12 @@ PR-only, full history, explicit permissions, evidence uploaded even on failure:
       # another job is invisible to the pairing and the sticky comment reports
       # NO VERIFY RESULT for it forever.
       - name: warden verify
+        id: verify
         run: .warden/bin/warden verify --scope app
+      # Each step that can refuse runs once verify has run, passed or not, so
+      # a PR with failing tests still shows its rule findings and attestation.
       - name: warden review
+        if: ${{ !cancelled() && steps.verify.outcome != 'skipped' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: .warden/bin/warden review --event "$GITHUB_EVENT_PATH"
@@ -252,6 +256,7 @@ PR-only, full history, explicit permissions, evidence uploaded even on failure:
       # (Level 3) requires it once one is. v2.2.0 has no `attest classify`:
       # on that pin leave it out, as `warden init` does.
       - name: proportionate review tier
+        if: ${{ !cancelled() && steps.verify.outcome != 'skipped' }}
         env:
           BASE_REF: ${{ github.base_ref }}
         run: .warden/bin/warden attest classify --enforce --base "origin/$BASE_REF"
@@ -259,6 +264,7 @@ PR-only, full history, explicit permissions, evidence uploaded even on failure:
       # not just the gitignored run dir. Fork PRs are exempt: the orchestrated
       # review needs credentials they lack.
       - name: pre-PR review attestation
+        if: ${{ !cancelled() && steps.verify.outcome != 'skipped' }}
         env:
           HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
           REPOSITORY: ${{ github.repository }}

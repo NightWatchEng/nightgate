@@ -54,12 +54,17 @@ jobs:
             exit 2
           fi
       - name: deterministic checks declared in repo.yaml
+        id: verify
         run: uv run --locked --project ../.. warden verify --scope app
+      # Review, certify, the tier and the attestation run once verify has
+      # run, passed or not, so a PR with failing tests shows those refusals.
       - name: the AI rules gate (HIGH findings exit 1)
+        if: ${{ !cancelled() && steps.verify.outcome != 'skipped' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: uv run --locked --project ../.. warden review --event "$GITHUB_EVENT_PATH"
       - name: enrollment maturity may not regress
+        if: ${{ !cancelled() && steps.verify.outcome != 'skipped' }}
         run: uv run --locked --project ../.. warden certify --level 3
       # The tag-vocabulary drift ceiling declared in .warden/memory/tags.yaml,
       # ENFORCED: exit 1 when a name in the committed corpus has no recorded
@@ -72,6 +77,7 @@ jobs:
       # none declared, required by certify's R-14 once one is. It needs
       # v2.3.0 or later.
       - name: proportionate review tier
+        if: ${{ !cancelled() && steps.verify.outcome != 'skipped' }}
         env:
           BASE_REF: ${{ github.base_ref }}
         run: |
@@ -92,6 +98,7 @@ jobs:
       # certify Evidenced. Fork PRs are exempt: the orchestrated review needs
       # credentials they do not have.
       - name: pre-PR review attestation
+        if: ${{ !cancelled() && steps.verify.outcome != 'skipped' }}
         env:
           HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
           REPOSITORY: ${{ github.repository }}

@@ -231,6 +231,10 @@ REGISTRY: dict[str, tuple[str, str]] = {
     "test_init:FIXTURES": (
         FIXTURE, "the manifest and source file of each fixture repo init "
         "enrolls — input data no guard consults"),
+    "test_init:FAILING_OUTPUTS": (
+        FIXTURE, "one failing run's output per runner and the test names "
+        "`verify.failing_tests` must read off it — input and expected data, "
+        "one entry per `_FAILING` pattern"),
     "test_init_proof:SPELLINGS": (
         FIXTURE, "the platform repository URLs the isolation script lists, each "
         "given a planted local route before git's refusal is checked — input"),

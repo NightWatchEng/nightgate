@@ -397,6 +397,7 @@ def render_classify_step(pin: str) -> str:
         return ""
     return """\
       - name: proportionate review tier
+        if: ${{ !cancelled() && steps.warden.outcome == 'success' }}
         shell: bash
         env:
           BASE_REF: ${{ github.base_ref }}
@@ -420,10 +421,20 @@ def render_workflow(langs: tuple[Language, ...], prefix: str = "",
     writes). Below the root each job runs its `run:` steps in PREFIX
     through one job-level default, and the checkout, artifact paths and names
     carry it; the commands are the root gate's."""
+    # Each scope's summary, which names its failing tests, goes to the log
+    # AND the step summary: the verify-result artifact expires in a day.
     steps = render_toolchain_step(langs) + "\n".join(
         f"      - name: warden verify --scope {lang.name}\n"
         f"        shell: bash\n"
-        f"        run: warden verify --scope {lang.name}"
+        f"        run: |\n"
+        f"          set -uo pipefail\n"
+        f"          out=\"$RUNNER_TEMP/verify-{lang.name}.txt\"\n"
+        f"          status=0\n"
+        f"          warden verify --scope {lang.name} > \"$out\" 2>&1 || status=$?\n"
+        f"          cat \"$out\"\n"
+        f"          {{ echo '### warden verify --scope {lang.name}';\n"
+        f"            echo '```'; cat \"$out\"; echo '```'; }} >> \"$GITHUB_STEP_SUMMARY\"\n"
+        f"          exit \"$status\""
         for lang in langs)
     text = (TEMPLATES / "workflow.yml").read_text(encoding="utf-8")
     text = text.replace("@@VERIFY_STEPS@@", steps)
@@ -635,6 +646,8 @@ Next steps:
   4. Ask the Nightgate owner for a read-only deploy key for this repository and
      store it as the {DEPLOY_KEY_SECRET} secret (Installation, "CI access to the platform").
   5. Make "{gate_check(enrollment.prefix)}" a required status check on your default branch.
+     It runs warden attest check: a pull request from this repository stays red
+     until it carries a committed pre-PR review attestation (step 8's pack writes one).
   6. warden certify --level 3
   7. warden rules recommend: the catalog entries that depend on what your code does.
   8. To run the skill pack, install it at the same tag, once per machine:

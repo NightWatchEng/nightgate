@@ -106,6 +106,16 @@ writes with `working-directory: "."`: `require a private repository` and
 any file it would write already exists, and an enrolled directory still holds
 `repo.yaml` and its rules, so it writes nothing and leaves you as you were.
 
+A gate `warden init` 3.0.1 or earlier wrote has no `warden attest check` step,
+so certify's E-01 fails in its own CI, and it stops before `warden review`
+when verify failed, so a pull request with failing tests shows no rule
+finding. The repair is the same hand-edit: copy the `gate` job the generator
+now writes over yours, and the `warden verify --scope` steps, which now copy
+the summary naming the failing tests into the step summary. The new step is
+fail-closed: a pull request from your repository that carries no committed
+pre-PR review attestation is red, a Dependabot one included, and a fork's
+is exempt.
+
 **Trust note.** `warden explain`, `warden review` and `warden rules lifecycle` load
 `.warden/checkers/*.py` from the repo they run in, executing that code at the
 same trust level as running the repo's tests. Don't point warden at a clone you
@@ -144,9 +154,9 @@ rm nightgate_deploy_key nightgate_deploy_key.pub
 Only the workflow's `install` job reads the key. It checks out `repo.yaml`
 alone, builds the platform wheel at `platform.pin` with no uv cache, and runs
 nothing from your repository. `verify` runs your verify commands with no
-secret. `gate` runs `warden review` and `warden certify` with no code from your
-repository, on the wheel whose hash `install` recorded; verify results reach it
-as pull request output that decides nothing. It reads `repo.yaml` and
+secret. `gate` runs `warden review`, `warden attest check` and `warden certify`, each whether or not
+verify passed, with no code from your repository, on the wheel whose hash `install` recorded;
+verify results reach it as pull request output that decides nothing. It reads `repo.yaml` and
 `.warden/rules` from the pull request, which can change both. Pull request code
 can read the platform at the pinned tag, as can any reader of the run's one-day
 wheel artifact, so a consumer repository must be private; the install job refuses one that is

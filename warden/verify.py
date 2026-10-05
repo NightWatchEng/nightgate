@@ -620,6 +620,36 @@ def _pytest_clause(results: Sequence[dict],
     return clause
 
 
+# One line naming one failing test, per runner whose output the platform's
+# own enrollments meet, each anchored on what only that runner prints: TAP's
+# `not ok N - ` (`node --test` off a terminal; a `# TODO`/`# SKIP` line is not
+# a failure), node's spec reporter's `\u2716 name (Nms)` with its duration (a
+# linter's `\u2716 3 problems` has none), pytest's short summary naming a
+# `.py` node id up to its ` - ` message (unittest's `FAILED (failures=2)` and
+# a log's `ERROR connecting` name none), and `go test -v`'s `--- FAIL: `.
+_FAILING = (
+    re.compile(r"^\s*not ok \d+ - (?!.*#\s*(?:TODO|SKIP)\b)(.+?)\s*$", re.I),
+    re.compile(r"^\s*\u2716 (.+?) \(\d+(?:\.\d+)?ms\)$"),
+    re.compile(r"^(?:FAILED|ERROR) (\S+?\.py(?:::.+?)?)(?: - .*)?$"),
+    re.compile(r"^\s*--- FAIL: (\S+)"),
+)
+_FAILING_SHOWN = 20
+
+
+def failing_tests(output: str) -> list[str]:
+    """The failing tests a step's output names, first-seen order, each once.
+    Read off the WHOLE output, so a name the tail window cut away is still
+    printed; empty when no line has a shape it knows, and the tail stands."""
+    names: list[str] = []
+    for line in _ANSI_SGR.sub("", output).splitlines():
+        for pattern in _FAILING:
+            m = pattern.match(line)
+            if m and m.group(1) not in names:
+                names.append(m.group(1))
+                break
+    return names
+
+
 def render_summary(doc: dict, *, which: str = "verify",
                    outputs: Sequence[str] | None = None) -> str:
     # `which` labels the run for its map (verify | deploy) — run_scope serves
@@ -644,13 +674,23 @@ def render_summary(doc: dict, *, which: str = "verify",
         # silence here would render the two identically.
         lines.append("  ⚠ tree state not recorded (git status failed) — "
                      "this verdict is unverified against HEAD")
-    for r in doc["results"]:
+    for i, r in enumerate(doc["results"]):
         status = "ok" if r["exit_code"] == 0 else f"exit {r['exit_code']}"
         lines.append(f"  [{status}] ({r['duration_s']}s) {r['cmd']}")
         if r.get("diagnosis"):
             # Above the output tail, not inside it: the tail is where the
             # unreadable `/bin/sh: go: command not found` already was.
             lines.append(f"    ✗ {r['diagnosis']}")
+        failing = (failing_tests(outputs[i] if outputs and i < len(outputs)
+                                 else r.get("output_tail") or "")
+                   if r["exit_code"] != 0 else [])
+        if failing:
+            # Named above the tail and in the log, because the tail is 15
+            # lines and the artifact that holds the rest expires in a day.
+            lines.append(f"    failing tests ({len(failing)}):")
+            lines.extend(f"      - {n}" for n in failing[:_FAILING_SHOWN])
+            if len(failing) > _FAILING_SHOWN:
+                lines.append(f"      … and {len(failing) - _FAILING_SHOWN} more")
         if r["exit_code"] != 0 and r.get("output_tail"):
             tail = "\n".join(r["output_tail"].splitlines()[-15:])
             lines.append("    " + tail.replace("\n", "\n    "))

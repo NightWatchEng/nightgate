@@ -25,7 +25,7 @@ warden certify --level 3
 | `repo.yaml` | components, risk tiers, detected verify commands, `platform.pin` set to the installed version, and `repair.budget` |
 | `.warden/rules/*.md` | starter rules from the guardrail catalog whose `applies_when` is unconditional for the detected language: `secrets-in-diff` everywhere, plus `swallowed-exceptions` for Python |
 | `.warden/skills-policy.md` | the six sections the skill pack and Level 3 read |
-| `.github/workflows/warden.yml` | the gate in three jobs: `install` builds `platform.pin` with the deploy key, `verify` runs every verify scope with no secret, and `gate` runs `warden review` and `warden certify --level 3` |
+| `.github/workflows/warden.yml` | the gate in three jobs: `install` builds `platform.pin` with the deploy key, `verify` runs every verify scope with no secret, and `gate` runs `warden review`, `warden attest check` and `warden certify --level 3`, each whether or not verify passed, then fails if verify did |
 | `.gitignore` | `.warden/out/`, `.warden/memory/findings.jsonl` and `.warden/memory/gate/`, plus `*.egg-info/` for Python and `node_modules/` for Node, appended where missing |
 
 The verify commands pass on a repository with no tests and leave the tree
@@ -43,7 +43,10 @@ exits 1. It prints the next steps: read the verify commands, commit, keep the
 repository private (the gate's one-day wheel artifact is readable by anyone who
 can read the repository, and its install job refuses a repository that is not
 private), store the CI credential ([Installation](Installation.md), *CI access to the platform*),
-and make `warden gate` a required check. The commit is what `certify` needs:
+and make `warden gate` a required check. That check runs `warden attest check`,
+so a pull request from the repository stays red until it carries a committed
+pre-PR review attestation, which the skill pack's `pre-pr-review` writes
+([Installation](Installation.md), *3. The skill pack, once per machine*). The commit is what `certify` needs:
 Level 3 checks the derived files are not tracked.
 
 **Below the git root.** Run in `svc/api`, `init` writes the files above in

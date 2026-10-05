@@ -108,7 +108,7 @@ CREDENTIAL = "platform credential"
 BUILD = "build warden at repo.yaml platform.pin"
 REMOVE = "remove platform credential"
 WHEEL_INSTALL = "install warden from the install job's wheel"
-REQUIRE = "require the install and verify jobs"
+REQUIRE = "require the install job"
 TAKE = "take the verify results"
 TAKE_RUN = 'warden take --from "$RUNNER_TEMP/warden-verify"'
 PRIVATE = "require a private repository"
@@ -154,7 +154,7 @@ def test_init_detects_the_manifest_and_writes_its_verify_scope(
         == {lang: scope}
     assert [c.lang for c in config.components] == [lang]
     workflow = (repo / enroll.WORKFLOW_PATH).read_text()
-    assert f"run: warden verify --scope {lang}" in workflow
+    assert f'warden verify --scope {lang} > "$out" 2>&1 || status=$?' in workflow
 
 
 @pytest.mark.parametrize("lang", sorted(FIXTURES))
@@ -182,8 +182,8 @@ def test_a_repo_with_several_manifests_enrolls_every_language(tmp_path, monkeypa
     config = config_mod.load(repo)
     assert sorted(config.verify) == ["go", "python"]
     workflow = yaml.safe_load((repo / enroll.WORKFLOW_PATH).read_text())
-    runs = [s.get("run") for s in _steps(workflow, "verify")]
-    assert "warden verify --scope python" in runs and "warden verify --scope go" in runs
+    runs = "".join(s.get("run") or "" for s in _steps(workflow, "verify"))
+    assert "warden verify --scope python >" in runs and "warden verify --scope go >" in runs
     swallowed = (repo / ".warden/rules/swallowed-exceptions.md").read_text()
     assert "'**/*.py'" in swallowed and "*.go" not in swallowed
 
@@ -573,7 +573,7 @@ def test_the_gate_job_runs_no_pull_request_code():
     classify = ([enroll.CLASSIFY_STEP]
                 if enroll.carries_classify_command(enroll.__version__) else [])
     assert names == [REQUIRE, WHEEL_INSTALL, TAKE, "warden review", *classify,
-                     "warden certify"]
+                     ATTEST_STEP, "warden certify", REQUIRE_VERIFY]
     assert _step(doc, "gate", "warden review")["run"] == (
         'warden review --no-project-checkers --event "$GITHUB_EVENT_PATH"')
     assert _step(doc, "gate", "warden certify")["run"] == "warden certify --level 3"
@@ -603,19 +603,6 @@ def test_the_gate_job_runs_no_pull_request_code():
     assert order.index(REQUIRE) < min(i for i, s in enumerate(_steps(doc, "gate"))
                                       if s.get("uses", "").startswith(
                                           "actions/download-artifact@"))
-
-
-@pytest.mark.parametrize("install, verify, code", [
-    ("success", "success", 0), ("failure", "skipped", 2), ("skipped", "skipped", 2),
-    ("success", "failure", 1), ("success", "cancelled", 1)])
-def test_the_gate_fails_unless_install_and_verify_succeeded(install, verify, code, tmp_path):
-    doc = _workflow()
-    step = _step(doc, "gate", REQUIRE)
-    assert step["env"] == {"INSTALL_RESULT": "${{ needs.install.result }}",
-                           "VERIFY_RESULT": "${{ needs.verify.result }}"}
-    result = _run_step(doc, "gate", step,
-                       {"INSTALL_RESULT": install, "VERIFY_RESULT": verify}, tmp_path)
-    assert result.returncode == code, result
 
 
 def _fakes(tmp_path: Path) -> tuple[Path, Path]:
@@ -3843,8 +3830,177 @@ def test_the_classify_step_is_pinned_to_the_release_the_gate_installs():
     assert "@@" not in enroll.render_workflow(chosen, pin=enroll.LACKS_CLASSIFY_COMMAND)
     carries = yaml.safe_load(enroll.render_workflow(chosen, pin=CARRIES))
     argvs = [a for a in _warden_argvs(carries) if a[:1] == ["attest"]]
-    assert argvs == [["attest", "classify", "--enforce", "--base",
-                      "origin/$BASE_REF"]], argvs
+    assert argvs == [["attest", "classify", "--enforce", "--base", "origin/$BASE_REF"],
+                     ["attest", "check", "--base", "origin/$BASE_REF"]], argvs
     assert cli.build_parser().parse_args(argvs[0]).enforce is True
     assert enroll.render_workflow(chosen) == enroll.render_workflow(
         chosen, pin=f"v{enroll.__version__}")
+
+
+# ── the gate shows every refusal (agentops-hy6o.30, agentops-hy6o.31) ───────
+
+ATTEST_STEP = "pre-PR review attestation"
+REQUIRE_VERIFY = "require the verify job"
+AFTER_WARDEN = "${{ !cancelled() && steps.warden.outcome == 'success' }}"
+
+
+def _fake_warden(tmp_path: Path, body: str) -> dict[str, str]:
+    """A `warden` on PATH that logs its argv and runs BODY; the env to run a
+    step with it, a runner temp and an emptied step summary file."""
+    bindir = tmp_path / "bin"
+    bindir.mkdir(exist_ok=True)
+    (bindir / "warden").write_text(
+        f'#!/bin/sh\nprintf "%s\\n" "$*" >> "{tmp_path}/argv"\n{body}\n')
+    (bindir / "warden").chmod(0o755)
+    (tmp_path / "summary").write_text("")
+    return {**_AMBIENT_GIT_CONFIG, "PATH": f"{bindir}{os.pathsep}{os.environ['PATH']}",
+            "RUNNER_TEMP": str(tmp_path), "GITHUB_STEP_SUMMARY": str(tmp_path / "summary")}
+
+
+@pytest.mark.parametrize("prefix", ["", "svc/api"])
+def test_the_emitted_gate_runs_attest_check_on_pull_request(prefix, tmp_path):
+    """The demo's gate had no `warden attest check` step, so certify's E-01
+    failed in the consumer's own CI and the attestation was unenforced. The
+    step runs ci.yml's `run:` byte for byte, fail-closed, with the fork
+    exemption, after review and before certify."""
+    from warden import certify as certify_mod
+    chosen = tuple(lang for lang in enroll.LANGUAGES if lang.name == "python")
+    text = enroll.render_workflow(chosen, prefix)
+    doc = yaml.safe_load(text)
+    assert "pull_request" in doc[True]
+    names = [s.get("name") for s in _steps(doc, "gate")]
+    assert names.index("warden review") < names.index(ATTEST_STEP) \
+        < names.index("warden certify"), names
+    step = _step(doc, "gate", ATTEST_STEP)
+    assert "continue-on-error" not in step and "continue-on-error" not in doc["jobs"]["gate"]
+    assert step["if"] == AFTER_WARDEN
+    live = _ci_yml_step(ATTEST_STEP)
+    assert step["run"] == live["run"].replace(".warden/bin/warden", "warden")
+    assert step["env"] == live["env"]
+    wf = tmp_path / "repo" / ".github" / "workflows" / "warden.yml"
+    wf.parent.mkdir(parents=True)
+    wf.write_text(text)
+    passed, detail = certify_mod._run_check(
+        {"type": "ci_step_enforced", "pattern": "warden attest check"}, tmp_path / "repo")
+    assert passed, detail
+    same = {"HEAD_REPO": "o/r", "REPOSITORY": "o/r", "BASE_REF": "main"}
+    for code in (0, 1, 2):
+        env = _fake_warden(tmp_path, f'echo "attest check: verdict {code}"; exit {code}')
+        result = _run_step(doc, "gate", step, {**env, **same}, tmp_path)
+        assert result.returncode == code, result
+        assert f"verdict {code}" in result.stdout
+        assert f"verdict {code}" in (tmp_path / "summary").read_text()
+    assert (tmp_path / "argv").read_text().splitlines()[-1] == "attest check --base origin/main"
+    (tmp_path / "argv").unlink()
+    fork = _run_step(doc, "gate", step, {**env, **same, "HEAD_REPO": "fork/r"}, tmp_path)
+    assert fork.returncode == 0 and "fork PR" in fork.stdout
+    assert not (tmp_path / "argv").exists()
+
+
+@pytest.mark.parametrize("prefix", ["", "svc/api"])
+def test_the_emitted_gate_reviews_a_pr_whose_verify_failed(prefix, tmp_path):
+    """Demo PR #2 carried a failing test and a HIGH rule finding; the gate
+    exited at its first step on the verify result, so review never ran and
+    only the verify refusal showed. The gate now requires install first,
+    runs every refusing step whatever verify or an earlier refusal said,
+    and fails on verify LAST."""
+    doc = _workflow(prefix=prefix)
+    steps = _steps(doc, "gate")
+    names = [s.get("name") or s["uses"] for s in steps]
+    require = _step(doc, "gate", REQUIRE)
+    assert require["env"] == {"INSTALL_RESULT": "${{ needs.install.result }}"}
+    for install, code in (("success", 0), ("failure", 2), ("skipped", 2)):
+        result = _run_step(doc, "gate", require, {"INSTALL_RESULT": install}, tmp_path)
+        assert result.returncode == code, result
+    assert _step(doc, "gate", WHEEL_INSTALL)["id"] == "warden"
+    # A failed verify job that uploaded nothing fails the download and skips
+    # the take (D-03 refuses a take step carrying `if:`); review runs anyway.
+    assert "if" not in _step(doc, "gate", TAKE)
+    refusing = ["warden review", ATTEST_STEP, "warden certify"]
+    if enroll.carries_classify_command(enroll.__version__):
+        refusing.insert(1, enroll.CLASSIFY_STEP)
+    for name in refusing:
+        assert _step(doc, "gate", name)["if"] == AFTER_WARDEN, name
+    last = _step(doc, "gate", REQUIRE_VERIFY)
+    assert names.index(REQUIRE_VERIFY) > max(names.index(n) for n in refusing)
+    assert last["if"] == "${{ !cancelled() && needs.install.result == 'success' }}"
+    assert last["env"] == {"VERIFY_RESULT": "${{ needs.verify.result }}"}
+    for verify, code in (("success", 0), ("failure", 1), ("cancelled", 1)):
+        result = _run_step(doc, "gate", last, {"VERIFY_RESULT": verify}, tmp_path)
+        assert result.returncode == code, result
+        assert ("gate fails until every verify scope passes" in result.stderr) == bool(code)
+
+
+FAILING_OUTPUTS = {
+    "node-tap": ("TAP version 13\n# Subtest: GET /slug with overlong text is a 400\n"
+                 "not ok 4 - GET /slug with overlong text is a 400\n"
+                 "not ok 5 - a pending one # TODO later\nok 6 - fine\n# fail 1\n",
+                 ["GET /slug with overlong text is a 400"]),
+    "node-spec": ("✔ fine (1.2ms)\n✖ GET /slug with overlong text is a 400 (3.1ms)\n"
+                  "ℹ fail 1\n✖ failing tests:\n\n"
+                  "✖ GET /slug with overlong text is a 400 (3.1ms)\n",
+                  ["GET /slug with overlong text is a 400"]),
+    "pytest": ("....F\n=== short test summary info ===\n"
+               "FAILED tests/test_app.py::test_slug_cap - assert 200 == 400\n"
+               "ERROR tests/test_db.py::test_conn\n1 failed, 4 passed, 1 error in 0.1s\n",
+               ["tests/test_app.py::test_slug_cap", "tests/test_db.py::test_conn"]),
+    "go": ("=== RUN   TestSlugCap\n    app_test.go:12: got 200\n--- FAIL: TestSlugCap (0.00s)\n"
+           "    --- FAIL: TestSlugCap/overlong (0.00s)\nFAIL\nFAIL\texample.com/app\t0.01s\n",
+           ["TestSlugCap", "TestSlugCap/overlong"]),
+}
+
+
+@pytest.mark.parametrize("runner", sorted(FAILING_OUTPUTS))
+def test_the_verify_step_names_the_failing_tests_in_the_log(runner, tmp_path):
+    """Demo PR #2's verify log printed the tail of `npm test` and the failing
+    test's name lived only in a one-day artifact. The summary names every
+    failing test read off the step's WHOLE output, however much output
+    follows, and the emitted step copies the summary into the step summary."""
+    output, failing = FAILING_OUTPUTS[runner]
+    assert verify_mod.failing_tests(output) == failing
+    padded = output + "noise\n" * 1000
+    doc = {"scope": "app", "passed": False, "dirty": False, "results": [
+        {"cmd": "npm test", "cwd": ".", "exit_code": 1, "duration_s": 1.0,
+         "output_tail": padded[-4000:]}]}
+    summary = verify_mod.render_summary(doc, outputs=[padded])
+    for name in failing:
+        assert f"      - {name}\n" in summary, summary
+    assert f"    failing tests ({len(failing)}):\n" in summary
+    passing = {**doc, "passed": True, "results": [{**doc["results"][0], "exit_code": 0}]}
+    assert "failing tests" not in verify_mod.render_summary(passing, outputs=[padded])
+
+    wf = _workflow(("python", "node", "go"))
+    for lang in ("python", "node", "go"):
+        step = _step(wf, "verify", f"warden verify --scope {lang}")
+        env = _fake_warden(tmp_path, f"cat <<'OUT'\n{summary}OUT\nexit 1")
+        result = _run_step(wf, "verify", step, env, tmp_path)
+        assert result.returncode == 1, result
+        assert failing[0] in result.stdout
+        written = (tmp_path / "summary").read_text()
+        assert f"### warden verify --scope {lang}" in written and failing[0] in written
+
+
+def test_the_hand_copied_gates_review_a_pr_whose_verify_failed():
+    """hello-svc's gate and Adopting.md's snippet are one job, so a failed
+    verify step skipped every step after it: each refusing step now runs once
+    verify has run, passed or not."""
+    ran = "${{ !cancelled() && steps.verify.outcome != 'skipped' }}"
+    doc = yaml.safe_load((ROOT / "examples/hello-svc/.github/workflows/ci.yml").read_text())
+    steps = _steps(doc, "gate")
+    at = next(i for i, s in enumerate(steps) if s.get("id") == "verify")
+    after = [s for s in steps[at + 1:] if "run" in s
+             and "check-vocabulary" not in s["run"]]  # its own guard bars an `if`
+    assert len(after) == 4 and all(s.get("if") == ran for s in after), after
+    page = (ROOT / "docs/wiki/Adopting.md").read_text()
+    assert "        id: verify\n" in page and page.count(f"        if: {ran}\n") == 3
+
+
+def test_failing_tests_names_no_test_off_a_line_another_tool_prints():
+    """Round 1 found `failing_tests` reading names off lines no test runner
+    printed and cutting a parametrized id at its first space."""
+    noise = ("✖ 3 problems (3 errors, 0 warnings)\nFAILED (failures=2)\n"
+             "ERROR connecting to db\n")
+    assert verify_mod.failing_tests(noise) == []
+    assert verify_mod.failing_tests(
+        "FAILED tests/t.py::test_a[a b] - assert 0\nERROR tests/t.py\n") == [
+        "tests/t.py::test_a[a b]", "tests/t.py"]
