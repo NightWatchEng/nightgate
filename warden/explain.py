@@ -161,7 +161,9 @@ def render(config: RepoConfig, base: str | None = None) -> str:
             lines.append(f"    - paused: {r.paused_reason}")
     blocking = ", ".join(config.review.blocking_severities)
     lines.append(f"\nBlocking severities: {blocking}. "
-                 "Findings post to the PR sticky comment; blocking findings fail the check.")
+                 "Findings post to the PR sticky comment, and to the job step "
+                 "summary when $GITHUB_STEP_SUMMARY is set; blocking findings "
+                 "fail the check.")
 
     state, detail = local_gate_state(config.root)
     label = {"enabled": "enabled", "unset": "NOT enabled", "bypassed": "BYPASSED"}[state]

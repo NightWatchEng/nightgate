@@ -163,6 +163,22 @@ def _cmd_deploy(args: argparse.Namespace) -> int:
     return 0 if run_doc["passed"] else 1
 
 
+def _append_step_summary(text: str) -> None:
+    """Append to the Actions job's step summary when `$GITHUB_STEP_SUMMARY`
+    names one; unset or empty, write nothing. The summary mirrors what the
+    review artifact and the sticky comment already record, so a write that
+    fails is reported on stderr and leaves the verdict as it is."""
+    path = os.environ.get("GITHUB_STEP_SUMMARY")
+    if not path:
+        return
+    try:
+        with open(path, "a", encoding="utf-8") as fh:
+            fh.write(text)
+    except OSError as e:
+        print(f"warden review: step summary not written to {path} ({e}); "
+              "verdict stands", file=sys.stderr)
+
+
 def _cmd_review(args: argparse.Namespace) -> int:
     config = config_mod.load()
     config_mod.enforce_platform_pin(config)
@@ -206,6 +222,7 @@ def _cmd_review(args: argparse.Namespace) -> int:
     scopes = verify_mod.scopes_for_paths(config, diff_ctx.scope_files)
     comment = audit_mod.render(
         doc, audit_mod.verify_for_review(config.root, doc, scopes))
+    _append_step_summary(audit_mod.render_step_summary(doc))
     if ctx and not args.no_comment:
         try:
             github_mod.upsert_sticky_comment(ctx, comment, config.root)

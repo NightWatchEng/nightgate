@@ -620,9 +620,15 @@ def clean_git_env():
     # developer machine has no such env and passes. The suite must not inherit
     # the caller's CI binding any more than it inherits their git binding.
     event = os.environ.pop("GITHUB_EVENT_PATH", None)
+    # GITHUB_STEP_SUMMARY likewise: `warden review` appends its findings table
+    # to the file it names, so every fixture review would otherwise write its
+    # made-up findings into the real job summary of the run testing it.
+    step_summary = os.environ.pop("GITHUB_STEP_SUMMARY", None)
     yield
     if event is not None:
         os.environ["GITHUB_EVENT_PATH"] = event
+    if step_summary is not None:
+        os.environ["GITHUB_STEP_SUMMARY"] = step_summary
     for key, value in ambient_config.items():
         if value is None:
             os.environ.pop(key, None)

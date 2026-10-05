@@ -128,6 +128,47 @@ def verify_for_review(root: Path, review_doc: dict | None,
     return verify_for_commit(root, str(review_doc.get("head_sha") or ""), scopes)
 
 
+def _sorted_findings(review_doc: dict) -> list[dict]:
+    return sorted(review_doc["findings"],
+                  key=lambda f: (_SEVERITY_ORDER[f["severity"]], f["file"]))
+
+
+def _findings_table(findings: list[dict]) -> list[str]:
+    """The count line and the findings table: what the sticky comment opens
+    with, and all the job step summary carries of a review."""
+    if not findings:
+        return ["✅ No findings. All applicable rules passed."]
+    high = sum(1 for f in findings if f["severity"] == "HIGH")
+    lines = [f"**{len(findings)} finding(s)** — {high} blocking (HIGH).",
+             "", "| severity | rule | location | finding |", "|---|---|---|---|"]
+    for f in findings:
+        loc = _cell(f["file"]) + (f":{f['line']}" if f.get("line") else "")
+        lines.append(f"| {f['severity']} | `{_cell(f['rule_id'])}` | `{loc}` "
+                     f"| {_cell(f['finding'])} |")
+    return lines
+
+
+def render_step_summary(review_doc: dict) -> str:
+    """The review's findings table for `$GITHUB_STEP_SUMMARY` — the same
+    table the sticky comment carries, with its deferred and paused lines and
+    without the evidence quotes, so a reader of the Actions run sees the
+    review's refusal beside verify's."""
+    reviewed = str(review_doc.get("head_sha") or UNKNOWN_SHA)[:12]
+    lines = [f"## warden review — `{reviewed}`", "",
+             *_findings_table(_sorted_findings(review_doc))]
+    # The deferred line too: CI evaluates no `engine: claude` rule, so a bare
+    # "No findings" here would read as every rule having passed.
+    deferred = review_doc.get("deferred_to_pre_pr", [])
+    if deferred:
+        lines += ["", "Deferred to pre-PR review (Claude Code session): " +
+                  ", ".join(f"`{r}`" for r in deferred)]
+    paused = review_doc.get("paused", [])
+    if paused:
+        lines += ["", "⏸ PAUSED (applied to this diff but not enforced): " +
+                  ", ".join(f"`{r}`" for r in paused)]
+    return "\n".join(lines) + "\n\n"
+
+
 def render_infra_failure(error: str, rules_version: str) -> str:
     return (f"{INFRA_BANNER}\n\n"
             f"The AI rules were NOT evaluated on this PR: `{error}`\n\n"
@@ -153,19 +194,9 @@ def render(review_doc: dict | None,
     if review_doc is None:
         lines.append("_No review artifact found._")
     else:
-        findings = sorted(review_doc["findings"],
-                          key=lambda f: (_SEVERITY_ORDER[f["severity"]], f["file"]))
-        if not findings:
-            lines.append("✅ No findings. All applicable rules passed.")
-        else:
-            high = sum(1 for f in findings if f["severity"] == "HIGH")
-            lines.append(f"**{len(findings)} finding(s)** — {high} blocking (HIGH).")
-            lines += ["", "| severity | rule | location | finding |",
-                      "|---|---|---|---|"]
-            for f in findings:
-                loc = _cell(f["file"]) + (f":{f['line']}" if f.get("line") else "")
-                lines.append(f"| {f['severity']} | `{_cell(f['rule_id'])}` | `{loc}` "
-                             f"| {_cell(f['finding'])} |")
+        findings = _sorted_findings(review_doc)
+        lines += _findings_table(findings)
+        if findings:
             lines += ["", "<details><summary>Evidence</summary>", ""]
             for f in findings:
                 lines += [f"**`{_cell(f['rule_id'])}` @ {_cell(f['file'])}**",

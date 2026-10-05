@@ -129,6 +129,109 @@ def test_comment_failure_keeps_blocking_exit_1_regression(sample_repo, tmp_path,
     assert cli.main(["review", "--event", str(event)]) == 2
 
 
+def _review_with_a_high_finding(sample_repo: Path, tmp_path: Path,
+                                monkeypatch: pytest.MonkeyPatch,
+                                deferred: tuple[str, ...] = ()
+                                ) -> tuple[Path, list[str]]:
+    """A review fixture whose diff carries one HIGH `secrets-in-diff` finding,
+    driven through the real `review` command with an event payload."""
+    shutil.copy(sample_repo / "repo.yaml", tmp_path / "repo.yaml")
+    shutil.copytree(sample_repo / ".warden" / "rules", tmp_path / ".warden" / "rules")
+    event = tmp_path / "event.json"
+    event.write_text(json.dumps({
+        "repository": {"full_name": "o/r"},
+        "pull_request": {"number": 2, "base": {"sha": "a" * 40},
+                         "head": {"sha": "b" * 40}}}))
+    monkeypatch.chdir(tmp_path)
+    ctx_obj = DiffContext(base="a" * 40, head="b" * 40, files=("app/x.py",),
+                          added={"app/x.py": ((7, "bad"),)}, removed={},
+                          read_base=lambda p: None, read_head=lambda p: None)
+    finding = {"rule_id": "secrets-in-diff", "severity": "HIGH",
+               "file": "app/x.py", "line": 7, "finding": "AWS key in diff",
+               "evidence": "+AKIA-shaped-token"}
+    doc = {"rules_version": "v", "engine": "deterministic", "base_sha": ctx_obj.base,
+           "head_sha": ctx_obj.head, "findings": [finding],
+           "deferred_to_pre_pr": list(deferred)}
+    monkeypatch.setattr(cli.diffs_mod, "get_context", lambda *a, **k: ctx_obj)
+    monkeypatch.setattr(review_mod, "run_review", lambda *a, **k: doc)
+    posted: list[str] = []
+    monkeypatch.setattr(github_mod, "upsert_sticky_comment",
+                        lambda ctx, body, root: posted.append(body))
+    return event, posted
+
+
+def test_review_writes_its_findings_to_the_step_summary_when_the_variable_is_set(
+        sample_repo, tmp_path, monkeypatch):
+    """The demo's PR #2: a HIGH finding reached only the sticky comment, so a
+    reader of the Actions run saw verify's refusal and not the review's. With
+    `$GITHUB_STEP_SUMMARY` set, the findings table is appended there too — and
+    the comment is byte-for-byte the one posted with the variable unset."""
+    event, posted = _review_with_a_high_finding(sample_repo, tmp_path, monkeypatch)
+    monkeypatch.delenv("GITHUB_STEP_SUMMARY", raising=False)
+    assert cli.main(["review", "--event", str(event)]) == 1
+    comment_without = posted[-1]
+
+    summary = tmp_path / "step-summary.md"
+    summary.write_text("## verify\n\nearlier step\n")
+    monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(summary))
+    assert cli.main(["review", "--event", str(event)]) == 1
+    assert posted[-1] == comment_without, "the sticky comment changed"
+
+    text = summary.read_text()
+    assert text.startswith("## verify\n\nearlier step\n"), (
+        "the summary was overwritten, not appended to")
+    assert "| HIGH | `secrets-in-diff` | `app/x.py:7` | AWS key in diff |" in text
+    assert "1 blocking (HIGH)" in text
+    # The table, not the evidence quotes the comment folds away.
+    assert "AKIA-shaped-token" not in text
+    assert "AKIA-shaped-token" in comment_without
+
+
+def test_review_writes_no_step_summary_when_the_variable_is_unset(
+        sample_repo, tmp_path, monkeypatch):
+    event, _ = _review_with_a_high_finding(sample_repo, tmp_path, monkeypatch)
+    monkeypatch.delenv("GITHUB_STEP_SUMMARY", raising=False)
+    before = sorted(p.name for p in tmp_path.iterdir())
+    assert cli.main(["review", "--event", str(event)]) == 1
+    after = sorted(p.name for p in tmp_path.iterdir())
+    assert after == before
+
+
+def test_the_step_summary_names_the_rules_ci_deferred(
+        sample_repo, tmp_path, monkeypatch):
+    """CI evaluates no `engine: claude` rule; it defers them. A summary that
+    printed the table alone would read "all applicable rules passed" over
+    rules that never ran, so the deferred line goes with it."""
+    event, _ = _review_with_a_high_finding(
+        sample_repo, tmp_path, monkeypatch, deferred=("enforcement-truth",))
+    summary = tmp_path / "step-summary.md"
+    monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(summary))
+    assert cli.main(["review", "--event", str(event)]) == 1
+    assert ("Deferred to pre-PR review (Claude Code session): "
+            "`enforcement-truth`") in summary.read_text()
+
+
+def test_the_suite_does_not_inherit_the_runners_step_summary():
+    """CI sets GITHUB_STEP_SUMMARY for the job running this suite. Inherited,
+    every fixture review that sets nothing itself would append its findings
+    to the real summary; the session fixture removes it, as it removes
+    GITHUB_EVENT_PATH."""
+    import os
+    assert "GITHUB_STEP_SUMMARY" not in os.environ
+
+
+def test_a_step_summary_that_cannot_be_written_leaves_the_verdict(
+        sample_repo, tmp_path, monkeypatch, capsys):
+    """The summary is a mirror; the artifact and comment are the record. An
+    unwritable path is named on stderr and the blocking exit 1 stands."""
+    event, posted = _review_with_a_high_finding(sample_repo, tmp_path, monkeypatch)
+    monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(tmp_path / "no" / "such" / "f"))
+    assert cli.main(["review", "--event", str(event)]) == 1
+    assert posted, "the sticky comment was not posted"
+    err = capsys.readouterr().err
+    assert "step summary not written" in err and "no/such/f" in err
+
+
 def _clone_fixture(sample_repo, tmp_path):
     """A committed, clean copy of the fixture repo — `attest write` refuses a
     dirty tree, and writing evidence must not dirty the session fixture."""
