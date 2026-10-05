@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import copy
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -61,13 +62,69 @@ def _fake_warden(tmp_path: Path, body: str) -> Path:
 
 # ── the README's Try it ─────────────────────────────────────────────────────
 
-def test_readme_try_it_is_install_init_certify_after_the_access_requirement():
+def test_readme_try_it_is_install_init_certify_after_the_install_section():
+    """The three commands follow `## Install`, whose tag check a reader runs
+    when the first of them cannot find the release."""
     readme = (ROOT / "README.md").read_text()
     assert _try_it(readme) == [INSTALL, "warden init", "warden certify --level 3"]
-    access = readme.index("You need read access to `NightWatchEng/nightgate`")
-    assert access < readme.index("\n## Try it\n"), "access is stated after Try it"
-    try_it = readme.split("\n## Try it\n", 1)[1].split("```sh", 1)[0]
-    assert "Access comes first" in try_it
+    assert readme.index("\n## Install\n") < readme.index("\n## Try it\n"), (
+        "Try it comes before the Install section that explains its first line")
+
+
+# The stems of words that say who may read a repository, matched at a word's
+# start so every inflection counts: privately, publicly, invitation,
+# collaborators, accessible, permissions.
+VISIBILITY = re.compile(r"\b(privat|public|invit|collaborat|visib|access|permission)",
+                        re.IGNORECASE)
+
+
+def _visibility_words(markdown: str) -> list[str]:
+    """Every visibility word MARKDOWN says in its own voice. Left out are the
+    `text` blocks, which quote another repository's CI output verbatim, and
+    the demo's planted AWS access key id, which names a secret's shape. Its
+    `sh` blocks are the README's own commands and are read."""
+    own = re.sub(r"(?ms)^```text\n.*?^```[^\n]*$", "", markdown)
+    own = re.sub(r"(?i)\bAWS access key id\b", "", own)
+    return [m.group(0) for m in VISIBILITY.finditer(own)]
+
+
+def test_readme_says_nothing_about_who_may_read_the_platform():
+    """The README is written for a reader deciding whether to adopt; access to
+    the platform repository is Installation.md's, which states it with the
+    failures the client prints. A README sentence about it would be false the
+    day the repository is public."""
+    assert _visibility_words((ROOT / "README.md").read_text()) == []
+
+
+# One sentence per alternative of VISIBILITY, each naming that stem and no
+# other, so deleting any alternative turns its row red. The README's own
+# earlier sentences are among them.
+@pytest.mark.parametrize("sentence", [
+    "The platform repository is kept privately.",
+    "Once the repository is publicly readable, anyone can install it.",
+    "Enrollment is by invitation.",
+    "Ask to be added as a collaborator.",
+    "Its visibility decides who can install it.",
+    "You need read access to `NightWatchEng/nightgate` and git credentials.",
+    "Ask NightWatchEng for permission first.",
+])
+def test_the_visibility_check_refuses_a_sentence_about_access(sentence):
+    """The check above, shown biting on sentences a rewrite could add."""
+    assert _visibility_words(f"# x\n\n{sentence}\n") != []
+
+
+def test_the_visibility_check_reads_the_readmes_own_commands():
+    text = "```sh\n# needs read access to NightWatchEng/nightgate\nwarden init\n```\n"
+    assert _visibility_words(text) == ["access"]
+
+
+def test_the_visibility_check_passes_a_quoted_secret_and_quoted_output():
+    """`access keys` in the README's own voice is still caught; only the
+    demo's `AWS access key id` and a quoted `text` block are left out."""
+    text = ("It commits a string shaped like an AWS access key id.\n\n"
+            "```text\nrepository is private\n```\n")
+    assert _visibility_words(text) == []
+    assert _visibility_words("You need access keys from us.\n") == ["access"]
 
 
 def _try_it_block(text: str) -> str | None:

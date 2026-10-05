@@ -120,8 +120,11 @@ ACCESS_FAILURES = ("Username for 'https://github.com':", "Invalid username or to
                    "Permission denied (publickey)", "ERROR: Repository not found.")
 
 
+# Installation.md alone states access, so it alone names these failures; the
+# README says nothing about who may read the platform
+# (tests/test_init_proof.py::test_readme_says_nothing_about_who_may_read_the_platform).
 @pytest.mark.parametrize("failure", ACCESS_FAILURES)
-@pytest.mark.parametrize("page", sorted(PAGES))
-def test_each_install_page_names_the_access_failure_git_prints(page, failure):
+def test_the_installation_page_names_the_access_failure_git_prints(failure):
+    page = "Installation.md"
     text = " ".join(PAGES[page].read_text().split())
     assert failure in text, f"{page} does not name {failure!r}"

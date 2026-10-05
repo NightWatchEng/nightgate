@@ -235,6 +235,9 @@ REGISTRY: dict[str, tuple[str, str]] = {
         FIXTURE, "one failing run's output per runner and the test names "
         "`verify.failing_tests` must read off it — input and expected data, "
         "one entry per `_FAILING` pattern"),
+    "test_init_proof:VISIBILITY": (
+        SWEPT, "the stems of words that say who may read a repository, which "
+        "the README must not use in its own voice"),
     "test_init_proof:SPELLINGS": (
         FIXTURE, "the platform repository URLs the isolation script lists, each "
         "given a planted local route before git's refusal is checked — input"),
@@ -862,6 +865,7 @@ EXEMPT: dict[str, dict[str, str]] = {
 # rather than summed, so a loss in one guard cannot hide behind a gain in
 # another, and the failure names the guard that changed.
 SWEPT_ALTERNATIVES: dict[str, int] = {
+    "test_init_proof:VISIBILITY": 7,
     "test_skillpack:_REVIEW_PROTOCOLS": 3,
     "test_skillpack:_LENS_SOURCE_SPELLINGS": 3,
     "test_toolchain:_INSTALLER": 3,
@@ -1829,7 +1833,7 @@ def test_the_ledger_states_the_harness_reach():
                        "test_unknown_key_render",
                        "test_runnable_docs",
                        "test_git_repo_binding",
-                       "test_self_cage",
+                       "test_self_cage", "test_init_proof",
                        # `toolchain` is the first NON-test
                        # module in the subject: a helper with no tests of its
                        # own, swept through the WITNESSES entry above, the same
@@ -1837,7 +1841,7 @@ def test_the_ledger_states_the_harness_reach():
                        "test_toolchain", "toolchain"}, sorted(modules)
     # Exact, not a floor: moving a guard in or out of the sweep is a
     # deliberate edit of this number.
-    assert by_kind[SWEPT] == 47, (
+    assert by_kind[SWEPT] == 48, (
         f"{by_kind[SWEPT]} SWEPT rows — a floor let twelve rows leave the "
         "sweep in silence once; a guard moved in or out of the sweep is a "
         "deliberate edit of this number, not a drift under it")
