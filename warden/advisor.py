@@ -727,24 +727,55 @@ def _pause_note(rule_id: str, reason: str, *, reopened: bool) -> str:
 
 
 # `lang:` is free text in repo.yaml's schema, and a hand-written one says
-# what its author calls the language — `python3.12`, `Python 3`, `pypy`,
-# `TypeScript`, `node.js`, `golang 1.22`. Each pattern reads a NAME followed by
-# nothing, a version, or a space, so `python3.12` is python and `gopher` is
-# not go. A spelling none of them reads is not a catalog language; what keeps
-# a misread from hiding a row is that a set-aside entry must also match
-# nothing in the tree (`_matches_nothing_here`).
-_LANG_SPELLINGS = (
-    ("python", re.compile(r"\A(?:c?python|pypy|py)(?:[\s\d.]|\Z)")),
-    ("node", re.compile(r"\A(?:node(?:\.?js)?|javascript|js|typescript|ts"
-                        r"|deno|bun)(?:[\s\d.]|\Z)")),
-    ("go", re.compile(r"\A(?:go|golang)(?:[\s\d.]|\Z)")),
-)
+# what its author calls the language — `python3.12`, `python-3.12`,
+# `CPython-3.11`, `TypeScript`, `node.js`, `golang 1.22`. A spelling is read
+# as its WORDS: runs of letters, where a word may end in `++` or `#` (`c++`,
+# `c#`). Anything else separates words, so `python3.12` is the word `python`
+# and `typescript+python` is two words. A word is matched whole, so `gopher`
+# is not go and `pythonic` is not python.
+_CATALOG_WORDS = {
+    "python": "python", "cpython": "python", "pypy": "python", "py": "python",
+    "node": "node", "nodejs": "node", "javascript": "node", "js": "node",
+    "typescript": "node", "ts": "node", "deno": "node", "bun": "node",
+    "go": "go", "golang": "go",
+}
+# Words that name something no catalog starter reads. A spelling made only
+# of these declares a known other language, which is what lets a node repo
+# with a `lang: md` docs component still set its Python-idiom entries aside.
+_OTHER_WORDS = frozenset((
+    "md", "markdown", "docs", "doc", "text", "txt", "rst", "asciidoc",
+    "html", "css", "scss", "sass", "yaml", "yml", "json", "toml", "xml",
+    "shell", "sh", "bash", "zsh", "fish", "powershell", "sql",
+    "terraform", "hcl", "docker", "dockerfile", "make", "makefile", "nix",
+    "proto", "protobuf", "graphql", "rust", "java", "kotlin", "scala",
+    "groovy", "ruby", "php", "swift", "c", "c++", "cpp", "c#", "csharp",
+    "f#", "dotnet", "elixir", "erlang", "haskell", "ocaml", "clojure",
+    "dart", "lua", "perl", "r", "julia", "zig", "nim", "solidity",
+))
+_LANG_WORD = re.compile(r"[a-z]+(?:\+\+|#)?")
+
+
+def _read_lang(spelling: str) -> frozenset[str] | None:
+    """The catalog languages `spelling` names, or None when it is unread.
+
+    Every word must be a catalog word or a known other one; a single word
+    that is neither makes the whole spelling unread. `Go/Django` could be a
+    Django (Python) component, and the reader cannot tell a harmless
+    qualifier from a language it does not know, so `Python/Django` is None
+    as well, as are `cobol-ng` and `3.12`. The caller then sets nothing
+    aside. Otherwise every catalog
+    language a word names is read, so `TypeScript/Python` is both, and a
+    spelling of known other words alone is an empty set.
+    """
+    words = _LANG_WORD.findall(spelling.lower())
+    if not words or any(w not in _CATALOG_WORDS and w not in _OTHER_WORDS
+                        for w in words):
+        return None
+    return frozenset(_CATALOG_WORDS[w] for w in words if w in _CATALOG_WORDS)
 
 
 def _catalog_lang(spelling: str) -> str | None:
-    text = spelling.strip().lower()
-    return next((name for name, pat in _LANG_SPELLINGS if pat.match(text)),
-                None)
+    return min(_read_lang(spelling) or (), default=None)
 
 
 def declared_languages(root: Path) -> tuple[frozenset[str], str]:
@@ -754,8 +785,12 @@ def declared_languages(root: Path) -> tuple[frozenset[str], str]:
     advisor holds a root, not a validated config. An empty set means the
     filter cannot know which languages apply, and the caller then sets
     NOTHING aside — a row too many is the safe direction for a report whose
-    job is the gap. `problem` is non-empty when repo.yaml could not be read
-    or its components are not a mapping, so the caller can say why.
+    job is the gap. `problem` is non-empty when repo.yaml could not be read,
+    its components are not a mapping, or any component's language cannot be
+    read (no `lang` string, or one `_read_lang` cannot classify), so the
+    caller can say why. An unread component fails closed: the set is then
+    EMPTY, never the other components' languages, because the unread one
+    may be the language a set-aside entry reads.
     """
     from .config import CONFIG_NAME, read_repo_yaml
     try:
@@ -767,11 +802,20 @@ def declared_languages(root: Path) -> tuple[frozenset[str], str]:
     comps = doc.get("components") if isinstance(doc, dict) else None
     if not isinstance(comps, dict):
         return frozenset(), f"{CONFIG_NAME} declares no components mapping"
-    langs = set()
-    for spec in comps.values():
+    langs: set[str] = set()
+    unread = []
+    for comp, spec in comps.items():
         lang = spec.get("lang") if isinstance(spec, dict) else None
-        if isinstance(lang, str) and (name := _catalog_lang(lang)):
-            langs.add(name)
+        read = _read_lang(lang) if isinstance(lang, str) else None
+        if read is None:
+            unread.append(f"component {str(comp)!r} declares " + (
+                f"lang {lang!r}, which this reader cannot classify"
+                if isinstance(lang, str) else "no lang string"))
+        else:
+            langs |= read
+    if unread:
+        return frozenset(), (f"{'; '.join(unread)} (catalog languages: "
+                             f"{', '.join(LANGS)})")
     return frozenset(langs), ""
 
 

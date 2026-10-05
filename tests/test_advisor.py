@@ -965,3 +965,78 @@ def test_a_paused_rules_entry_on_another_language_reopens_into_the_gap(tmp_path)
     assert "os-command-injection" not in dict(report.set_aside)
     assert any("PAUSED" in c for c in rows["os-command-injection"].caveats)
     assert not any("os-command-injection" in lim for lim in report.limits)
+
+
+# agentops-elsx.24: a lang spelling the reader cannot classify fails closed.
+
+
+@pytest.mark.parametrize("spelling", ["python-3.12", "python:3.12",
+                                      "py-3", "CPython-3.11", "python_3",
+                                      "python>=3.11"])
+def test_a_python_spelling_with_any_separator_beside_node_sets_nothing_aside(
+        tmp_path, spelling):
+    """A version or qualifier after the name, whatever separates it, still
+    names Python: the mixed repo is not read as node-only."""
+    declare_components(tmp_path, api=spelling, web="node")
+    report = advisor.recommend(tmp_path)
+    assert report.repo_langs == ("node", "python")
+    assert report.set_aside == ()
+
+
+@pytest.mark.parametrize("spelling", ["TypeScript/Python",
+                                      "typescript+python", "Python & Node"])
+def test_a_spelling_naming_two_languages_reads_both(tmp_path, spelling):
+    declare_components(tmp_path, app=spelling)
+    report = advisor.recommend(tmp_path)
+    assert report.repo_langs == ("node", "python")
+    assert report.set_aside == ()
+
+
+@pytest.mark.parametrize("spelling", ["cobol-ng", "pythonic-docs",
+                                      "Rust/Django", "3.12", "",
+                                      "Python/Django", "Go/Django", "go-flask",
+                                      "TypeScript + FastAPI"])
+def test_an_unclassifiable_lang_sets_nothing_aside_and_names_the_spelling(
+        tmp_path, spelling):
+    """A word that is neither a catalog language nor a known other one —
+    alone, or beside a catalog word as in `Go/Django` — means the reader
+    cannot say this component is not Python, so nothing is set aside as
+    OTHER LANGUAGES, and the LIMITS line quotes the spelling it could not
+    read."""
+    declare_components(tmp_path, api=spelling, web="node")
+    report = advisor.recommend(tmp_path)
+    assert report.set_aside == () and report.repo_langs == ()
+    assert PYTHON_IDIOM_ENTRIES <= {r.entry_id for r in report.recommendations}
+    lines = [lim for lim in report.limits
+             if "no entry is set aside by language" in lim]
+    assert len(lines) == 1 and repr(spelling) in lines[0] and "'api'" in lines[0]
+    assert "OTHER LANGUAGES" not in advisor.render(report)
+
+
+@pytest.mark.parametrize("spec", [{"path": "."}, {"path": ".", "lang": 3.12},
+                                  {"path": ".", "lang": ["python"]}])
+def test_a_component_with_no_readable_lang_sets_nothing_aside(tmp_path, spec):
+    """A component that declares no lang string says nothing about its
+    language; dropping it would read the repo as its other components'."""
+    enrolled(tmp_path)
+    (tmp_path / "repo.yaml").write_text(yaml.safe_dump(
+        {"components": {"api": spec, "web": {"path": ".", "lang": "node"}}}))
+    report = advisor.recommend(tmp_path)
+    assert report.set_aside == () and report.repo_langs == ()
+    assert any("'api'" in lim and "no entry is set aside by language" in lim
+               for lim in report.limits)
+
+
+@pytest.mark.parametrize("spelling", ["md", "Markdown", "rust 1.80", "shell",
+                                      "c++17", "java-21", "docs"])
+def test_a_known_other_language_beside_node_still_sets_python_aside(
+        tmp_path, spelling):
+    """A declared, known non-catalog language is read, not unread: it names
+    no catalog language, so the node repo's Python-idiom entries are still
+    set aside and no LIMITS line blames the spelling."""
+    declare_components(tmp_path, docs=spelling, web="node")
+    report = advisor.recommend(tmp_path)
+    assert report.repo_langs == ("node",)
+    assert dict(report.set_aside).keys() == PYTHON_IDIOM_ENTRIES
+    assert not any("no entry is set aside by language" in lim
+                   for lim in report.limits)
