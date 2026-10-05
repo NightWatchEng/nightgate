@@ -19,15 +19,15 @@ can read it over https; `gh auth setup-git` sets those up. Then one command
 installs both `warden` and `cage`, with no clone of the platform:
 
 ```sh
-uv tool install git+https://github.com/NightWatchEng/nightgate@v3.0.0
+uv tool install git+https://github.com/NightWatchEng/nightgate@v3.0.1
 warden --version
 ```
 
-`warden --version` prints the tag's version, `warden 3.0.0`. If `uv` cannot
-find `v3.0.0`, run
-`git ls-remote --tags https://github.com/NightWatchEng/nightgate v3.0.0`.
+`warden --version` prints the tag's version, `warden 3.0.1`. If `uv` cannot
+find `v3.0.1`, run
+`git ls-remote --tags https://github.com/NightWatchEng/nightgate v3.0.1`.
 A published tag, lightweight or annotated, prints one line: an object id, a
-tab, and `refs/tags/v3.0.0`. No output means the release tag is not published
+tab, and `refs/tags/v3.0.1`. No output means the release tag is not published
 yet. Without access, git fails instead. Over https it asks
 `Username for 'https://github.com':` when it has no credentials, prints
 `Invalid username or token` and `Authentication failed` when a stored token
@@ -46,7 +46,7 @@ described under Install. Then, from the root of your own Python, Node or Go git
 repository:
 
 ```sh
-uv tool install git+https://github.com/NightWatchEng/nightgate@v3.0.0
+uv tool install git+https://github.com/NightWatchEng/nightgate@v3.0.1
 warden init
 warden certify --level 3
 ```

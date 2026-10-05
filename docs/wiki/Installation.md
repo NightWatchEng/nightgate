@@ -23,11 +23,11 @@ For the CLI:
 ```sh
 gh auth login
 gh auth setup-git
-git ls-remote --tags https://github.com/NightWatchEng/nightgate v3.0.0
+git ls-remote --tags https://github.com/NightWatchEng/nightgate v3.0.1
 ```
 
-The `ls-remote` line prints one line when `v3.0.0` is published, whether the
-tag is lightweight or annotated: an object id, a tab, and `refs/tags/v3.0.0`.
+The `ls-remote` line prints one line when `v3.0.1` is published, whether the
+tag is lightweight or annotated: an object id, a tab, and `refs/tags/v3.0.1`.
 For an annotated tag the id is the tag object's, not the commit's. No output,
 with exit status 0, means the tag is not published yet. Without access, git
 exits 128 instead. Over https it asks `Username for 'https://github.com':`
@@ -67,13 +67,13 @@ GitHub-only limit*.
 ## 1. The CLI, from a release tag
 
 ```sh
-uv tool install git+https://github.com/NightWatchEng/nightgate@v3.0.0
+uv tool install git+https://github.com/NightWatchEng/nightgate@v3.0.1
 warden --version
 ```
 
 One package, both commands: `warden` and `cage` land on your PATH, and there is
 no clone of the platform. `warden --version` prints the tag's version, here
-`warden 3.0.0`. If the install cannot find `v3.0.0`, run the `ls-remote` check
+`warden 3.0.1`. If the install cannot find `v3.0.1`, run the `ls-remote` check
 under *Access comes first*: no output means the release tag is not published
 yet.
 
@@ -83,7 +83,7 @@ tag must then be deleted and re-cut.
 
 That version is not only a banner. Every command compares `repo.yaml`'s
 `platform.pin` against it and fails closed on a mismatch, so a repo pinned to
-`v3.0.0` runs under this install and refuses any other.
+`v3.0.1` runs under this install and refuses any other.
 
 `platform.pin` is the one version an enrolled repository declares. The
 workflow `warden init` writes reads it from `repo.yaml` when it runs and
@@ -167,15 +167,15 @@ cwd only, so a worktree or a headless session cannot see them, while
 user-scope plugin skills resolve everywhere.
 
 ```bash
-claude plugin marketplace add 'https://github.com/NightWatchEng/nightgate#v3.0.0'
+claude plugin marketplace add 'https://github.com/NightWatchEng/nightgate#v3.0.1'
 claude plugin install nightgate-skills@nightgate
 ```
 
-Then check it with `warden skills pin`, which v3.0.0 carries.
+Then check it with `warden skills pin`, which v3.0.1 carries.
 
 Claude Code clones the marketplace with your git credentials, so the https
 URL uses the `gh auth setup-git` helper above; the `NightWatchEng/nightgate`
-shorthand would clone over ssh instead. The `#v3.0.0` is `platform.pin`:
+shorthand would clone over ssh instead. The `#v3.0.1` is `platform.pin`:
 neither command takes a version flag, but a ref on the URL clones the
 marketplace at that tag and the pack installs from that clone. `warden skills
 pin` refuses (exit 1) a machine whose marketplace ref or installed pack version
