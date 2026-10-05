@@ -906,6 +906,10 @@ def undeclared_at_bar(root: Path, records: list[dict]) -> list[str]:
     What it IS good for is telling the retro which `left_undeclared:` entries
     have outgrown their reason: a class recorded as "n=1, watching" that now
     carries four upheld records is a re-read, and this line names it.
+    What IS refused is narrower than the count: `attest write`, in a repo
+    declaring a ceiling, refuses a payload whose own records would leave an
+    at-bar receipt's premise broken (`outgrown_receipts`). The number of
+    names at the bar stays unbounded.
 
     Records are expected CANONICALIZED (every read seam folds them), so a name
     resolved by an alias has already become its target and never appears here.
@@ -914,6 +918,56 @@ def undeclared_at_bar(root: Path, records: list[dict]) -> list[str]:
     judged, upheld = tag_counts(records)
     return sorted(t for t, n in judged.items() if t not in vocab
                   and n >= DECLARE_MIN_N and upheld.get(t, 0) * 2 > n)
+
+
+# What an at-bar receipt says to stay a live decision: that it argues FROM the
+# bar, and the count it argues from. The words and the `n=` shape are this
+# repo's guard's (tests/test_tag_vocabulary_guards.py), read here so `attest
+# write` can refuse a payload that would break them before it is a shard.
+AT_BAR_WORDS = "AT the declaration bar"
+_STATED_N = re.compile(r"\bn=(\d+)")
+
+
+def outgrown_receipts(root: Path, records: list[dict],
+                      rules) -> dict[str, list[str]]:
+    """Every name whose `left_undeclared:` premise this corpus has outgrown,
+    each with why; empty while every premise holds.
+
+    Two readings, the two the guard suite applies to the committed corpus:
+    a receipt whose `trigger:` has fired (either side of the bar), and an
+    undeclared name AT the declaration bar whose receipt is missing, does
+    not say it argues from the bar, states no `n=<judged>`, or states an `n`
+    below the judged count. A sub-bar receipt whose `n=` has crept is not
+    read: the guard leaves it to its own tracked item, and so does this.
+
+    Records are expected CANONICALIZED and restatement-folded, as every
+    counting seam reads them.
+    """
+    left, _ = load_left_undeclared(root)
+    triggers, _ = load_triggers(root)
+    judged, _ = tag_counts(records)
+    out = {name: list(why)
+           for name, why in fired_triggers(triggers, records, rules).items()}
+    for name in undeclared_at_bar(root, records):
+        have = judged.get(name, 0)
+        receipt = left.get(name)
+        stated = _STATED_N.search(receipt or "")
+        if not receipt:
+            why = (f"AT the declaration bar ({have} judged) with no receipt "
+                   f"under '{LEFT_KEY}:' to re-read")
+        elif AT_BAR_WORDS not in receipt:
+            why = (f"reaches the bar ({have} judged) and its receipt does not "
+                   f"argue it — it never says '{AT_BAR_WORDS}'")
+        elif not stated:
+            why = (f"AT the declaration bar ({have} judged) and its receipt "
+                   f"states no count as `n=<judged>`")
+        elif int(stated.group(1)) < have:
+            why = (f"its at-bar receipt argues from n={stated.group(1)} and "
+                   f"the shards would hold {have} judged record(s)")
+        else:
+            continue
+        out.setdefault(name, []).append(why)
+    return out
 
 
 # ── the complaint labeller: one answer to "which declaration is this about?" ─

@@ -764,7 +764,21 @@ coined this round, watching" is a receipt — so the ceiling can sit at 0.
   a declared rule id used as an undeclared tag, naming the declared tags, and
   refuses any tagged payload while that declaration cannot be read — the
   ceiling reading the guard applies at pre-push, moved to where no shard
-  exists yet to delete.
+  exists yet to delete. In the same repo it also refuses (exit 2) a payload
+  whose own records — filed, or a committed finding re-filed with a new
+  status — would break a `left_undeclared:` receipt's premise: fire its
+  `trigger:`, or take its name AT the declaration bar (3+ judged, more upheld
+  than not) where the receipt is missing, does not say `AT the declaration
+  bar`, states no `n=<judged>`, or states an `n` below the judged count. So
+  "n=1, coined this round, watching" is a receipt until the class reaches the
+  bar; the round that takes it there names it, and the receipt is re-argued
+  from the bar, the name declared or folded, or the finding re-tagged. A
+  premise the committed shards already broke is not refused, the number of
+  names at the bar stays unbounded, and `memory check-vocabulary` is
+  unchanged. An unreadable committed corpus refuses any payload with
+  findings, since no tag rules out a restatement. A warden pinned before
+  this refusal writes such a payload, and a repo with no guard of its own
+  never hears of it.
 - A repo that declares **no** ceiling has nothing to breach. There is no flag
   that overrides a declared one — a ceiling you can pass on the command line
   is not a declaration.

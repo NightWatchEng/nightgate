@@ -658,6 +658,69 @@ def _check_tags(findings: list[dict], root: Path | None,
             f"{listed}")
 
 
+def _check_receipts(doc: dict, root: Path | None, rules_dir: Path) -> None:
+    """Refuse a payload whose records would outgrow a `left_undeclared:`
+    receipt, before the shard exists.
+
+    `_check_tags` asks whether each tag HAS a disposition. This asks whether
+    the disposition still holds once this round's records are counted: the
+    guard suite (tests/test_tag_vocabulary_guards.py) holds every receipt to
+    its premise over the committed corpus, and a builder may not edit the
+    receipt, so a shard that breaks one is found only after it was written,
+    ingested and committed, and the branch is rebuilt without it.
+
+    Counted the way the suite will count it: the records `memory ingest`
+    builds from this document, canonicalized and folded with the corpus, so a
+    restatement of a committed finding is no new evidence. The fold keeps the
+    later round's copy WHATEVER its tags, so a payload can change a name's
+    counts without carrying it — re-filing a committed refutation as `fixed`
+    under another tag drops one refuted record from that name. So every name
+    is read, not only the ones the payload carries; the payload is the only
+    thing that differs between the two readings, so whatever newly breaks is
+    its doing. Refused is only what THIS payload breaks — a premise the
+    committed shards already broke is the suite's to report, and refusing on
+    it would block every later round that carries the name. Same scope as
+    `_check_tags`: a repo that declares a ceiling. A corpus that cannot be
+    read refuses any payload with findings there, since no tag — declared or
+    none — rules out a restatement.
+    """
+    if root is None or not doc.get("findings"):
+        return
+    from . import tags as tags_mod
+    ceiling, ceiling_problems = tags_mod.load_ceiling(root)
+    if ceiling is None and not ceiling_problems:
+        return
+    from .memory import build_records, fold_restatements, records_from_shards
+    where = f".warden/memory/{tags_mod.VOCAB_FILE}"
+    try:
+        corpus = records_from_shards(root)
+    except ValueError as e:
+        raise AttestError(
+            f"{where} declares a ceiling, and the committed corpus cannot be "
+            f"read to show this payload leaves its '{tags_mod.LEFT_KEY}:' "
+            f"receipts standing: {e}") from e
+    new = tags_mod.canonicalize_records(root, build_records(doc))
+    from .rules import load_rules
+    rules = load_rules(rules_dir)
+    before = tags_mod.outgrown_receipts(root, corpus, rules)
+    after = tags_mod.outgrown_receipts(
+        root, fold_restatements(corpus + new), rules)
+    broken = {name: why for name, why in after.items() if name not in before}
+    if not broken:
+        return
+    detail = "; ".join(f"{name}: {', '.join(why)}"
+                       for name, why in sorted(broken.items()))
+    declared = ", ".join(sorted(tags_mod.load_vocab(root))) or "(none)"
+    raise AttestError(
+        f"tag(s) {', '.join(sorted(broken))} would outgrow the "
+        f"'{tags_mod.LEFT_KEY}:' receipt in {where} once this shard is "
+        f"counted, and the vocabulary guard suite refuses that corpus — "
+        f"{detail}. A finding this payload files under the name, or a "
+        f"committed one it re-files with a new status, moved the count: "
+        f"re-tag with a declared tag (Declared tags: {declared}), or have the "
+        f"receipt re-argued, the name declared or folded in {where}, then "
+        f"re-run")
+
 def range_binding(findings: list[dict], changed_paths: tuple[str, ...],
                   base_sha: str, head_sha: str) -> tuple[str, str]:
     """Warn when a findings set names no file the attested range changed.
@@ -2928,6 +2991,10 @@ def build(payload: dict, *, head_sha: str, base_sha: str,
     # ingest` copies its strings into a content-addressed shard. One point
     # means the artifact and the shard cannot disagree about a path.
     doc = relativize_strings(doc, root)
+    # Over the RELATIVIZED document, because that is what `memory ingest`
+    # copies into the shard: a restatement folds on the file it names, so the
+    # count has to be taken from the strings the shard will carry.
+    _check_receipts(doc, root, rules_dir)
     open_findings = [f for f in doc["findings"] if f["status"] == "confirmed"]
     if doc["verdict"] == "clean" and open_findings:
         raise AttestError(f"verdict 'clean' but {len(open_findings)} finding(s) "
