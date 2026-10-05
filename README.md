@@ -202,7 +202,7 @@ job, a rule finding is in the PR comment, and a missing attestation is in
 the gate job's attestation step.
 
 **What green looks like.** PR #5 above. Verify passes, the comment says no
-findings, and `attest check` lists each round's record. A person merges.
+findings, and `attest check` lists each round's record. Merging stays a person's decision.
 
 ## Design rules
 

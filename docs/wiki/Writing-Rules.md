@@ -184,8 +184,9 @@ rules dir and a human merges it.
 
 ### Answering the gap
 
-`warden rules recommend` leads with **UNANSWERED: N**. Two things shrink it:
-adopting an entry, or answering it in `.warden/catalog-answers.yaml`.
+`warden rules recommend` leads with **UNANSWERED: N**. Three things shrink it:
+adopting an entry, answering it in `.warden/catalog-answers.yaml`, or — on a
+warden newer than v3.0.2 — declaring each component's `lang:` in `repo.yaml`.
 
 ```yaml
 version: 1
@@ -214,6 +215,28 @@ waiver cannot buy its way past the ceiling. The 25 entries that ship no starter 
 argument, which is why that argument is mandatory: nothing can ever contradict
 those waivers. An answer the scan could not reach is **UNVERIFIED** and counted as
 unanswered, because "could not look" is not "clean".
+
+The third is about which language a starter reads. A catalog entry's `langs:`
+names the languages whose idioms its starter matches — `shell=True`,
+`pickle.loads` and `except: pass` are Python spellings, so seven entries carry
+`langs: [python]`; an entry without `langs:` reads no language in particular.
+`recommend` reads the `lang:` of every component in `repo.yaml`, and an entry
+whose `langs:` names none of them is set aside under **OTHER LANGUAGES**
+instead of recommended, and is not counted in UNANSWERED. Setting aside is
+narrow: only an entry that is unanswered, whose rule is not paused, and whose
+starter measurably matches nothing in this tree — a match, or a scan that
+could not finish, keeps the row, with a note saying why. The class may still
+matter in that repo; no starter in its language exists yet, and `warden
+catalog show <id>` says what each one guards. No component declaring a
+language the catalog tags (`python`, `node`, `go`) sets nothing aside, and a
+LIMITS line says so. On a repo that declares one of those languages but not
+Python, a report recommending an `engine:python` entry says, under PRIOR ART,
+that the engine names the language the checker is written in, not the one it
+reads.
+
+No tagged release carries any of this paragraph yet: v3.0.2 and earlier have
+no `langs:` key and no OTHER LANGUAGES section, so on a repo pinned there a
+declared `lang:` sets nothing aside and moves no count.
 
 The bare `warden rules recommend` enforces the declared ceiling: exit 1 above
 it, exit 2 when the gap or the ceiling cannot be read. That is what a CI step
