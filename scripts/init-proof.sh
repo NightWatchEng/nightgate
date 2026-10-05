@@ -7,13 +7,14 @@
 # The Try it block is three commands: install warden from the release tag,
 # `warden init`, `warden certify --level 3`. This reads that block from the
 # README through scripts/readme-try-it.sh rather than retyping it, and runs
-# its second and third commands in a fresh Python, Node and Go repository
-# under WORKDIR, with whichever `warden` is first on PATH. CI puts the wheel built from the pull request there, so the
+# its second and third commands in a fresh Python, Node, Go and Java
+# repository under WORKDIR, with whichever `warden` is first on PATH. CI puts the wheel built from the pull request there, so the
 # install line is the one command not run as written: it must name this
 # warden's version, the tag a reader would install.
 #
-# Each repository holds only a manifest and one source file, committed. For
-# each one:
+# Each repository holds only a manifest and one source file, committed; the
+# Java one also holds one JUnit 5 test, so the scope init writes for it has a
+# test to run (tests/test_init_proof.py runs it). For each one:
 #   - init exits 0;
 #   - the paths git sees as new are exactly the ones init reports writing, so
 #     nothing the proof passes on was written by hand;
@@ -113,6 +114,42 @@ prove() {
       printf 'module example.com/demo\n\ngo 1.22\n' > "$repo/go.mod"
       printf 'package demo\n\nfunc Add(a, b int) int { return a + b }\n' > "$repo/demo.go"
       ;;
+    java)
+      mkdir -p "$repo/src/main/java/demo" "$repo/src/test/java/demo"
+      cat > "$repo/pom.xml" <<'EOF'
+<project xmlns="http://maven.apache.org/POM/4.0.0">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>com.example</groupId>
+  <artifactId>demo</artifactId>
+  <version>0.1.0</version>
+  <properties>
+    <maven.compiler.release>17</maven.compiler.release>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+  </properties>
+  <dependencies>
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <version>5.11.4</version>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <version>3.5.2</version>
+      </plugin>
+    </plugins>
+  </build>
+</project>
+EOF
+      printf 'package demo;\n\npublic class Demo {\n    public static int add(int a, int b) { return a + b; }\n}\n' \
+        > "$repo/src/main/java/demo/Demo.java"
+      printf 'package demo;\n\nimport static org.junit.jupiter.api.Assertions.assertEquals;\n\nimport org.junit.jupiter.api.Test;\n\nclass DemoTest {\n    @Test\n    void adds() { assertEquals(3, Demo.add(1, 2)); }\n}\n' \
+        > "$repo/src/test/java/demo/DemoTest.java"
+      ;;
   esac
   (cd "$repo" && g init -q -b main && g add -A && g commit -qm fixture) >/dev/null
 
@@ -144,6 +181,6 @@ prove() {
   echo "init proof: $lang: init wrote $(echo "$reported" | awk 'END { print NR }') file(s), $(grep -E '^certification: ' "$workdir/$lang-certify.txt"), declare check clean"
 }
 
-for lang in python node go; do
+for lang in python node go java; do
   prove "$lang"
 done

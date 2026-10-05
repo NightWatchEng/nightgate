@@ -90,7 +90,7 @@ claude plugin install nightgate-skills@nightgate
 
 ## Try it
 
-From the root of your own Python, Node or Go git repository:
+From the root of your own Python, Node, Go or Java git repository:
 
 ```sh
 uv tool install git+https://github.com/NightWatchEng/nightgate@v3.0.3
@@ -99,8 +99,8 @@ warden certify --level 3
 ```
 
 `warden certify --level 3` then reports `certification: LEVEL 3 (Reviewed)` with no file written by hand. `warden init`
-writes `repo.yaml` for Python, Node and Go, and for every PR, platform CI runs `warden init` and `warden certify` with
-that PR's wheel on a fresh repository of each. Any other language works with a hand-written `repo.yaml`, the other
+writes `repo.yaml` for Python, Node, Go and Java, and for every PR, platform CI runs `warden init` and `warden certify`
+with that PR's wheel on a fresh repository of each. Any other language works with a hand-written `repo.yaml`, the other
 files [Adopting](docs/wiki/Adopting.md) shows, and a gate job that installs `warden` as [Install](#install) does.
 
 **What runs in CI.** `warden init` writes `repo.yaml`, starter rules, a skills policy and the gate,

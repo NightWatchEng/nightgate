@@ -27,14 +27,17 @@ warden certify --level 3
 | `.warden/rules/*.md` | starter rules from the guardrail catalog whose `applies_when` is unconditional for the detected language: `secrets-in-diff` everywhere, plus `swallowed-exceptions` for Python |
 | `.warden/skills-policy.md` | the six sections the skill pack and Level 3 read |
 | `.github/workflows/warden.yml` | the gate in three jobs: `install` builds `platform.pin`, cloned with no secret, `verify` runs every verify scope with no secret, and `gate` runs `warden review`, `warden attest check` and `warden certify --level 3`, each whether or not verify passed, then fails if verify did |
-| `.gitignore` | `.warden/out/`, `.warden/memory/findings.jsonl` and `.warden/memory/gate/`, plus `*.egg-info/` for Python and `node_modules/` for Node, appended where missing |
+| `.gitignore` | `.warden/out/`, `.warden/memory/findings.jsonl` and `.warden/memory/gate/`, plus `*.egg-info/` for Python, `node_modules/` for Node, `target/` for a Maven build and `build/` and `.gradle/` for a Gradle one, appended where missing |
 
 The verify commands pass on a repository with no tests and leave the tree
 clean: Python runs pytest against `uv.lock` if there is one and in a throwaway
 environment if not, and counts nothing collected as a pass; Node installs
 without writing a lockfile and runs `npm test` only for a real test script; Go
-runs `go vet` and `go test`. What a build writes is ignored rather than
-avoided: a setuptools project's `*.egg-info/` and Node's `node_modules/`.
+runs `go vet` and `go test`; Java runs `mvn -q -B test` for a `pom.xml`, else
+`./gradlew test` when the repository has a Gradle wrapper and `gradle test`
+when it does not. What a build writes is ignored rather than avoided: a
+setuptools project's `*.egg-info/`, Node's `node_modules/`, Maven's `target/`
+and Gradle's `build/` and `.gradle/`.
 `init` warns where it finds no test.
 
 Each manifest present enrolls its language, so a repository with both a

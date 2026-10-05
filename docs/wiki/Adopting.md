@@ -18,8 +18,8 @@ GitHub Actions workflow and there is no other: on any other CI, read
 *Another CI: the GitHub-only limit* below before you enroll. A fresh
 repository reaches Level 3 once you commit the files
 ([Quickstart](Quickstart.md)); platform CI proves that on every PR by running
-the README's Try it block, read from the README, on fresh Python, Node and Go
-repositories. What follows is reference: what each file means, and how to
+the README's Try it block, read from the README, on fresh Python, Node, Go
+and Java repositories. What follows is reference: what each file means, and how to
 write it by hand.
 
 ```sh
@@ -245,9 +245,9 @@ jobs:
       # `warden init` renders into every generated gate (warden/enroll.py's
       # `render_toolchain_step`), with two things read off this page instead:
       # the pair list, and the setup actions the message names — the generated
-      # one says setup-go and setup-node because it is rendered for a Go or
-      # Node enrollment. `examples/hello-svc` adapts those same two and
-      # nothing else.
+      # one names setup-go, setup-node, setup-java and setup-gradle because it
+      # is rendered for a Go, Node or Java enrollment. `examples/hello-svc`
+      # adapts those same two and nothing else.
       # This page's copy is PINNED: a test makes the two substitutions and
       # asserts what is left is byte-identical to the render, so editing
       # either end alone goes red rather than drifting quietly. The example's

@@ -1006,7 +1006,12 @@ jobs:
       # shows the commands a reader would type.
       - name: the README's Try it block, byte for byte
         run: bash scripts/readme-try-it.sh
-      - name: fresh Python, Node and Go repositories reach Level 3 through the README's Try it
+      # This job installs no JDK or Maven: init, certify and declare check
+      # start no JVM. The ubuntu-latest image carries both anyway, so nothing
+      # here would go red if one of them began to. The Java fixture's own
+      # build and JUnit test run in the `tests` job, which installs both
+      # (tests/test_init_proof.py).
+      - name: fresh Python, Node, Go and Java repositories reach Level 3 through the README's Try it
         run: bash scripts/init-proof.sh "$RUNNER_TEMP/fresh"
       - name: actionlint, pinned by checksum, passes every workflow init wrote
         env:
@@ -1023,13 +1028,15 @@ jobs:
           command -v shellcheck || { echo "no shellcheck on the runner, so actionlint would not check the run scripts"; exit 1; }
           ./actionlint -version
           ./actionlint fresh/python/.github/workflows/warden.yml \
-            fresh/node/.github/workflows/warden.yml fresh/go/.github/workflows/warden.yml
+            fresh/node/.github/workflows/warden.yml fresh/go/.github/workflows/warden.yml \
+            fresh/java/.github/workflows/warden.yml
       - name: every output and artifact the generated gate reads comes from a job it needs
         run: |
           uv run --locked python scripts/workflow-graph-check.py \
             "$RUNNER_TEMP/fresh/python/.github/workflows/warden.yml" \
             "$RUNNER_TEMP/fresh/node/.github/workflows/warden.yml" \
-            "$RUNNER_TEMP/fresh/go/.github/workflows/warden.yml"
+            "$RUNNER_TEMP/fresh/go/.github/workflows/warden.yml" \
+            "$RUNNER_TEMP/fresh/java/.github/workflows/warden.yml"
 
   # A fresh clone has no tracker: the Dolt database under .beads/ is
   # gitignored. Its history is published on the git remote as refs/dolt/data,

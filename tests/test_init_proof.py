@@ -2,7 +2,7 @@
 for a live run of the workflow init writes.
 
 `scripts/init-proof.sh` runs the README's Try it commands, read from the README,
-on fresh Python, Node and Go repositories with whichever warden is on PATH; the
+on fresh Python, Node, Go and Java repositories with whichever warden is on PATH; the
 `init-proof` CI job puts the PR's wheel there, and `scripts/init-proof-isolation.sh`
 first checks that warden is the uv tool's and that git cannot reach the platform.
 `scripts/workflow-graph-check.py` follows the values the generated gate hands
@@ -17,9 +17,11 @@ import os
 import re
 import subprocess
 import sys
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 import pytest
+import toolchain
 import yaml
 from conftest import _AMBIENT_GIT_CONFIG, why_a_ci_job_might_not_run
 
@@ -208,15 +210,53 @@ def test_readme_try_it_script_exits_1_printing_nothing_without_a_closed_block(te
 
 # ── scripts/init-proof.sh ───────────────────────────────────────────────────
 
-def test_init_proof_takes_fresh_python_node_and_go_repos_to_level_3(tmp_path):
-    result = _proof(tmp_path / "fresh")
+def _langs() -> list[str]:
+    """Every language `warden init` enrolls, read from enroll.LANGUAGES, so a
+    language added there is one the proof and its CI job must cover."""
+    return [lang.name for lang in enroll.LANGUAGES]
+
+
+@pytest.fixture(scope="module")
+def fresh(tmp_path_factory) -> tuple[Path, subprocess.CompletedProcess]:
+    """A run of the proof on the real README, shared by the tests that read
+    what it left in WORKDIR: once per process, so once per xdist worker that
+    collects one of them under `-n auto`."""
+    workdir = tmp_path_factory.mktemp("proof") / "fresh"
+    return workdir, _proof(workdir)
+
+
+def test_init_proof_takes_fresh_python_node_go_and_java_repos_to_level_3(fresh):
+    workdir, result = fresh
     assert result.returncode == 0, result.stdout + result.stderr
-    assert (tmp_path / "fresh" / "try-it.txt").read_bytes() == \
+    assert (workdir / "try-it.txt").read_bytes() == \
         _try_it_block((ROOT / "README.md").read_bytes().decode()).encode()
-    for lang in ("python", "node", "go"):
+    for lang in _langs():
         assert f"init proof: {lang}: " in result.stdout, result.stdout
-        assert "certification: LEVEL 3" in (tmp_path / "fresh" / f"{lang}-certify.txt").read_text()
-        assert (tmp_path / "fresh" / lang / enroll.WORKFLOW_PATH).is_file()
+        assert "certification: LEVEL 3" in (workdir / f"{lang}-certify.txt").read_text()
+        assert (workdir / lang / enroll.WORKFLOW_PATH).is_file()
+
+
+def test_the_init_proofs_java_repo_runs_its_junit_test_through_the_scope_init_wrote(fresh):
+    """The proof itself starts no JVM: init, certify and declare check read
+    files. This runs the verify scope init wrote for the Java fixture, as the
+    generated gate's verify job would, so the fixture is shown to compile and
+    its one JUnit 5 test to run and pass, not only to be detected. The JDK
+    and Maven come from the suite jobs' toolchain (#428)."""
+    workdir, result = fresh
+    assert result.returncode == 0, result.stdout + result.stderr
+    repo = workdir / "java"
+    toolchain.require("mvn", "java")
+    env = {**os.environ, **_AMBIENT_GIT_CONFIG,
+           "PATH": f"{VENV_BIN}{os.pathsep}{os.environ['PATH']}"}
+    run = subprocess.run(["warden", "verify", "--scope", "java"], cwd=repo, env=env,
+                         capture_output=True, text=True, timeout=600)
+    assert run.returncode == 0, run.stdout + run.stderr
+    report = repo / "target" / "surefire-reports" / "TEST-demo.DemoTest.xml"
+    suite = ET.parse(report).getroot()
+    assert (suite.get("tests"), suite.get("failures"), suite.get("errors")) == ("1", "0", "0")
+    status = subprocess.run(["git", "status", "--porcelain"], cwd=repo, env=env,
+                            capture_output=True, text=True, timeout=60)
+    assert status.stdout == "", "the build left the enrolled tree dirty: " + status.stdout
 
 
 @pytest.mark.parametrize("block, named", [
@@ -587,7 +627,7 @@ def test_ci_runs_the_init_proof_from_the_built_wheel_with_no_secret():
     assert order == sorted(order), runs
     assert "uv tool dir --bin >> \"$GITHUB_PATH\"" in joined
     assert "command -v shellcheck" in joined
-    for lang in ("python", "node", "go"):
+    for lang in _langs():
         for step in ("actionlint", "workflow-graph-check"):
             text = next(r for r in runs if step in r and "fresh/" in r)
             assert f"fresh/{lang}/{enroll.WORKFLOW_PATH}" in text, (step, lang)
