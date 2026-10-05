@@ -38,9 +38,12 @@ It prints this repo's `.warden/bin/warden` launcher when there is one, else
 init enrolls a consumer with no launcher). A refusal is a stop: report it and
 never substitute another warden. Put the printed word wherever `$WARDEN`
 appears, or start each shell command with `WARDEN=<that word>;` — a variable
-does not survive between tool calls. Each probe below opens with a line that
-stops on an unset `$WARDEN`, which would otherwise fall silently into the
-probe's fallback arm.
+does not survive between tool calls. Each probe fence below opens with the
+line `: "${WARDEN:?is unset; run the resolution step first}"`, which stops on
+an unset `$WARDEN` that would otherwise fall silently into the probe's
+fallback arm. Run that line first, too, before any other step that reads a
+failed command as an older pin: unset, `$WARDEN rules recommend` runs `rules
+recommend`, exits 127 and reads as a subcommand the pin lacks.
 
 ## Procedure
 

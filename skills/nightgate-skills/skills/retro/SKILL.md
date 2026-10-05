@@ -22,10 +22,39 @@ contract): its `## Integrations` hooks name the lenses and rituals this
 project actually runs — the retro audits what exists, and proposes against
 that declared baseline, not an imagined one.
 
+## Which warden — resolve it before any other step
+
+Run this from the repo root before anything else; every command below is
+written `$WARDEN <subcommand>`.
+
+```sh
+if [ -x .warden/bin/warden ]; then echo .warden/bin/warden
+elif ! command -v warden >/dev/null 2>&1; then
+  echo "REFUSED: no .warden/bin/warden in this repo and none on PATH; install the release repo.yaml's platform.pin names" >&2; false
+else
+  pin=$(awk '/^platform:/ {p=1; next} p && /^[^[:space:]#]/ {exit} p && /^[[:space:]]+pin:/ {sub(/^[[:space:]]+pin:[[:space:]]*/, ""); sub(/[[:space:]].*$/, ""); gsub(/["'\'']/, ""); sub(/^v/, ""); print; exit}' repo.yaml 2>/dev/null)
+  have=$(warden --version 2>/dev/null | awk '{sub(/^v/, "", $2); print $2}')
+  if [ -n "$pin" ] && [ "$have" = "$pin" ]; then echo warden
+  else echo "REFUSED: PATH has warden ${have:-of no readable version}, repo.yaml's platform.pin is ${pin:-unreadable}; install the pinned release" >&2; false; fi
+fi
+```
+
+It prints this repo's `.warden/bin/warden` launcher when there is one, else
+`warden` on PATH when its `--version` is `repo.yaml`'s `platform.pin` (warden
+init enrolls a consumer with no launcher). A refusal is a stop: report it and
+never substitute another warden. Put the printed word wherever `$WARDEN`
+appears, or start each shell command with `WARDEN=<that word>;` — a variable
+does not survive between tool calls. Each probe fence below opens with the
+line `: "${WARDEN:?is unset; run the resolution step first}"`, which stops on
+an unset `$WARDEN` that would otherwise fall silently into the probe's
+fallback arm. Run that line first, too, before any other step that reads a
+failed command as an older pin: unset, `$WARDEN rules recommend` runs `rules
+recommend`, exits 127 and reads as a subcommand the pin lacks.
+
 ## 1 · Gather (evidence before opinions)
 
 - `.warden/skills-policy.md` — the declared org surface to audit.
-- `.warden/bin/warden memory ingest`, then `.warden/bin/warden memory stats`.
+- `$WARDEN memory ingest`, then `$WARDEN memory stats`.
   Run the ingest FIRST, every time. `stats` reads the derived, gitignored
   cache (`.warden/memory/findings.jsonl`, R-08), so a fresh clone, a fresh
   worktree, or CI before its ingest step has none — and every precision row,
@@ -51,7 +80,7 @@ that declared baseline, not an imagined one.
   | `CANDIDATE RULES` | **add a rule or lens** — a `PROPOSE RULE` row is a class no rule covers |
   | `SKILL RECURRENCE` | **change a skill** — a `PROPOSE SKILL CHANGE` row is a protocol that keeps producing judged findings |
   | `SKILL-STEP PROVENANCE` | **review or drop a skill step** for a `QUIET` row; a `PROVENANCE ERROR` row is a fix, not a proposal |
-  | `LENSES` | **change the review topology** — outcome per lens and per round is the only committed evidence for scaling review depth, adding a lens or retiring one, and it is what `.warden/bin/warden graph validate`'s standing warnings are argued against |
+  | `LENSES` | **change the review topology** — outcome per lens and per round is the only committed evidence for scaling review depth, adding a lens or retiring one, and it is what `$WARDEN graph validate`'s standing warnings are argued against |
   | `DISPATCHES` | **change a protocol** — a lens's `no-review` share is dispatches that did not review, and a rising one is a protocol proposal, never a precision reading. Read beside LENSES, never joined to it: these rows count ROSTER ENTRIES keyed on the roster's label, LENSES counts FINDINGS keyed on the finding's lens, and the two key spellings do not even line up |
   | `REVIEWER SEATS` | **change the crew composition** — per seat `graph.yaml` declares, the findings it first raised, their precision floor, and the share no other seat raised in the same round (a seat alone in its round reads 100% by construction, so that share compares only seats that share a round); a seat is not a rule, so nothing here promotes or pauses one, and a seat change is a `graph.yaml` proposal for the founder |
   | `TAGS` | **reconcile the tag vocabulary** (step 3) |
@@ -87,7 +116,7 @@ that declared baseline, not an imagined one.
   need a second attempt", "did repair loops rise after a rule changed".
   A loop count climbing while acceptance holds steady is a warning that
   arrives before the acceptance rate moves.
-- `.warden/bin/warden rules recommend` — the guardrail GAP: applicable catalog entries
+- `$WARDEN rules recommend` — the guardrail GAP: applicable catalog entries
   this repo does not enforce, joined against the corpus and `.warden/rules/`.
   Read the **UNANSWERED: N** headline first — applicable, unenforced, and no
   decision on record. That number is the gap, and reading it does not shrink
@@ -114,7 +143,7 @@ that declared baseline, not an imagined one.
   **Command unavailable → say so and propose nothing from it.** An unread gap is
   reported as unread, exactly like the ledger inputs below — never as "no
   gaps found".
-- `.warden/bin/warden catalog check --online` — the CURRENCY report. It
+- `$WARDEN catalog check --online` — the CURRENCY report. It
   resolves every citation, then reports CURRENT / SUPERSEDED per dated source
   by probing where the NEXT edition would live. A `SUPERSEDED` line means a
   newer edition of a cited source (CWE Top 25, OWASP Top 10) appears to
@@ -126,7 +155,7 @@ that declared baseline, not an imagined one.
   from it, exactly like the guardrail gap above.
 - `bd list` — bug-type issues created since the last retro; note which
   touch code that passed review (escape suspects).
-- `.warden/bin/warden graph validate` — standing warnings (single-verifier, unwired
+- `$WARDEN graph validate` — standing warnings (single-verifier, unwired
   memory) are topology inputs.
 - The last retro's proposals — what was accepted, what did it change?
 
@@ -142,7 +171,7 @@ suspect: find the causing PR, confirm the defect was visible in that diff
   have caught it.
 Never blame-hunt: escapes are corpus food, not performance reviews.
 
-`.warden/bin/warden mine` reads the GitHub side of this (merged PRs, comments, check
+`$WARDEN mine` reads the GitHub side of this (merged PRs, comments, check
 runs) only with a token: export `GH_TOKEN=$(gh auth token)` (or
 `GITHUB_TOKEN`) first. Without one, mine is honest — it lists those classes
 under NOT READ — but three of the retro's recall inputs are then never
@@ -221,7 +250,7 @@ as clean.
   moment either lands. A covers-retrofit proposed on its own reproduces the
   incident this warning is about.
   **Backtest it first: a rule proposal without its history
-  numbers does not ship.** Run `.warden/bin/warden rules recommend --backtest` and carry
+  numbers does not ship.** Run `$WARDEN rules recommend --backtest` and carry
   the row's `backtest:` line into the proposal — flagged / true-positive /
   projected-false-positive over the stated window. The projected-FP is a
   revert-COINCIDENCE ESTIMATE, not a bound: true-positive counts a flagged
@@ -240,7 +269,7 @@ as clean.
   is `nightgate-skills:rule-advisor`'s job, the on-demand skill that works from
   full PR history plus prior art. Hand an accepted rule proposal to it rather
   than hand-writing the file here; the two overlap only on `rules recommend`.
-- **Answer a guardrail row** — from `.warden/bin/warden rules recommend`, and there are
+- **Answer a guardrail row** — from `$WARDEN rules recommend`, and there are
   TWO ways to answer one, both legitimate. Adopting the entry is the first.
   Recording a verdict in `.warden/catalog-answers.yaml` is the second: a
   class that genuinely cannot occur here, or one deferred behind a tracked
@@ -294,7 +323,7 @@ as clean.
   `VOCABULARY UNREADABLE` (the whole `tags.yaml`, so whether a ceiling is
   declared cannot be known), `DECLARATION BLOCK UNREADABLE` (the `tags:` or
   `aliases:` block), `RECEIPTS UNREADABLE` (the `left_undeclared:` block).
-  `.warden/bin/warden memory stats` is the authority for which of those exist, never this
+  `$WARDEN memory stats` is the authority for which of those exist, never this
   list.
   **A MISSING ceiling reading has two causes, and you cannot tell them apart
   from the report.** No `drift ceiling: N of M` line and no `CEILING BREACHED`

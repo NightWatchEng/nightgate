@@ -1118,7 +1118,7 @@ def _gather_stats_bullet() -> str:
     """The `memory stats` bullet of step 1, flattened — not the whole file,
     for the reason `_reconcile_bullet` gives."""
     gather = _retro_section("## 1 · Gather")
-    start = gather.index("- `.warden/bin/warden memory ingest`")
+    start = gather.index("- `$WARDEN memory ingest`")
     rest = gather[start:]
     end = rest.index("\n- ", 1)
     return _flat(rest[:end])
@@ -1491,7 +1491,7 @@ def test_the_section_enumeration_proof_fires_and_stays_silent():
     assert not _unnamed_sections(" ".join(headers))
 
     bullet = _gather_stats_bullet()
-    assert bullet.startswith("- `.warden/bin/warden memory ingest`")
+    assert bullet.startswith("- `$WARDEN memory ingest`")
     assert len(bullet) < len(_flat(RETRO.read_text())) / 4, (
         "the bullet slice is most of the file, so scoping bought nothing")
 
@@ -1566,7 +1566,7 @@ def test_the_retro_names_every_audit_line_stats_can_print():
 
     bullet = _reconcile_bullet()
     for phrase, why in (
-        ("`.warden/bin/warden memory stats` is the authority",
+        ("`$WARDEN memory stats` is the authority",
          "the enumeration must name the authority for which lines exist "
          "rather than stand as the list itself, or it rots again on the "
          "next line added"),
@@ -1993,8 +1993,7 @@ def test_every_warden_invocation_in_the_pack_is_spelled_from_the_resolved_warden
 
     One spelling, pack-wide, guarded here: every fenced invocation and every
     inline-code invocation in skills/**/SKILL.md names `$WARDEN`, which
-    each skill's first step resolves (agentops-hy6o.32), or — in a skill
-    `UNRESOLVED` still lists — the launcher.
+    each skill's first step resolves (agentops-hy6o.32, agentops-hy6o.32.1).
     Prose ("a pinned warden older than...") is the tool's name, not a
     command, and is not scanned.
     """
@@ -2023,10 +2022,10 @@ def test_every_warden_invocation_in_the_pack_is_spelled_from_the_resolved_warden
 
 LAUNCHER = ".warden/bin/warden"
 RESOLVE_HEADING = "## Which warden — resolve it before any other step"
-# Skills still calling the launcher outright, converted by agentops-hy6o.32.1
-# (the Small-PR contract's 400-line cap split the item); empty when it lands.
-UNRESOLVED = {"autonomous-run", "deliver", "intake", "orchestrate", "retro",
-              "rule-advisor"}
+# Skills still calling the launcher outright. Empty since agentops-hy6o.32.1
+# converted the last six; a skill added with the launcher spelled outright
+# fails the test below until it carries the resolution step.
+UNRESOLVED: set[str] = set()
 
 
 def _resolve_section(text: str) -> str:
@@ -2199,8 +2198,8 @@ _PROBE_FENCE = re.compile(
 # probe with `--help >/dev/null 2>&1` must be listed here, so a fourth probing
 # skill — or a deleted row — is red, not silently unread.
 PROBED_SKILLS = {
-    "deliver": (".warden/bin/warden round classify", ".warden/bin/warden ship"),
-    "orchestrate": (".warden/bin/warden progress", ".warden/bin/warden ship"),
+    "deliver": ("$WARDEN round classify", "$WARDEN ship"),
+    "orchestrate": ("$WARDEN progress", "$WARDEN ship"),
     "pre-pr-review": ("$WARDEN graph crew", "$WARDEN round", "$WARDEN progress"),
 }
 _PROBE_MARK = "--help >/dev/null 2>&1"

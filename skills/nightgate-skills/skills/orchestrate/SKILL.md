@@ -14,6 +14,35 @@ queue; this is the fan-out. If the harness serves no subagents, do not
 imitate parallelism — degrade, observably, to the sequential queue and say
 so in the report.
 
+## Which warden — resolve it before any other step
+
+Run this from the repo root before anything else; every command below is
+written `$WARDEN <subcommand>`.
+
+```sh
+if [ -x .warden/bin/warden ]; then echo .warden/bin/warden
+elif ! command -v warden >/dev/null 2>&1; then
+  echo "REFUSED: no .warden/bin/warden in this repo and none on PATH; install the release repo.yaml's platform.pin names" >&2; false
+else
+  pin=$(awk '/^platform:/ {p=1; next} p && /^[^[:space:]#]/ {exit} p && /^[[:space:]]+pin:/ {sub(/^[[:space:]]+pin:[[:space:]]*/, ""); sub(/[[:space:]].*$/, ""); gsub(/["'\'']/, ""); sub(/^v/, ""); print; exit}' repo.yaml 2>/dev/null)
+  have=$(warden --version 2>/dev/null | awk '{sub(/^v/, "", $2); print $2}')
+  if [ -n "$pin" ] && [ "$have" = "$pin" ]; then echo warden
+  else echo "REFUSED: PATH has warden ${have:-of no readable version}, repo.yaml's platform.pin is ${pin:-unreadable}; install the pinned release" >&2; false; fi
+fi
+```
+
+It prints this repo's `.warden/bin/warden` launcher when there is one, else
+`warden` on PATH when its `--version` is `repo.yaml`'s `platform.pin` (warden
+init enrolls a consumer with no launcher). A refusal is a stop: report it and
+never substitute another warden. Put the printed word wherever `$WARDEN`
+appears, or start each shell command with `WARDEN=<that word>;` — a variable
+does not survive between tool calls. Each probe fence below opens with the
+line `: "${WARDEN:?is unset; run the resolution step first}"`, which stops on
+an unset `$WARDEN` that would otherwise fall silently into the probe's
+fallback arm. Run that line first, too, before any other step that reads a
+failed command as an older pin: unset, `$WARDEN rules recommend` runs `rules
+recommend`, exits 127 and reads as a subcommand the pin lacks.
+
 ## 0 · The one rule that earns this skill its place
 
 **A builder brief names the skill to invoke. It never restates the
@@ -38,7 +67,7 @@ expected merge order.
 
 ## 2 · Dispatch
 
-First run `.warden/bin/warden skills preflight` — a brief must not name a skill the
+First run `$WARDEN skills preflight` — a brief must not name a skill the
 installed pack no longer serves. The
 default checks a repo-local pack source; on a repo that consumes the pack
 via the plugin marketplace, point `--pack` at the installed plugin
@@ -70,9 +99,9 @@ the brief, that step belongs in `deliver` itself — file the item.
 ## 3 · Collect — the ship-stage checklist, per PR
 
 **Probe both commands before you rely on either**, the same way `deliver`
-probes `.warden/bin/warden ship` and `pre-pr-review` probes `round new`. This pack ships
+probes `$WARDEN ship` and `pre-pr-review` probes `round new`. This pack ships
 from the DEFAULT BRANCH while every consumer repo pins a warden by version or
-SHA, and `.warden/bin/warden progress` and `.warden/bin/warden ship` landed together
+SHA, and `$WARDEN progress` and `$WARDEN ship` landed together
 (#201) — so a pin that predates them has neither, and `argparse`
 exits 2 on `invalid choice` exactly as both commands exit 2 on a state they
 cannot evaluate. Probe the SUBCOMMAND with `--help`; never by running it and
@@ -80,12 +109,13 @@ reading the exit code, which cannot tell "this warden has no such command"
 from "this command refused":
 
 ```
-if .warden/bin/warden progress --help >/dev/null 2>&1; then BOARD=yes; else BOARD=no; fi
-if .warden/bin/warden ship --help     >/dev/null 2>&1; then CHECKS=yes; else CHECKS=no; fi
+: "${WARDEN:?is unset; run the resolution step first}"
+if $WARDEN progress --help >/dev/null 2>&1; then BOARD=yes; else BOARD=no; fi
+if $WARDEN ship --help     >/dev/null 2>&1; then CHECKS=yes; else CHECKS=no; fi
 ```
 
 Each probe BRANCHES, and the two branch separately. That is the same `if ... else ... fi`
-shape `deliver` uses for `.warden/bin/warden ship` and `pre-pr-review` for `round new` —
+shape `deliver` uses for `$WARDEN ship` and `pre-pr-review` for `round new` —
 one house rule, not three.
 
 Where a probe fails, that half degrades to the **hand-run fallback at the end
@@ -95,7 +125,7 @@ you say in the report which halves you ran.
 Read the board before you ask anyone anything:
 
 ```
-.warden/bin/warden progress show
+$WARDEN progress show
 ```
 
 One row per unit — its branch, its head, the head its last boundary applies
@@ -115,7 +145,7 @@ the builder's word:
    inside that unit's worktree:
 
    ```
-   .warden/bin/warden ship --checks-only --base origin/main \
+   $WARDEN ship --checks-only --base origin/main \
      --title "$(gh pr view <branch> --json title --jq .title)"
    ```
 
@@ -127,7 +157,7 @@ the builder's word:
    `.warden/memory/attest/` and verdict-clean (an attestation left sitting in
    the gitignored `.warden/out/` instead reads as success locally and fails
    the gate one push later); the title accepted by
-   `./scripts/commit-lint.sh --header-only`; and `.warden/bin/warden review --base
+   `./scripts/commit-lint.sh --header-only`; and `$WARDEN review --base
    origin/main --no-comment` at exit 0, which is exactly what CI will say.
    Exit 1 is a refusal naming its step; exit 2 is a step that could not be
    evaluated, which is never a pass.
@@ -145,7 +175,7 @@ the builder's word:
 
 2. **PR is open** against the default branch, body carrying the evidence
    chain, and `gh pr view <n> --json mergeable` does not report a conflict.
-   Nothing in check 1 asks either question: `.warden/bin/warden ship` opens a PR and
+   Nothing in check 1 asks either question: `$WARDEN ship` opens a PR and
    never looks at it again, and whether main has moved underneath it since
    is the whole reason §4 exists.
 
@@ -154,7 +184,7 @@ you, following `deliver`'s Ship section) before it is reported. Report
 units as they complete; never batch the report silently.
 
 **The hand-run fallback**, for a pinned warden that failed either probe.
-The checks below depend on nothing newer than `.warden/bin/warden review`, and
+The checks below depend on nothing newer than `$WARDEN review`, and
 they are what collection means on such a pin.
 No board: ask each builder where it is, and say in the report that the age
 signal was unavailable. No `--checks-only`, so per unit, with fresh output:
@@ -165,14 +195,14 @@ signal was unavailable. No `--checks-only`, so per unit, with fresh output:
 2. **Title lints**: the PR's title passes
    `./scripts/commit-lint.sh --header-only` — on this pin it is the ONLY
    place the title is linted before CI sees the squash headline.
-3. **Gate parity**: `.warden/bin/warden review --base origin/main --no-comment` exited 0
+3. **Gate parity**: `$WARDEN review --base origin/main --no-comment` exited 0
    on the branch.
 4. Check 2 above — PR open, and `--json mergeable` reporting no conflict —
    is the same on every pin and is not part of the fallback.
 
 What the fallback does NOT give you is check 1's first step: nothing here
 asks whether a verify artifact names the head being shipped, which is the
-failure `.warden/bin/warden ship` exists to refuse. Say so when you report a unit
+failure `$WARDEN ship` exists to refuse. Say so when you report a unit
 collected this way.
 
 ## 4 · Reconcile as PRs land
@@ -220,7 +250,7 @@ Earned steps and the incidents behind them. `as_of` is
 the last date this protocol was checked against the system it describes.
 The `assumes:` block declares this skill's harness assumptions:
 the siblings it invokes by name must resolve in the
-installed pack (`.warden/bin/warden skills preflight` checks this), and it needs
+installed pack (`$WARDEN skills preflight` checks this), and it needs
 subagents — degrading as the Boundaries state when the harness has none.
 
 ```yaml
@@ -231,9 +261,9 @@ assumes:
 steps:
   - step: "a builder brief names the skill to invoke; it never restates the protocol's steps"
     evidence: commit:f06bd818
-  - step: "collection re-verifies the ship tail with fresh output rather than trusting the builder's word: `.warden/bin/warden ship --checks-only` at the unit's current head (verify naming that head, tip attestations clean, title lint, gate parity), plus the PR-open-and-mergeable check no command covers"
+  - step: "collection re-verifies the ship tail with fresh output rather than trusting the builder's word: `$WARDEN ship --checks-only` at the unit's current head (verify naming that head, tip attestations clean, title lint, gate parity), plus the PR-open-and-mergeable check no command covers"
     evidence: commit:f06bd818
-  - step: "read `.warden/bin/warden progress show` before asking a builder anything, and before running checks-only, whose gate-parity step records a `parity-run` boundary that refreshes the age column"
+  - step: "read `$WARDEN progress show` before asking a builder anything, and before running checks-only, whose gate-parity step records a `parity-run` boundary that refreshes the age column"
     evidence: commit:1a4959a1
   - step: "both commands are probed with `--help` before collection leans on them, each probe BRANCHES (a bare probe line discards the diagnostic and leaves failure byte-identical to success), and a failed probe degrades to the four pin-agnostic hand-run checks rather than to nothing — the pack ships from the default branch and no consumer pin carries either command yet"
     evidence: commit:c9abf277

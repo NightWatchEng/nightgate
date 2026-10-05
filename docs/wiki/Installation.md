@@ -129,9 +129,14 @@ Repositories enrolled before `warden init` committed a launcher at
 `.warden/bin/warden` that ran the platform at a commit SHA (`PIN_SHA`) over
 ssh, bumped together with `platform.pin`. The workflow `warden init` writes
 does not use it. To migrate, replace the CI job that calls the shim with that
-workflow and drop `PIN_SHA`. The skill pack still calls `.warden/bin/warden`,
-so a repository that runs the skills keeps that path as a launcher for the
-warden from section 1:
+workflow and drop `PIN_SHA`. Every skill in the pack resolves warden in its
+first step: it runs `.warden/bin/warden` when the repository has one, else
+`warden` on PATH when its `--version` is `platform.pin`, and refuses
+otherwise. So outside the cage the shim can go once section 1's warden is on
+PATH. A repository that runs the cage (section 4) keeps the path: the caged
+session's permission profile admits warden only as `.warden/bin/warden`, so
+with no launcher every warden call in an unattended run is denied. Keep it as
+a launcher for the warden from section 1:
 
 ```sh
 #!/bin/sh

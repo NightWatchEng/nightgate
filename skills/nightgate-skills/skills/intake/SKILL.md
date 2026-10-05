@@ -11,9 +11,38 @@ execute them without asking a follow-up question.
 
 You write no code here. The output is items and an order.
 
+## Which warden — resolve it before any other step
+
+Run this from the repo root before anything else; every command below is
+written `$WARDEN <subcommand>`.
+
+```sh
+if [ -x .warden/bin/warden ]; then echo .warden/bin/warden
+elif ! command -v warden >/dev/null 2>&1; then
+  echo "REFUSED: no .warden/bin/warden in this repo and none on PATH; install the release repo.yaml's platform.pin names" >&2; false
+else
+  pin=$(awk '/^platform:/ {p=1; next} p && /^[^[:space:]#]/ {exit} p && /^[[:space:]]+pin:/ {sub(/^[[:space:]]+pin:[[:space:]]*/, ""); sub(/[[:space:]].*$/, ""); gsub(/["'\'']/, ""); sub(/^v/, ""); print; exit}' repo.yaml 2>/dev/null)
+  have=$(warden --version 2>/dev/null | awk '{sub(/^v/, "", $2); print $2}')
+  if [ -n "$pin" ] && [ "$have" = "$pin" ]; then echo warden
+  else echo "REFUSED: PATH has warden ${have:-of no readable version}, repo.yaml's platform.pin is ${pin:-unreadable}; install the pinned release" >&2; false; fi
+fi
+```
+
+It prints this repo's `.warden/bin/warden` launcher when there is one, else
+`warden` on PATH when its `--version` is `repo.yaml`'s `platform.pin` (warden
+init enrolls a consumer with no launcher). A refusal is a stop: report it and
+never substitute another warden. Put the printed word wherever `$WARDEN`
+appears, or start each shell command with `WARDEN=<that word>;` — a variable
+does not survive between tool calls. Each probe fence below opens with the
+line `: "${WARDEN:?is unset; run the resolution step first}"`, which stops on
+an unset `$WARDEN` that would otherwise fall silently into the probe's
+fallback arm. Run that line first, too, before any other step that reads a
+failed command as an older pin: unset, `$WARDEN rules recommend` runs `rules
+recommend`, exits 127 and reads as a subcommand the pin lacks.
+
 ## 1 · Understand before decomposing
 
-Read the repo first, not the requester's mind: `.warden/bin/warden explain` for
+Read the repo first, not the requester's mind: `$WARDEN explain` for
 components and risk tiers, `.warden/skills-policy.md` for how work is
 verified and shipped, and the existing tracker for items that already cover
 part of this.

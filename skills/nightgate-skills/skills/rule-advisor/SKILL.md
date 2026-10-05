@@ -17,6 +17,35 @@ Project specifics come from `.warden/skills-policy.md` (the policy contract).
 Missing file or missing section → stop and report; never guess a project's
 policy.
 
+## Which warden — resolve it before any other step
+
+Run this from the repo root before anything else; every command below is
+written `$WARDEN <subcommand>`.
+
+```sh
+if [ -x .warden/bin/warden ]; then echo .warden/bin/warden
+elif ! command -v warden >/dev/null 2>&1; then
+  echo "REFUSED: no .warden/bin/warden in this repo and none on PATH; install the release repo.yaml's platform.pin names" >&2; false
+else
+  pin=$(awk '/^platform:/ {p=1; next} p && /^[^[:space:]#]/ {exit} p && /^[[:space:]]+pin:/ {sub(/^[[:space:]]+pin:[[:space:]]*/, ""); sub(/[[:space:]].*$/, ""); gsub(/["'\'']/, ""); sub(/^v/, ""); print; exit}' repo.yaml 2>/dev/null)
+  have=$(warden --version 2>/dev/null | awk '{sub(/^v/, "", $2); print $2}')
+  if [ -n "$pin" ] && [ "$have" = "$pin" ]; then echo warden
+  else echo "REFUSED: PATH has warden ${have:-of no readable version}, repo.yaml's platform.pin is ${pin:-unreadable}; install the pinned release" >&2; false; fi
+fi
+```
+
+It prints this repo's `.warden/bin/warden` launcher when there is one, else
+`warden` on PATH when its `--version` is `repo.yaml`'s `platform.pin` (warden
+init enrolls a consumer with no launcher). A refusal is a stop: report it and
+never substitute another warden. Put the printed word wherever `$WARDEN`
+appears, or start each shell command with `WARDEN=<that word>;` — a variable
+does not survive between tool calls. Each probe fence below opens with the
+line `: "${WARDEN:?is unset; run the resolution step first}"`, which stops on
+an unset `$WARDEN` that would otherwise fall silently into the probe's
+fallback arm. Run that line first, too, before any other step that reads a
+failed command as an older pin: unset, `$WARDEN rules recommend` runs `rules
+recommend`, exits 127 and reads as a subcommand the pin lacks.
+
 ## How this differs from the retro (say so when they overlap)
 
 The **retro** (`nightgate-skills:retro`) is weekly, works from this repo's own
@@ -28,7 +57,7 @@ wants to propose adopting a guardrail, it hands the class to the advisor.
 
 ## 1 · Mine the history
 
-`.warden/bin/warden mine [--since <date>] [--repo <owner/name>] [--pr-limit N]` — defect
+`$WARDEN mine [--since <date>] [--repo <owner/name>] [--pr-limit N]` — defect
 signals from history that never produced an attestation: reverts and what they
 reverted, fix-after-merge, review comments, CI failures. A class it could not
 read is reported UNREAD, never counted as zero. No git/GH history → say so and
@@ -37,7 +66,7 @@ silent one.
 
 ## 2 · Recommend, backtested
 
-`.warden/bin/warden rules recommend --backtest` — the guardrail GAP (applicable catalog
+`$WARDEN rules recommend --backtest` — the guardrail GAP (applicable catalog
 entries this repo does not enforce) joined against the corpus, and for each
 recommendation the **history backtest**: flagged / true-positive /
 projected-false-positive over the stated window, or an `UNBACKTESTED` marker
@@ -54,7 +83,7 @@ for a rule no regex can replay. Read the rows exactly as the retro's
 
 ## 2b · Audit the rule set you already have — subtract, don't only add
 
-`.warden/bin/warden rules lifecycle [--window N]` — the other half of the audit, and the
+`$WARDEN rules lifecycle [--window N]` — the other half of the audit, and the
 half a recommender-only tool never does. Read three sections, all measured
 over the two windows the report prints (the commit replay and the corpus):
 
@@ -64,7 +93,7 @@ over the two windows the report prints (the commit replay and the corpus):
 - **DEMOTE?** — the corpus argues these down: a rule near-always refuted or
   dismissed-with-reason is actively harmful. Propose demotion out of the
   blocking severities, or a narrowing — never keep it at strength for
-  appearances. This is the CHRONIC read; `.warden/bin/warden autonomy pause` is the acute
+  appearances. This is the CHRONIC read; `$WARDEN autonomy pause` is the acute
   one (a streak of consecutive refuting review rounds) and it cannot see a rule that is
   steadily dismissed without ever streaking.
 - **NARROW?** — fires on most diffs it is selected on: a convention the repo
@@ -123,7 +152,7 @@ version. The artifact's SHAPE depends on the rule:
   regex numbers. Certify re-derives these on every run and drops if they drift.
 - **`action` names an enum this skill deliberately does not retype.** The
   authority is the warden the CONSUMER has pinned, and the way to ask it is
-  `.warden/bin/warden certify --help` plus the S-05 line the run prints; where an action
+  `$WARDEN certify --help` plus the S-05 line the run prints; where an action
   is actually rejected, the failure message interpolates the accepted set
   rather than a hand-written list. Do NOT expect a clean run to recite the
   enum — S-05 names it when it refuses something, so on a passing tree you
@@ -163,10 +192,10 @@ registered is caught HERE, not in production.
 
 Then run the gate on the result — **the whole gate, not two commands**:
 
-- `.warden/bin/warden review --base <main> --no-comment` exits 0 (the deterministic gate);
-- `.warden/bin/warden certify` still reports its current level (E-02 + S-05 hold);
+- `$WARDEN review --base <main> --no-comment` exits 0 (the deterministic gate);
+- `$WARDEN certify` still reports its current level (E-02 + S-05 hold);
 - **and the policy file's `## Verify` commands** — the repo's own test suite
-  and linters. `.warden/bin/warden review` and `certify` do NOT run the repo's tests, and
+  and linters. `$WARDEN review` and `certify` do NOT run the repo's tests, and
   on a self-hosting repo the tests are exactly what catch an unregistered
   covers-bearing rule or a drifted count. A PR that says "the tree passes" on
   review + certify alone is overclaiming; run Verify and say what actually ran.
@@ -179,7 +208,7 @@ rejected draft with the failure, never forced onto a green-looking PR.
 `gh pr create --base main`, idempotent. The body carries, PER RULE: the
 proposal's basis (evidence vs prior art), the backtest numbers (or the
 `UNBACKTESTED` reason), the rule file, and the evidence the tree still passes —
-naming what actually ran (`.warden/bin/warden review`, `.warden/bin/warden certify`, AND the policy's
+naming what actually ran (`$WARDEN review`, `$WARDEN certify`, AND the policy's
 `## Verify` suite), not an unqualified "passes". A suggested review order.
 **Never merges.**
 

@@ -21,6 +21,35 @@ say which one you took.
 Project specifics come from `.warden/skills-policy.md`. Missing file or
 missing section → stop and report; never guess a project's policy.
 
+## Which warden — resolve it before any other step
+
+Run this from the repo root before anything else; every command below is
+written `$WARDEN <subcommand>`.
+
+```sh
+if [ -x .warden/bin/warden ]; then echo .warden/bin/warden
+elif ! command -v warden >/dev/null 2>&1; then
+  echo "REFUSED: no .warden/bin/warden in this repo and none on PATH; install the release repo.yaml's platform.pin names" >&2; false
+else
+  pin=$(awk '/^platform:/ {p=1; next} p && /^[^[:space:]#]/ {exit} p && /^[[:space:]]+pin:/ {sub(/^[[:space:]]+pin:[[:space:]]*/, ""); sub(/[[:space:]].*$/, ""); gsub(/["'\'']/, ""); sub(/^v/, ""); print; exit}' repo.yaml 2>/dev/null)
+  have=$(warden --version 2>/dev/null | awk '{sub(/^v/, "", $2); print $2}')
+  if [ -n "$pin" ] && [ "$have" = "$pin" ]; then echo warden
+  else echo "REFUSED: PATH has warden ${have:-of no readable version}, repo.yaml's platform.pin is ${pin:-unreadable}; install the pinned release" >&2; false; fi
+fi
+```
+
+It prints this repo's `.warden/bin/warden` launcher when there is one, else
+`warden` on PATH when its `--version` is `repo.yaml`'s `platform.pin` (warden
+init enrolls a consumer with no launcher). A refusal is a stop: report it and
+never substitute another warden. Put the printed word wherever `$WARDEN`
+appears, or start each shell command with `WARDEN=<that word>;` — a variable
+does not survive between tool calls. Each probe fence below opens with the
+line `: "${WARDEN:?is unset; run the resolution step first}"`, which stops on
+an unset `$WARDEN` that would otherwise fall silently into the probe's
+fallback arm. Run that line first, too, before any other step that reads a
+failed command as an older pin: unset, `$WARDEN rules recommend` runs `rules
+recommend`, exits 127 and reads as a subcommand the pin lacks.
+
 ## Without a tracker — `--no-tracker`
 
 By default the item lives in the repo's tracker (beads, `bd`): Select reads
@@ -45,7 +74,7 @@ every gate and every review round. Only where the item is recorded moves:
   `(no-bead: no tracker)` — and the body carries a `Task:` line quoting the
   prompt's task verbatim. The PR body opens with the same quotation where it
   would name the item id. `--bead` is optional on
-  `.warden/bin/warden decide record` and `.warden/bin/warden attest write`;
+  `$WARDEN decide record` and `$WARDEN attest write`;
   leave it off.
 - **Follow-ups**: wherever this page or `pre-pr-review` says to file a
   tracked item or tracker issue (a parked finding, a finding from an
@@ -68,12 +97,12 @@ stays tracker-bound.
 
 ## 0 · Orient
 
-1. `.warden/bin/warden explain` — components, risk tiers, which rules fire.
+1. `$WARDEN explain` — components, risk tiers, which rules fire.
 2. Read `.warden/skills-policy.md` in full, and the repair budget from
    `repo.yaml`'s `repair.budget`.
 3. If `graph.yaml` exists, read it: it declares which node you are, which
    judges are independent, which roles review each round
-   (`.warden/bin/warden graph crew --round N`), and your failure policy. The
+   (`$WARDEN graph crew --round N`), and your failure policy. The
    declared topology beats this skill's defaults; say so in the attestation
    when they differ.
 4. Confirm a clean tree on a branch that is not `main`. Dirty tree or wrong
@@ -95,10 +124,11 @@ Claim it (`bd update <id> --claim`).
 ## 2 · Plan
 
 ```
-if .warden/bin/warden plan --help 2>&1 | grep -q -- '--path'; then
-  .warden/bin/warden plan --task "<the item's intent>" [--area <area>] [--path <file>]...
+: "${WARDEN:?is unset; run the resolution step first}"
+if $WARDEN plan --help 2>&1 | grep -q -- '--path'; then
+  $WARDEN plan --task "<the item's intent>" [--area <area>] [--path <file>]...
 else
-  .warden/bin/warden plan --task "<the item's intent>" [--area <area>]
+  $WARDEN plan --task "<the item's intent>" [--area <area>]
 fi
 ```
 
@@ -128,11 +158,11 @@ tiering logic). A **HIGH**-tier change does not reach Build without a
 **decision record**: the front-half artifact that says what you are about to
 do and why, *before* the code exists to argue about.
 
-Record it with `.warden/bin/warden decide record --input <file> [--bead <id>]`, where
+Record it with `$WARDEN decide record --input <file> [--bead <id>]`, where
 `<file>` is a JSON object carrying the ruling (`decided`), the reasoning a
 reviewer can disagree with (`why`), what it costs if wrong (`cost_if_wrong`),
 the alternatives weighed (`alternatives`), the scope it governs (`scope`).
-Then `.warden/bin/warden memory ingest` writes the decision shard under
+Then `$WARDEN memory ingest` writes the decision shard under
 `.warden/memory/decide/`, and **`git add` it into the branch and commit it** —
 `ingest` writes the shard, committing it is yours, exactly as the attestation
 shard is `git add`ed in Verify. That shard is committed EVIDENCE on the same
@@ -157,7 +187,7 @@ and the commit. Honor its verdict.
 
 No hook → build directly: implement with tests per the repo's Definition of
 Done, commit in the repo's convention. The count an `Evidence:` line cites
-("N tests passed") is read off `.warden/bin/warden verify`'s summary line,
+("N tests passed") is read off `$WARDEN verify`'s summary line,
 which states `PASS — pytest: N passed, M skipped, K failed` for each scope
 whose runner is pytest — never out of a gitignored artifact, and never
 from memory. A line that prints no counts (a pinned warden that predates
@@ -170,7 +200,7 @@ contract": how many rounds review runs, what the repair budget counts, what
 each round may file, and the closure round past the cap. This page carries
 the commands that contract runs under, and the parking and wording defaults
 below, which any repo follows. Round one is the crew
-`.warden/bin/warden graph crew --round 1` prints: `pre-pr-review` dispatches
+`$WARDEN graph crew --round 1` prints: `pre-pr-review` dispatches
 exactly those roles, in that order, carrying that command's `lenses` as
 checklists inside the dispatch the graph feeds the diff; a second round's
 crew is whatever `--round 2` prints.
@@ -178,10 +208,10 @@ Repair runs in **rounds**, capped at 2 — a repo may set a lower cap,
 never a higher one — so there is no third round. The budget is
 `repo.yaml`'s typed `repair.budget` key (a whole number from 1 to 2), never
 a number read out of the policy's prose. A `repo.yaml` with no key: take the
-cap of 2 and say so in the attestation; `.warden/bin/warden certify` R-12
+cap of 2 and say so in the attestation; `$WARDEN certify` R-12
 fails that repo at Level 3.
 The scoped re-review is a round DIRECTORY like any
-other, so mint it with `.warden/bin/warden round new` — `pre-pr-review`'s
+other, so mint it with `$WARDEN round new` — `pre-pr-review`'s
 **Mint every one of them** covers it, and a round nobody minted is invisible
 to `classify`: at or past #191 that is the exit 2 below, and on an
 older pin it is measured silently, which is worse. Whether a round counts,
@@ -189,7 +219,7 @@ and whether the loop has reached a scaffolding stop, is computed, never
 argued from your own diff:
 
 ```
-.warden/bin/warden round classify --findings <attestation payload> --round <dir> [--round <dir>...]
+$WARDEN round classify --findings <attestation payload> --round <dir> [--round <dir>...]
 ```
 
 exits 0 when the loop ends (clean, or scaffolding stop), 1 when the round
@@ -208,7 +238,7 @@ before #191 HAS `classify`, so the probe below passes, and has no
 declared-rounds refusal at all — there an unminted round is measured
 silently. Mint every round because the chain needs it, never because you
 expect to be caught. It reads both ranges from the manifests
-`.warden/bin/warden round new` wrote and the findings from the payload `attest write`
+`$WARDEN round new` wrote and the findings from the payload `attest write`
 consumes; a file in both ranges is repair-written, and a finding with no
 file, or on a file in neither range, is the change's.
 
@@ -220,8 +250,9 @@ exactly as the command exits 2 on a chain it cannot read, so probe the
 SUBCOMMAND with `--help`, never by running it and reading the exit code:
 
 ```
-if .warden/bin/warden round classify --help >/dev/null 2>&1; then
-  .warden/bin/warden round classify --findings <payload> --round <dir> [--round <dir>...]
+: "${WARDEN:?is unset; run the resolution step first}"
+if $WARDEN round classify --help >/dev/null 2>&1; then
+  $WARDEN round classify --findings <payload> --round <dir> [--round <dir>...]
 else
   : # pinned warden predates the classifier — every round counts, as before
 fi
@@ -246,7 +277,7 @@ is a stopping rule, not a method:
   attestation (on this repository the Small-PR contract below narrows which
   findings get a tracked item). A silent discard is forbidden, and parking
   *before* the cap to end a loop early — or calling a round a scaffolding
-  round without `.warden/bin/warden round classify` saying so — is
+  round without `$WARDEN round classify` saying so — is
   pre-judging with a different name.
 - **An open wording finding `classify` does not count** is resolved in the
   SAME round, never held for the cap: in round one, fix it in the repair
@@ -280,8 +311,8 @@ workaround.
    the candidate list. The judging role in the round's declared crew — the
    graph's answer, never this skill's — is the single arbiter. Fix
    confirmed findings in Build's rounds, under the round contract Build
-   points at. Must end `.warden/bin/warden attest write` CLEAN.
-4. **Gate parity**: `.warden/bin/warden review --base origin/main --no-comment` exits 0.
+   points at. Must end `$WARDEN attest write` CLEAN.
+4. **Gate parity**: `$WARDEN review --base origin/main --no-comment` exits 0.
    This is exactly what CI will say.
 
 ## 5 · Ship
@@ -290,21 +321,21 @@ The tail is ONE command. It runs the steps in order, prints what each one
 checked and what it found, and stops at the first step it cannot prove:
 
 ```
-.warden/bin/warden ship --base origin/main --title "<the squash headline>" --body-file <path>
+$WARDEN ship --base origin/main --title "<the squash headline>" --body-file <path>
 ```
 
 Six steps: a verify artifact that names **this** HEAD and passed, under every
 scope the diff requires; every tip attestation in `origin/main..HEAD`
 committed and verdict-clean; the PR title linted by the repo's own
 `scripts/commit-lint.sh` **before the PR exists**; gate parity
-(`.warden/bin/warden review --base origin/main --no-comment`, the command CI runs); the
+(`$WARDEN review --base origin/main --no-comment`, the command CI runs); the
 push, confirmed by asking the REMOTE whether it carries HEAD; and the PR —
 created, or the existing OPEN PR for this branch updated. A refusal stops the
 tail and nothing after it runs. Exit 1 is "a step refused"; exit 2 is "a step
 could not be evaluated", which is never a pass.
 
 - **Step 1 is where a green claim about the wrong commit dies.** Committing
-  the attestation shard MOVES HEAD, so the last `.warden/bin/warden verify` ran on a
+  the attestation shard MOVES HEAD, so the last `$WARDEN verify` ran on a
   commit that is no longer the one you are shipping. Re-run the policy's
   verify scopes on the commit you are about to ship, then ship. An artifact
   naming the pre-shard commit is a refusal, and it is the correct one.
@@ -312,7 +343,7 @@ could not be evaluated", which is never a pass.
   characters for what you write. Over budget → shorten the title; never
   widen the budget.
 - The body `--body-file` points at carries the evidence chain: the item id,
-  `.warden/bin/warden attest show` output, what was built, every finding and its
+  `$WARDEN attest show` output, what was built, every finding and its
   disposition, a suggested review order, and whatever the policy's
   `## Shipping` section adds. It is required to open a PR; `--checks-only`
   runs the four checks and stops, pushing nothing and opening nothing.
@@ -332,8 +363,9 @@ this pack ships from the default branch while each repo pins a warden
 VERSION, and a pin predating #201 has no `ship` subcommand at all.
 
 ```
-if .warden/bin/warden ship --help >/dev/null 2>&1; then
-  .warden/bin/warden ship --base origin/main --title "<title>" --body-file <path>
+: "${WARDEN:?is unset; run the resolution step first}"
+if $WARDEN ship --help >/dev/null 2>&1; then
+  $WARDEN ship --base origin/main --title "<title>" --body-file <path>
 else
   : # fallback below — and say in the report that you ran it
 fi
@@ -431,7 +463,7 @@ steps:
     evidence: shard:20260914T2018550000-c740d097-2d471865
   - step: "the repair budget is read from repo.yaml's typed repair.budget key, never from policy prose; with no key, take the cap and say so"
     evidence: shard:20260915T0252230000-4dbe6b40-2d3779d1
-  - step: "the cap counts change-defect rounds: a round counts when a counting finding (a behaviour finding, or a wording finding that does not rank below every blocking severity) is open on the original diff or above LOW; a scaffolding round ends the loop instead, and `.warden/bin/warden round classify` decides which — never the builder"
+  - step: "the cap counts change-defect rounds: a round counts when a counting finding (a behaviour finding, or a wording finding that does not rank below every blocking severity) is open on the original diff or above LOW; a scaffolding round ends the loop instead, and `$WARDEN round classify` decides which — never the builder"
     evidence: commit:2301beec
   - step: "the review crew runs flat across diff classes by ruling, enforcement-truth never dropped; the depth ruling in force is the one the Nightgate platform policy's `## Review charter` names, and superseded rulings live in their decide shards"
     evidence: commit:2301beec
@@ -443,7 +475,7 @@ steps:
     evidence: commit:3747b2cc
   - step: "no third round runs, but the scoped re-review is a round DIRECTORY minted like any other, and `classify` exits 2 on a payload declaring a round the chain has no directory for"
     evidence: commit:410cd48e
-  - step: "the ship tail is ONE command (`.warden/bin/warden ship`) that refuses per step — verify naming THIS head, tip attestations clean, the title linted BEFORE the PR exists, gate parity, a push the remote confirms, then the PR; hand-run only behind a `--help` probe on a pin predating it"
+  - step: "the ship tail is ONE command (`$WARDEN ship`) that refuses per step — verify naming THIS head, tip attestations clean, the title linted BEFORE the PR exists, gate parity, a push the remote confirms, then the PR; hand-run only behind a `--help` probe on a pin predating it"
     evidence: commit:1a4959a1
   - step: "the small-PR contract binds this repository's own PRs: one item per PR at most 400 changed lines, a tracked item only for a behaviour finding on runtime code, nothing committed after the final attestation, the light round unused and round 2 filing a new record only for a behaviour finding on runtime code"
     evidence: shard:20260927T0434390000-9189ab03-ca6028b6

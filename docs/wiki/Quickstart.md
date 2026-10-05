@@ -178,10 +178,11 @@ quietly slip below the bar it claims.
 ## 6 · Enroll your own repo
 
 `warden init` (top of this page) writes all of it. Its CI job installs the tag
-`platform.pin` names. The skill pack still calls `.warden/bin/warden`, so add
-that launcher before you add the agents ([Installation](Installation.md),
-*Migrating from the pinned shim*). By hand, enrollment is two files plus a CI
-job:
+`platform.pin` names. The skill pack runs that `warden` from PATH, refusing
+one at another release, so put the pinned release on PATH before you add the
+agents; a repo that will run the cage also keeps a `.warden/bin/warden`
+launcher ([Installation](Installation.md), *Migrating from the pinned shim*).
+By hand, enrollment is two files plus a CI job:
 
 | File | What it is |
 |---|---|
