@@ -6,7 +6,7 @@ DIR ends up holding exactly the commit's tree filtered by its publish.yaml (a
 top-level `.git` aside), so a rerun changes nothing. The message loses bead ids
 and `(no-bead: ...)` asides, keeps `(#N)`, ends its header in the `(no-bead:
 private ...)` tag the public commit-lint accepts, trades Evidence paragraphs for
-one line carrying only the test counts, and ends `Source: <sha>`.
+one line carrying only the suite's test counts, and ends `Source: <sha>`.
 Exit 0 exported, 1 refused by the manifest before DIR is touched, 2 anything else.
 """
 
@@ -163,8 +163,30 @@ _PR_SUFFIX = re.compile(r" \(#[0-9]+\)$")  # the forge's, kept last where it wro
 # Evidence prose names beads by their bare short id ("c0e4 mutation-proven"),
 # which no pattern tells from a word, so only the counts cross; the fence needs
 # a top-level `Evidence: ` line on feat/fix, and the receipt stays private.
-_COUNTS = re.compile(r"\b[0-9]+ passed(?:, [0-9]+ skipped)?")
+# The count that crosses is the suite's: the last top-level Evidence paragraph
+# carrying one (a squash body holds one per commit, and the last measured the
+# tree closest to the one exported), and in it the first count that states its
+# skips or follows "suite", and is tied to no test file ("tests/test_x.py 7
+# passed", "52 passed in tests/test_docs.py"). A bare "12 passed" or "284 tests
+# passed" may be one file's or one repair's, so with no suite-shaped count
+# anywhere the line crosses with none rather than a guessed one.
+_COUNTS = re.compile(r"\b([0-9]+) (?:tests )?passed(?:(?:,| /|) ([0-9]+) skipped)?")
+_FILE_AFTER = re.compile(r"\s*(?:\(|in\s|across\s)\s*\S*(?:/|\.py\b)")
 EVIDENCE = "Evidence: {}the full receipt stays with the private Source commit"
+
+
+def suite_count(paragraph: str) -> str | None:
+    """The paragraph's first suite-shaped `N passed[, M skipped]`, normalised."""
+    text = " ".join(paragraph.split())
+    for m in _COUNTS.finditer(text):
+        words = text[:m.start()].split()[-2:] or [""]
+        word = words[-1].rstrip(":")  # "x.py, 4106 passed": the comma closes the file's clause
+        tied = not word.endswith((",", ";")) and ("/" in word or word.endswith(".py"))
+        if tied or _FILE_AFTER.match(text, m.end()):
+            continue
+        if m.group(2) or "suite" in " ".join(words).lower():
+            return f"{m.group(1)} passed" + (f", {m.group(2)} skipped" if m.group(2) else "")
+    return None
 
 
 def scrub_subject(subject: str) -> str:
@@ -183,14 +205,19 @@ def scrub_message(message: str, sha: str) -> str:
     kept, evidence, nested, top = [], [], False, False
     for line in body.split("\n"):  # an Evidence paragraph runs to the next blank line
         nested = line.lstrip().startswith("Evidence:") or (nested and bool(line.strip()))
+        if line.startswith("Evidence:"):
+            evidence.append("")
         top = line.startswith("Evidence:") or (top and bool(line.strip()))
-        (evidence if top else [] if nested else kept).append(line)
+        if top:
+            evidence[-1] += line + "\n"
+        elif not nested:
+            kept.append(line)
     body = re.sub(r"(?m)^[ \t]*[-*]\n", "", scrub_text("\n".join(kept)) + "\n")  # id-only bullets
     body = re.sub(r"\n{3,}", "\n\n", body).strip("\n")
     receipt = ""
     if evidence:  # a top-level paragraph: the one place commit-lint looks
-        counts = _COUNTS.search(" ".join(" ".join(evidence).split()))
-        receipt = EVIDENCE.format(f"{counts.group(0)}; " if counts else "")
+        counts = next(filter(None, map(suite_count, reversed(evidence))), None)
+        receipt = EVIDENCE.format(f"{counts}; " if counts else "")
     parts = (scrub_subject(subject), body, receipt, f"Source: {sha}")
     return "\n\n".join(p for p in parts if p) + "\n"
 

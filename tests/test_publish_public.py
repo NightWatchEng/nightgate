@@ -210,13 +210,105 @@ def test_scrubbed_body_keeps_why_and_drops_bead_ids_and_evidence_prose():
 @pytest.mark.parametrize("evidence, line", [
     ("Evidence: 5051 passed, 1 skipped (warden verify at 0d9af043);\nreview rounds ran",
      "Evidence: 5051 passed, 1 skipped; the full receipt stays with the private Source commit"),
-    ("Evidence: c0e4 mutation-proven per member; 12\npassed",
+    ("Evidence: c0e4 mutation-proven per member; full suite 12\npassed",
      "Evidence: 12 passed; the full receipt stays with the private Source commit"),
     ("Evidence: agentops-ab1.", "Evidence: the full receipt stays with the private Source commit"),
 ])
 def test_evidence_crosses_as_its_counts_and_nothing_else(tmp_path, evidence, line):
     public = publish.scrub_message(f"feat(ci): x (agentops-ab1)\n\nWhy: y\n\n{evidence}\n", "a")
     assert public == f"feat(ci): x (no-bead: private tracker)\n\nWhy: y\n\n{line}\n\nSource: a\n"
+    _public_fence_passes(tmp_path, public)
+
+
+# hy6o.23: the line carries the suite's count, never the first count the prose
+# happens to give, which is often one test file's.
+@pytest.mark.parametrize("evidence, count", [
+    ("Evidence: 52 passed in tests/test_docs.py; full suite 2328 passed, 1 skipped",
+     "2328 passed, 1 skipped"),
+    ("Evidence: tests/test_certify.py 71 passed, full suite 1450 passed; review round ran",
+     "1450 passed"),
+    ("Evidence: 7 passed in test_guard_mutations.py, 0 unpinned; full suite 2328\n"
+     "passed, 1 skipped in 158.91s", "2328 passed, 1 skipped"),
+    ("Evidence: 2332 passed / 1 skipped; ruff F,E9 clean", "2332 passed, 1 skipped"),
+    ("Evidence: 39 tests in tests/test_c.py, 4106 passed 1 skipped", "4106 passed, 1 skipped"),
+    ("Evidence: 3830 tests passed, 1 skipped; review round ran", "3830 passed, 1 skipped"),
+    ("Evidence: 7 passed in tests/test_x.py; full suite 650 tests passed", "650 passed"),
+])
+def test_a_per_file_count_before_the_suite_count_exports_the_suite_count(tmp_path, evidence,
+                                                                          count):
+    public = publish.scrub_message(f"fix(ci): x (agentops-ab1)\n\nWhy: y\n\n{evidence}\n", "a")
+    assert f"\nEvidence: {count}; the full receipt stays with" in public
+    _public_fence_passes(tmp_path, public)
+
+
+@pytest.mark.parametrize("evidence", [
+    "Evidence: tests/test_tag_vocabulary_guards.py 7 passed; review round ran",
+    "Evidence: 99 passed across tests/test_a.py and tests/test_b.py",
+    "Evidence: 22 passed in tests/test_review_round_isolation.py",
+    "Evidence: 137 passed (tests/test_docs.py, tests/test_runnable_docs.py); ruff clean",
+    "Evidence: c0e4 mutation-proven per member; 12\npassed",  # one file's, unnamed
+    "Evidence: 7 tests passed; each case fails against a mutated script",  # 60c3ab53's
+])
+def test_an_evidence_paragraph_with_no_suite_count_exports_no_count(tmp_path, evidence):
+    public = publish.scrub_message(f"fix(ci): x (agentops-ab1)\n\nWhy: y\n\n{evidence}\n", "a")
+    assert "\nEvidence: the full receipt stays with the private Source commit\n" in public
+    _public_fence_passes(tmp_path, public)
+
+
+# 4f8a7cb9 on main, a squash: its first commit's Evidence and its last three
+# verbatim, the bodies between cut. The first count the old line took was 52.
+SQUASH_4F8A7CB9 = """\
+fix(warden): a mutation harness for the guard layer, and the fourteen bugs it closes (agentops-38w) (#196)
+
+Evidence: no behaviour change yet — this commit adds the engine only; the
+registry, the sweep's assertions and the fixes it found follow.
+
+* fix(warden): the denial scan reads markdown as markdown (agentops-a5w, agentops-9am, agentops-ode)
+
+Evidence: 52 passed in tests/test_docs.py; full suite 2328 passed, 1 skipped
+
+* fix(warden): the registry's totality was a property of the box, not the tree (agentops-38w)
+
+Evidence: 2614 passed, 1 skipped; 9 passed in tests/test_guard_mutations.py;
+the regression watched RED before the fix and green after; discovery finds 164
+vocabularies with 0 unclassified and 0 stale; ruff F,E9 clean
+
+* fix(warden): three defects in the CI fix, and a disposition it caught (agentops-38w)
+
+Evidence: 2614 passed, 1 skipped; the function-local leak measured gone; each
+half of the empty-container fix watched RED under its own revert; ruff clean
+
+* docs(warden): the residual, stated to the bound a cross-examiner measured (agentops-38w)
+
+Evidence: probe fixture present vs absent gives ESCAPES = ATTR_CALL, BINOP,
+HELPER_CALL, IFEXP, METHOD, SUBSCRIPT; comment-only, no behaviour change.
+"""
+
+
+def test_the_export_of_squash_4f8a7cb9_states_its_suite_figure(tmp_path):
+    public = publish.scrub_message(SQUASH_4F8A7CB9, "4f8a7cb9")
+    receipts = [line for line in public.split("\n") if line.startswith("Evidence:")]
+    assert receipts == ["Evidence: 2614 passed, 1 skipped; the full receipt stays with the"
+                        " private Source commit"]
+    _public_fence_passes(tmp_path, public)
+
+
+# 236a739a on main (R1): a squash whose last paragraph counted one repair's
+# tests, which "tests passed" does not tell from the suite's 4647.
+SQUASH_236A739A = """\
+fix(warden): x (agentops-ab1) (#307)
+
+Evidence: 4647 tests passed; review round ran
+
+* fix(warden): the repair (agentops-ab1)
+
+Evidence: 284 tests passed; review round ran
+"""
+
+
+def test_a_squash_whose_last_count_is_a_repairs_exports_no_count(tmp_path):
+    public = publish.scrub_message(SQUASH_236A739A, "236a739a")
+    assert "\nEvidence: the full receipt stays with the private Source commit\n" in public
     _public_fence_passes(tmp_path, public)
 
 
