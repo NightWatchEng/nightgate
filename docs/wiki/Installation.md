@@ -24,11 +24,11 @@ is what `uv` uses for a `git+https` source.
 To check that a release tag is published:
 
 ```sh
-git ls-remote --tags https://github.com/NightWatchEng/nightgate v3.0.3
+git ls-remote --tags https://github.com/NightWatchEng/nightgate v3.0.4
 ```
 
-The `ls-remote` line prints one line when `v3.0.3` is published, whether the
-tag is lightweight or annotated: an object id, a tab, and `refs/tags/v3.0.3`.
+The `ls-remote` line prints one line when `v3.0.4` is published, whether the
+tag is lightweight or annotated: an object id, a tab, and `refs/tags/v3.0.4`.
 For an annotated tag the id is the tag object's, not the commit's. No output,
 with exit status 0, means the tag is not published yet. When git cannot
 read the repository, it exits 128 instead. Over https GitHub answers a
@@ -71,13 +71,13 @@ GitHub-only limit*.
 ## 1. The CLI, from a release tag
 
 ```sh
-uv tool install git+https://github.com/NightWatchEng/nightgate@v3.0.3
+uv tool install git+https://github.com/NightWatchEng/nightgate@v3.0.4
 warden --version
 ```
 
 One package, both commands: `warden` and `cage` land on your PATH, and there is
 no clone of the platform. `warden --version` prints the tag's version, here
-`warden 3.0.3`. If the install cannot find `v3.0.3`, run the `ls-remote` check
+`warden 3.0.4`. If the install cannot find `v3.0.4`, run the `ls-remote` check
 under *Reading the platform repository*: no output means the release tag is not published
 yet.
 
@@ -87,7 +87,7 @@ tag must then be deleted and re-cut.
 
 That version is not only a banner. Every command compares `repo.yaml`'s
 `platform.pin` against it and fails closed on a mismatch, so a repo pinned to
-`v3.0.3` runs under this install and refuses any other.
+`v3.0.4` runs under this install and refuses any other.
 
 `platform.pin` is the one version an enrolled repository declares. The
 workflow `warden init` writes reads it from `repo.yaml` when it runs and
@@ -124,7 +124,7 @@ request from your repository that carries no committed pre-PR review
 attestation is red, a Dependabot one included, and a fork's is exempt.
 
 A gate `warden init` 3.0.2 or earlier wrote exits 2 at `install` in a public repository or with no `NIGHTGATE_DEPLOY_KEY`,
-and raising `platform.pin` repairs neither: replace the whole workflow file with the one 3.0.3 writes.
+and raising `platform.pin` repairs neither: replace the whole workflow file with the one 3.0.3 or later writes.
 
 **Trust note.** `warden explain`, `warden review` and `warden rules lifecycle` load
 `.warden/checkers/*.py` from the repo they run in, executing that code at the
@@ -192,16 +192,16 @@ cwd only, so a worktree or a headless session cannot see them, while
 user-scope plugin skills resolve everywhere.
 
 ```bash
-claude plugin marketplace add 'https://github.com/NightWatchEng/nightgate#v3.0.3'
+claude plugin marketplace add 'https://github.com/NightWatchEng/nightgate#v3.0.4'
 claude plugin install nightgate-skills@nightgate
 ```
 
-Then check it with `warden skills pin`, which v3.0.3 carries.
+Then check it with `warden skills pin`, which v3.0.4 carries.
 
 Claude Code clones the marketplace with git. The https URL needs no
 credential, except at a pin below v3.0.0, where it uses the `gh auth
 setup-git` helper above; the `NightWatchEng/nightgate` shorthand would clone
-over ssh instead, which needs an ssh key GitHub accepts. The `#v3.0.3` is `platform.pin`:
+over ssh instead, which needs an ssh key GitHub accepts. The `#v3.0.4` is `platform.pin`:
 neither command takes a version flag, but a ref on the URL clones the
 marketplace at that tag and the pack installs from that clone. `warden skills
 pin` refuses (exit 1) a machine whose marketplace ref or installed pack version
@@ -259,17 +259,17 @@ see [The Cage](The-Cage.md) for enrollment.
 ## Upgrading an enrolled repository
 
 This is the order a `platform.pin` bump takes on a repository `warden init`
-enrolled, written for the move to v3.0.3. Read the release's notes first
+enrolled, written for the move to v3.0.4. Read the release's notes first
 ([Releasing](Releasing.md) lists them): they say what changes in `repo.yaml`
 and in the workflow `warden init` writes.
 
 **1. Install the new CLI and the new skill pack, before the bump.**
 
 ```sh
-uv tool install --force git+https://github.com/NightWatchEng/nightgate@v3.0.3
+uv tool install --force git+https://github.com/NightWatchEng/nightgate@v3.0.4
 warden --version
 claude plugin marketplace remove nightgate
-claude plugin marketplace add 'https://github.com/NightWatchEng/nightgate#v3.0.3'
+claude plugin marketplace add 'https://github.com/NightWatchEng/nightgate#v3.0.4'
 claude plugin install nightgate-skills@nightgate
 ```
 
@@ -282,7 +282,7 @@ in it, so start a new session. From here this machine's `warden` refuses a
 repository still pinned at the old tag.
 
 **2. On a branch, move the pin.** Set `repo.yaml`'s `platform.pin` to
-`v3.0.3`, with any key the release notes say the schema now requires. Then
+`v3.0.4`, with any key the release notes say the schema now requires. Then
 `warden skills pin` reads the new pin and exits 0.
 
 **3. Replace the whole workflow file with the one the new release writes.**
@@ -309,7 +309,7 @@ cp "$scratch/.github/workflows/$f" .github/workflows/
 
 The workflow depends only on the directory, the manifests found there (and,
 for a Gradle build, whether `gradlew` is beside them) and the release, so the copied file is byte for byte what a fresh enrollment at
-v3.0.3 writes. Copy the whole file, not a job: a release can change the
+v3.0.4 writes. Copy the whole file, not a job: a release can change the
 header comment and steps outside the `gate` job (v3.0.2 changed the `warden
 verify --scope` steps in the `verify` job and added an `id: warden` to its
 install step). The `diff` shows what the copy discards: re-apply any edit you

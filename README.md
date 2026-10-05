@@ -72,19 +72,19 @@ attest check: PASS — 2 of 3 commit(s) in origin/main..6271425f04f7 carry a com
 ## Install
 
 ```sh
-uv tool install git+https://github.com/NightWatchEng/nightgate@v3.0.3
+uv tool install git+https://github.com/NightWatchEng/nightgate@v3.0.4
 warden --version
 ```
 
-That installs `warden` and `cage`. `warden --version` prints `warden 3.0.3`. If `uv`
-cannot find `v3.0.3`, run `git ls-remote --tags https://github.com/NightWatchEng/nightgate v3.0.3`.
+That installs `warden` and `cage`. `warden --version` prints `warden 3.0.4`. If `uv`
+cannot find `v3.0.4`, run `git ls-remote --tags https://github.com/NightWatchEng/nightgate v3.0.4`.
 It prints one line when the tag is published and nothing when it is not.
 
 The skill pack, which holds `deliver` and `pre-pr-review`, installs into Claude Code as below.
 [Installation](docs/wiki/Installation.md) covers it in full, with [the cage](docs/wiki/The-Cage.md).
 
 ```bash
-claude plugin marketplace add 'https://github.com/NightWatchEng/nightgate#v3.0.3'
+claude plugin marketplace add 'https://github.com/NightWatchEng/nightgate#v3.0.4'
 claude plugin install nightgate-skills@nightgate
 ```
 
@@ -93,7 +93,7 @@ claude plugin install nightgate-skills@nightgate
 From the root of your own Python, Node, Go or Java git repository:
 
 ```sh
-uv tool install git+https://github.com/NightWatchEng/nightgate@v3.0.3
+uv tool install git+https://github.com/NightWatchEng/nightgate@v3.0.4
 warden init
 warden certify --level 3
 ```

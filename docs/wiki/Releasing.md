@@ -5,7 +5,9 @@ A release is a tag on `main` whose name is
 `platform.pin` names one, and every `warden` command compares that pin
 against the running version and fails closed on a mismatch
 (`warden/config.py` `enforce_platform_pin`). A builder prepares the release PR;
-the founder merges it and pushes the tag. What v3.0.3 carries is in
+the founder merges it and pushes the tag. What v3.0.4 carries is in
+[release-notes-v3.0.4](../design/release-notes-v3.0.4.md), a patch release;
+v3.0.3's is
 [release-notes-v3.0.3](../design/release-notes-v3.0.3.md), a patch release;
 v3.0.2's is
 [release-notes-v3.0.2](../design/release-notes-v3.0.2.md), a patch release;

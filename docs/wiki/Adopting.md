@@ -70,7 +70,7 @@ repo: hello-svc
 # must agree or warden fails closed. Bumped together with the platform's own
 # version at release time (see the tagged GitHub release's notes).
 platform:
-  pin: v3.0.3
+  pin: v3.0.4
 
 components:
   app:   {path: hello_svc/, lang: python, description: "stdlib HTTP JSON service (/health, /greet)"}
