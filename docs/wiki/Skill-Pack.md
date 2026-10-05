@@ -92,9 +92,9 @@ unattended worktrees could not see shared skills at all. User-scope plugin
 skills resolve everywhere — any checkout, any worktree, headless `claude -p`
 sessions included.
 
-The marketplace is added at the tag `platform.pin` names (`<url>#v3.0.1`),
+The marketplace is added at the tag `platform.pin` names (`<url>#v3.0.2`),
 so the pack a machine serves is the pin's and `claude plugin marketplace
-update nightgate` does not move it. `warden skills pin`, which v3.0.1 carries,
+update nightgate` does not move it. `warden skills pin`, which v3.0.2 carries,
 refuses a machine whose marketplace ref or installed pack version disagrees
 with `repo.yaml` ([Installation](Installation.md) section 3). A
 pin bump re-adds the marketplace at the new tag ([Installation](Installation.md)

@@ -23,11 +23,11 @@ For the CLI:
 ```sh
 gh auth login
 gh auth setup-git
-git ls-remote --tags https://github.com/NightWatchEng/nightgate v3.0.1
+git ls-remote --tags https://github.com/NightWatchEng/nightgate v3.0.2
 ```
 
-The `ls-remote` line prints one line when `v3.0.1` is published, whether the
-tag is lightweight or annotated: an object id, a tab, and `refs/tags/v3.0.1`.
+The `ls-remote` line prints one line when `v3.0.2` is published, whether the
+tag is lightweight or annotated: an object id, a tab, and `refs/tags/v3.0.2`.
 For an annotated tag the id is the tag object's, not the commit's. No output,
 with exit status 0, means the tag is not published yet. Without access, git
 exits 128 instead. Over https it asks `Username for 'https://github.com':`
@@ -67,13 +67,13 @@ GitHub-only limit*.
 ## 1. The CLI, from a release tag
 
 ```sh
-uv tool install git+https://github.com/NightWatchEng/nightgate@v3.0.1
+uv tool install git+https://github.com/NightWatchEng/nightgate@v3.0.2
 warden --version
 ```
 
 One package, both commands: `warden` and `cage` land on your PATH, and there is
 no clone of the platform. `warden --version` prints the tag's version, here
-`warden 3.0.1`. If the install cannot find `v3.0.1`, run the `ls-remote` check
+`warden 3.0.2`. If the install cannot find `v3.0.2`, run the `ls-remote` check
 under *Access comes first*: no output means the release tag is not published
 yet.
 
@@ -83,7 +83,7 @@ tag must then be deleted and re-cut.
 
 That version is not only a banner. Every command compares `repo.yaml`'s
 `platform.pin` against it and fails closed on a mismatch, so a repo pinned to
-`v3.0.1` runs under this install and refuses any other.
+`v3.0.2` runs under this install and refuses any other.
 
 `platform.pin` is the one version an enrolled repository declares. The
 workflow `warden init` writes reads it from `repo.yaml` when it runs and
@@ -110,7 +110,9 @@ A gate `warden init` 3.0.1 or earlier wrote has no `warden attest check` step,
 so certify's E-01 fails in its own CI, and it stops before `warden review`
 when verify failed, so a pull request with failing tests shows no rule
 finding. The repair is the same hand-edit: copy the `gate` job the generator
-now writes over yours, and the `warden verify --scope` steps, which now copy
+now writes over yours, written for the same directory below the git root:
+there the job's name, `warden gate (<dir>)`, is the check your branch rule
+requires, and its working directory and upload path carry the directory, and the `warden verify --scope` steps, which now copy
 the summary naming the failing tests into the step summary. The new step is
 fail-closed: a pull request from your repository that carries no committed
 pre-PR review attestation is red, a Dependabot one included, and a fork's
@@ -177,15 +179,15 @@ cwd only, so a worktree or a headless session cannot see them, while
 user-scope plugin skills resolve everywhere.
 
 ```bash
-claude plugin marketplace add 'https://github.com/NightWatchEng/nightgate#v3.0.1'
+claude plugin marketplace add 'https://github.com/NightWatchEng/nightgate#v3.0.2'
 claude plugin install nightgate-skills@nightgate
 ```
 
-Then check it with `warden skills pin`, which v3.0.1 carries.
+Then check it with `warden skills pin`, which v3.0.2 carries.
 
 Claude Code clones the marketplace with your git credentials, so the https
 URL uses the `gh auth setup-git` helper above; the `NightWatchEng/nightgate`
-shorthand would clone over ssh instead. The `#v3.0.1` is `platform.pin`:
+shorthand would clone over ssh instead. The `#v3.0.2` is `platform.pin`:
 neither command takes a version flag, but a ref on the URL clones the
 marketplace at that tag and the pack installs from that clone. `warden skills
 pin` refuses (exit 1) a machine whose marketplace ref or installed pack version
