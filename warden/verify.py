@@ -625,14 +625,27 @@ def _pytest_clause(results: Sequence[dict],
 # `not ok N - ` (`node --test` off a terminal; a `# TODO`/`# SKIP` line is not
 # a failure), node's spec reporter's `\u2716 name (Nms)` with its duration (a
 # linter's `\u2716 3 problems` has none), pytest's short summary naming a
-# `.py` node id up to its ` - ` message (unittest's `FAILED (failures=2)` and
-# a log's `ERROR connecting` name none), and `go test -v`'s `--- FAIL: `.
+# `.py` node id up to its ` - ` message, and `go test -v`'s `--- FAIL: `.
+# pytest's line is read only inside its short test summary section, so
+# unittest's `FAILED (failures=2)` and a log's `ERROR app.py - failed to
+# connect` printed outside it name none; a node id's `::` parts hold no space,
+# and its bracketed parametrize id is read whole up to the first `]` the
+# message can follow, so `test_a[x - y] - assert 0` keeps its ` - `. Inside the
+# section a line of a test's own message, which `-vv` and `CI=true` print whole
+# at column 0, is still read as an entry when it has an entry's shape.
 _FAILING = (
     re.compile(r"^\s*not ok \d+ - (?!.*#\s*(?:TODO|SKIP)\b)(.+?)\s*$", re.I),
     re.compile(r"^\s*\u2716 (.+?) \(\d+(?:\.\d+)?ms\)$"),
-    re.compile(r"^(?:FAILED|ERROR) (\S+?\.py(?:::.+?)?)(?: - .*)?$"),
+    re.compile(r"^(?:FAILED|ERROR) (\S+?\.py(?:::[^\s\[]+)*(?:\[.*?\])?)(?: - .*)?$"),
     re.compile(r"^\s*--- FAIL: (\S+)"),
 )
+_PYTEST_FAILING = _FAILING[2]
+# The section opens on its own `=` rule and closes only on pytest's closing
+# count line, `=`-ruled or, under `-q`, bare: a line of a multi-line message
+# can begin with `=` too. A text that holds no header at all, such as the
+# 4000-character tail `warden deploy` reads, keeps the pytest lines that carry
+# a `::` node id, which a log line naming a file does not.
+_PYTEST_SHORT_SUMMARY = re.compile(r"^=+ short test summary info =+$")
 _FAILING_SHOWN = 20
 
 
@@ -641,9 +654,22 @@ def failing_tests(output: str) -> list[str]:
     Read off the WHOLE output, so a name the tail window cut away is still
     printed; empty when no line has a shape it knows, and the tail stands."""
     names: list[str] = []
-    for line in _ANSI_SGR.sub("", output).splitlines():
+    lines = _ANSI_SGR.sub("", output).splitlines()
+    headerless = not any(map(_PYTEST_SHORT_SUMMARY.match, lines))
+    in_summary = False
+    for line in lines:
+        if _PYTEST_SHORT_SUMMARY.match(line):
+            in_summary = True
+            continue
+        if in_summary and _PYTEST_SUMMARY.match(line):
+            in_summary = False
         for pattern in _FAILING:
+            if pattern is _PYTEST_FAILING and not in_summary and not headerless:
+                continue
             m = pattern.match(line)
+            if (m and pattern is _PYTEST_FAILING and not in_summary
+                    and "::" not in m.group(1)):
+                continue
             if m and m.group(1) not in names:
                 names.append(m.group(1))
                 break

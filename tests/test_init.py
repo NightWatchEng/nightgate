@@ -4002,5 +4002,65 @@ def test_failing_tests_names_no_test_off_a_line_another_tool_prints():
              "ERROR connecting to db\n")
     assert verify_mod.failing_tests(noise) == []
     assert verify_mod.failing_tests(
+        "=== short test summary info ===\n"
         "FAILED tests/t.py::test_a[a b] - assert 0\nERROR tests/t.py\n") == [
         "tests/t.py::test_a[a b]", "tests/t.py"]
+
+
+def test_failing_tests_reads_a_pytest_id_whole_and_no_log_line_as_a_test():
+    """Round 2 of hy6o.30/.31 found the pytest pattern cutting a parametrize
+    id at its ` - ` and naming `app.py` off a logging line. A pytest name is
+    read only inside the short test summary, and its bracketed id whole."""
+    summary = ("2024-01-01 ERROR app.py - noise\nERROR app.py - failed to connect\n"
+               "FAILED tests/t.py::test_b - printed by a test, not the summary\n"
+               "=========== short test summary info ===========\n"
+               "FAILED tests/t.py::test_a[x - y] - assert a[0] == 1\n"
+               "FAILED tests/t.py::TestK::test_c[] - assert 0\n"
+               "ERROR tests/t_db.py - ImportError: no module named db\n"
+               "========= 2 failed, 1 error in 0.1s =========\n"
+               "ERROR app.py - failed to connect\n")
+    assert verify_mod.failing_tests(summary) == [
+        "tests/t.py::test_a[x - y]", "tests/t.py::TestK::test_c[]", "tests/t_db.py"]
+    assert verify_mod.failing_tests("ERROR app.py - failed to connect\n") == []
+    quiet = ("=== short test summary info ===\nFAILED tests/t.py::test_a - assert 0\n"
+             "1 failed in 0.1s\nERROR app.py - failed to connect\n")
+    assert verify_mod.failing_tests(quiet) == ["tests/t.py::test_a"]
+
+
+def test_failing_tests_reads_a_multiline_pytest_message_without_dropping_names():
+    """Round 1 of hy6o.34 found the summary section closed by a `=` line of a
+    test's own message, which `-vv` and `CI=true` print whole at column 0, so
+    every failing test after it went unnamed. Only the count line closes it."""
+    vv = ("=========== short test summary info ===========\n"
+          "FAILED t.py::test_a_raise - RuntimeError: first\n"
+          "=== rule ===\nmore\n"
+          "FAILED t.py::test_b_later - assert 0\n"
+          "FAILED t.py::test_c_later - assert 0\n"
+          "========= 3 failed in 0.02s =========\n"
+          "FAILED t.py::test_d - printed after the run\n")
+    assert verify_mod.failing_tests(vv) == [
+        "t.py::test_a_raise", "t.py::test_b_later", "t.py::test_c_later"]
+
+
+def test_failing_tests_names_node_ids_off_a_tail_the_summary_header_fell_out_of():
+    """Round 1 of hy6o.34 found `warden deploy`'s summary, which reads only the
+    4000-character output tail, naming no pytest test once the summary's header
+    fell outside that window. With no header in the text a line carrying a
+    `::` node id is still read, and a log line, which carries none, is not."""
+    lines = "".join(f"FAILED tests/t.py::test_{i:03d} - assert {i} == 0, value came back unset\n"
+                    for i in range(100))
+    output = ("=========== short test summary info ===========\n" + lines
+              + "ERROR app.py - failed to connect\n========= 100 failed in 1s =========\n")
+    tail = output[-verify_mod._TAIL_CHARS:]
+    assert "short test summary info" not in tail
+    named = verify_mod.failing_tests(tail)
+    assert named and named[-1] == "tests/t.py::test_099", named
+    assert "app.py" not in named
+    doc = {"scope": "app", "passed": False, "dirty": False, "results": [
+        {"cmd": "pytest", "cwd": ".", "exit_code": 1, "duration_s": 1.0,
+         "output_tail": tail}]}
+    summary = verify_mod.render_summary(doc, which="deploy")
+    assert f"    failing tests ({len(named)}):\n" in summary, summary
+    assert verify_mod.failing_tests(
+        "= short test summary info =\nFAILED tests/t.py::test_a[x - y] - assert 0\n"
+    ) == ["tests/t.py::test_a[x - y]"]
