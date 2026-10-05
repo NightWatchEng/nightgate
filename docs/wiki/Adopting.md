@@ -9,7 +9,7 @@ directory to enroll below it ([Quickstart](Quickstart.md), *Below the git
 root*), it writes step 1 (`repo.yaml`), step 2 (starter rules), the
 `.gitignore` half of step 3, and step 5 (`.warden/skills-policy.md`). It writes
 no shim, the other half of step 3, and sets no branch protection. Its CI
-workflow, which installs the tag `platform.pin` names, is not step 4's job: it
+workflow, which installs the tag `platform.pin` names, is the workflow step 4 writes by hand, plus an install job and a certify step: it
 installs the pinned platform, with no secret unless the pin is a private build,
 in a job that runs no repository code, runs verify in a job with no secret, and runs `warden review`,
 `warden attest check` and `warden certify` in a third, each whether or not
@@ -42,7 +42,7 @@ Four steps get you a gate. Two more get you agents and unattended runs.
 |---|---|---|
 | 1 | `repo.yaml` | the policy: components, risk tiers, verify commands |
 | 2 | `.warden/rules/` | rules that can auto-reject a diff |
-| 3 | the shim + `.gitignore` | one entrypoint, locally and in CI |
+| 3 | the shim + `.gitignore` | one local entrypoint, and generated files kept out of git |
 | 4 | a CI job + branch protection | a gate the merge button enforces |
 | 5 | `.warden/skills-policy.md` | the agent side — six required sections, plus the optional `## Build disciplines` craft layer ([Skills Policy](Skills-Policy.md)) |
 | 6 | `cage.toml` | unattended runs. Note one thing no tool can do for you: dropping `[triggers.schedule]` deletes the plist but cannot unload a job launchd already bootstrapped — run `launchctl bootout gui/$UID/com.<name>.cage` yourself ([The Cage](The-Cage.md)) |
@@ -127,8 +127,9 @@ CI at $0), `python` (a checker module), `claude` (judgment, evaluated pre-PR).
 
 The full contract — frontmatter fields, the `checks:` DSL, per-line exception
 markers, pausing, and the shipped guardrail catalog — is
-[Writing Rules](Writing-Rules.md). To start, copy the four rules from
-`examples/hello-svc/.warden/rules/` and scope their `applies_to` to your source
+[Writing Rules](Writing-Rules.md). To start, copy the rules from
+`examples/hello-svc/.warden/rules/` except `handler-response-contract`, which
+step 4's gate cannot run, and scope their `applies_to` to your source
 directories.
 
 Then find out what you are missing:
@@ -180,23 +181,56 @@ disk. (`diff` writes the file you name with `-o` and nothing else.)
 
 ## 4 · Add the CI job and make it required
 
-PR-only, full history, explicit permissions, evidence uploaded even on failure:
+This workflow is the hand-written form of the one `warden init` emits, for a
+language `init` does not detect or a repository you enroll by hand. Save it
+as `.github/workflows/warden.yml`. It has the emitted gate's split: **verify**
+runs your verify commands, which a pull request controls, and **gate** runs
+`warden review` and the attestation check in a job that executes no code from
+the repository. One job that runs both is a gate the pull request can switch
+off: a verify command could replace the `warden` on `PATH`, or rewrite the
+rules or `.warden/out/`, before review reads them. Each job installs warden
+itself, before its first warden step, from the public platform repository at
+the tag `platform.pin` names, with no secret. It leaves out two things the
+emitted workflow has: the install job, which exists to hold the deploy key a
+pin of a private build needs, and the `warden certify --level 3` step, which
+you add once `warden certify` reports Level 3.
 
 ```yaml
-  gate:
-    name: warden gate
+name: warden
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: warden verify
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
     permissions:
       contents: read
-      pull-requests: write
-      issues: write     # the sticky comment goes through the issues API; an
-      #                   explicit permissions block zeroes unlisted scopes
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
-          fetch-depth: 0   # the gate diffs base...head; a shallow clone has no merge-base
+          persist-credentials: false
       - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7  # v10.2.0
+        with:
+          version: "0.12.1"
+          enable-cache: false   # a cache this job wrote, the gate job would read
+      # The same step in both jobs. --no-config keeps a uv.toml or
+      # pyproject.toml the pull request adds from steering the install.
+      - name: install warden at repo.yaml platform.pin
+        id: warden
+        shell: bash
+        run: |
+          pin="$(awk '/^platform:/ {inside = 1; next} inside && /^[^[:space:]#]/ {inside = 0} inside && $1 == "pin:" {print $2; exit}' repo.yaml | tr -d "\"'\r")" || pin=""
+          if ! printf '%s\n' "$pin" | grep -Eqx 'v?[0-9]+\.[0-9]+\.[0-9]+'; then
+            echo "warden gate: repo.yaml platform.pin is ${pin:-missing}, not a release tag like v1.2.3 written as a block (platform: then an indented pin:); the gate DID NOT RUN." >&2
+            exit 2
+          fi
+          GIT_TERMINAL_PROMPT=0 uv tool install --no-config --no-cache \
+            "git+https://github.com/NightWatchEng/nightgate@v${pin#v}"
+          uv tool dir --bin >> "$GITHUB_PATH"
       # The toolchain your verify commands invoke, DECLARED here and installed
       # by nothing. This gate installs its OWN runtime — the
       # setup-uv step above, because warden is itself a uv tool — and no
@@ -243,34 +277,82 @@ PR-only, full history, explicit permissions, evidence uploaded even on failure:
             echo "PATH=$PATH" >&2
             exit 2
           fi
-      # Every scope the diff can require runs HERE, before review and in this
-      # job. Evidence lives in the runner's own filesystem, so a scope run in
-      # another job is invisible to the pairing and the sticky comment reports
-      # NO VERIFY RESULT for it forever.
-      - name: warden verify
-        id: verify
-        run: .warden/bin/warden verify --scope app
-      # Each step that can refuse runs once verify has run, passed or not, so
-      # a PR with failing tests still shows its rule findings and attestation.
+      # One step per name under `verify:` in repo.yaml.
+      - name: warden verify --scope app
+        run: warden verify --scope app
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        if: always()
+        with:
+          name: warden-verify
+          path: .warden/out/*-verify/verify-result.json
+          if-no-files-found: ignore
+          retention-days: 1
+
+  gate:
+    name: warden gate
+    needs: verify
+    if: ${{ !cancelled() }}   # runs when verify failed, and fails at its end
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write     # the sticky comment goes through the issues API; an
+      #                   explicit permissions block zeroes unlisted scopes
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          fetch-depth: 0   # the gate diffs base...head; a shallow clone has no merge-base
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7  # v10.2.0
+        with:
+          version: "0.12.1"
+          enable-cache: false
+      - name: install warden at repo.yaml platform.pin
+        id: warden
+        shell: bash
+        run: |
+          pin="$(awk '/^platform:/ {inside = 1; next} inside && /^[^[:space:]#]/ {inside = 0} inside && $1 == "pin:" {print $2; exit}' repo.yaml | tr -d "\"'\r")" || pin=""
+          if ! printf '%s\n' "$pin" | grep -Eqx 'v?[0-9]+\.[0-9]+\.[0-9]+'; then
+            echo "warden gate: repo.yaml platform.pin is ${pin:-missing}, not a release tag like v1.2.3 written as a block (platform: then an indented pin:); the gate DID NOT RUN." >&2
+            exit 2
+          fi
+          GIT_TERMINAL_PROMPT=0 uv tool install --no-config --no-cache \
+            "git+https://github.com/NightWatchEng/nightgate@v${pin#v}"
+          uv tool dir --bin >> "$GITHUB_PATH"
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
+        with:
+          name: warden-verify
+          path: ${{ runner.temp }}/warden-verify
+      # The verify results fill the review comment's verify lines and decide
+      # nothing: the last step below is what fails the gate on a red verify.
+      - name: take the verify results
+        shell: bash
+        run: warden take --from "$RUNNER_TEMP/warden-verify"
+      # Each step that can refuse runs once warden is installed, whatever
+      # verify or another of them said, so a pull request shows every refusal.
+      # --no-project-checkers: review imports nothing under .warden/checkers/.
       - name: warden review
-        if: ${{ !cancelled() && steps.verify.outcome != 'skipped' }}
+        if: ${{ !cancelled() && steps.warden.outcome == 'success' }}
+        shell: bash
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: .warden/bin/warden review --event "$GITHUB_EVENT_PATH"
+        run: warden review --no-project-checkers --event "$GITHUB_EVENT_PATH"
       # Binds a light round declared in graph.yaml: the verdict is recomputed
       # over the pushed range. It exits 0 with none declared; certify's R-14
       # (Level 3) requires it once one is. v2.2.0 has no `attest classify`:
       # on that pin leave it out, as `warden init` does.
       - name: proportionate review tier
-        if: ${{ !cancelled() && steps.verify.outcome != 'skipped' }}
+        if: ${{ !cancelled() && steps.warden.outcome == 'success' }}
+        shell: bash
         env:
           BASE_REF: ${{ github.base_ref }}
-        run: .warden/bin/warden attest classify --enforce --base "origin/$BASE_REF"
+        run: warden attest classify --enforce --base "origin/$BASE_REF"
       # Assert the PR left a pre-PR review attestation in the COMMITTED corpus,
       # not just the gitignored run dir. Fork PRs are exempt: the orchestrated
       # review needs credentials they lack.
       - name: pre-PR review attestation
-        if: ${{ !cancelled() && steps.verify.outcome != 'skipped' }}
+        if: ${{ !cancelled() && steps.warden.outcome == 'success' }}
+        shell: bash
         env:
           HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
           REPOSITORY: ${{ github.repository }}
@@ -279,7 +361,17 @@ PR-only, full history, explicit permissions, evidence uploaded even on failure:
           if [ "$HEAD_REPO" != "$REPOSITORY" ]; then
             echo "fork PR: attestation not required"; exit 0
           fi
-          .warden/bin/warden attest check --base "origin/$BASE_REF"
+          warden attest check --base "origin/$BASE_REF"
+      - name: require the verify job
+        if: ${{ !cancelled() }}
+        shell: bash
+        env:
+          VERIFY_RESULT: ${{ needs.verify.result }}
+        run: |
+          if [ "$VERIFY_RESULT" != success ]; then
+            echo "warden gate: the verify job ended $VERIFY_RESULT; the gate fails until every verify scope passes." >&2
+            exit 1
+          fi
       - name: upload evidence run dirs
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         if: always()
@@ -288,6 +380,14 @@ PR-only, full history, explicit permissions, evidence uploaded even on failure:
           path: .warden/out/
           if-no-files-found: ignore
 ```
+
+**The gate runs no project checker.** `warden review --no-project-checkers`
+exits 2, the gate DID NOT RUN, on a module under `.warden/checkers/` and on an
+`engine: python` rule that no core checker serves, because either one is code
+from the checkout running in the gate job. The emitted gate refuses both the
+same way. That is why step 2 says to leave `handler-response-contract`
+out: it is hello-svc's demonstration of the project-checker seam, and its
+checker is a module under `.warden/checkers/`.
 
 **The gate declares its toolchain and installs no consumer one.** The
 pre-flight step above names every binary your verify commands invoke that the
@@ -302,11 +402,12 @@ pass anyway. Keep the pair list in step with your `repo.yaml` — a pair naming
 a binary the gate installs is a check that cannot fire, and a binary in
 neither half is the hole the step exists to close.
 
-Every verify scope a diff can REQUIRE must run in this job, before
-`warden review` — one `warden verify --scope <name>` step each. The gate pairs
-a verify result to the review on two axes, the commit and the scope, and it
-reads the evidence from the local filesystem: a scope run in a different job
-leaves nothing here, and its line renders `NO VERIFY RESULT` on every PR. Which scopes a given diff requires follows from your
+Every verify scope a diff can REQUIRE must run in the verify job — one
+`warden verify --scope <name>` step each — and reach the gate job through the
+uploaded results and `warden take`. The gate pairs a verify result to the
+review on two axes, the commit and the scope, and it reads the evidence from
+its own filesystem: a scope whose result never arrives there renders
+`NO VERIFY RESULT` on every PR. Which scopes a given diff requires follows from your
 `repo.yaml`, and the honest way to say what a step exercises is to DECLARE it:
 `covers: [glob, ...]` on the step, and the scope is required exactly when a
 changed path matches one of those globs. Declare it wherever a

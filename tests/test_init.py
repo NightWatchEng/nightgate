@@ -3719,14 +3719,16 @@ def test_the_adopting_page_declares_the_toolchain_its_own_verify_runs():
     editing its `repo.yaml` to run a new binary reddens here.
     """
     repo_yaml, gate, gate_text = _adopting_snippets()
-    names = [s.get("name") for s in gate["jobs"]["gate"]["steps"]]
+    # The page's verify commands run in its verify job, as the emitted
+    # gate's do (agentops-hy6o.51), so the pre-flight is read there.
+    names = [s.get("name") for s in gate["jobs"]["verify"]["steps"]]
     assert enroll.TOOLCHAIN_STEP in names, (
-        "Adopting.md section 4 hands a consumer a gate job with no toolchain "
+        "Adopting.md section 4 hands a consumer a verify job with no toolchain "
         "pre-flight, while `warden init` and examples/hello-svc both render "
         "one — so the page a consumer copies by hand prescribes a gate the "
         "platform does not ship")
     assert names.index(enroll.TOOLCHAIN_STEP) < min(
-        i for i, n in enumerate(names) if n == "warden verify"), (
+        i for i, n in enumerate(names) if (n or "").startswith("warden verify")), (
         "the page's pre-flight runs after a scope has already failed on an "
         "exit 127 the reader then has to diagnose")
 
@@ -3735,7 +3737,7 @@ def test_the_adopting_page_declares_the_toolchain_its_own_verify_runs():
                for cmd in cmds
                for tool in _invoked_binaries(cmd["run"])}
     assert invoked, "the page's repo.yaml declares no verify command"
-    declared = _declared_toolchain(gate, "gate")
+    declared = _declared_toolchain(gate, "verify")
     installed = _gate_installs(gate_text)
 
     unaccounted = {p for p in invoked
@@ -4104,9 +4106,12 @@ def test_the_verify_step_names_the_failing_tests_in_the_log(runner, tmp_path):
 
 
 def test_the_hand_copied_gates_review_a_pr_whose_verify_failed():
-    """hello-svc's gate and Adopting.md's snippet are one job, so a failed
-    verify step skipped every step after it: each refusing step now runs once
-    verify has run, passed or not."""
+    """hello-svc's gate is one job, so a failed verify step skipped every step
+    after it: each refusing step now runs once verify has run, passed or not.
+    Adopting.md's snippet runs verify in a job of its own (agentops-hy6o.51),
+    so its gate job runs whatever verify said, runs each refusing step once
+    warden is installed, and fails at its end on a verify that did not
+    pass."""
     ran = "${{ !cancelled() && steps.verify.outcome != 'skipped' }}"
     doc = yaml.safe_load((ROOT / "examples/hello-svc/.github/workflows/ci.yml").read_text())
     steps = _steps(doc, "gate")
@@ -4114,8 +4119,17 @@ def test_the_hand_copied_gates_review_a_pr_whose_verify_failed():
     after = [s for s in steps[at + 1:] if "run" in s
              and "check-vocabulary" not in s["run"]]  # its own guard bars an `if`
     assert len(after) == 4 and all(s.get("if") == ran for s in after), after
-    page = (ROOT / "docs/wiki/Adopting.md").read_text()
-    assert "        id: verify\n" in page and page.count(f"        if: {ran}\n") == 3
+    gate = _adopting_snippets()[1]["jobs"]["gate"]
+    assert gate["needs"] == "verify" and gate["if"] == "${{ !cancelled() }}", gate
+    installed = "${{ !cancelled() && steps.warden.outcome == 'success' }}"
+    refusing = [s for s in gate["steps"]
+                if re.search(r"^\s*warden (?!take)", s.get("run", ""), re.M)]
+    assert len(refusing) == 3 and all(s.get("if") == installed
+                                      for s in refusing), refusing
+    last = [s for s in gate["steps"] if "run" in s][-1]
+    assert last.get("if") == "${{ !cancelled() }}", last
+    assert "needs.verify.result" in last["env"]["VERIFY_RESULT"], last
+    assert "exit 1" in last["run"], last
 
 
 def test_failing_tests_names_no_test_off_a_line_another_tool_prints():

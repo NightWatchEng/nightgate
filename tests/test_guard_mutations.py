@@ -215,6 +215,12 @@ REGISTRY: dict[str, tuple[str, str]] = {
         "departs from `render_toolchain_step`, as the substitutions the "
         "byte-equality applies. Each pair is asserted present on BOTH sides "
         "before it is applied, so deleting either stops the equality holding"),
+    "test_docs:_WARDEN_LINE": (
+        UNSWEPT, "a `run:` line in Adopting.md's gate snippet that invokes "
+        "warden, which the install-before-use and job-split guards read. One "
+        "pattern with no alternation, so the sweep has nothing to delete. "
+        "Covered by those guards themselves, measured: against the "
+        "pre-hy6o.51 page each of them fails"),
     "test_docs:HOME_PLACEHOLDERS": (
         SWEPT, "names that are placeholders rather than people"),
     "test_docs:HOME_RE": (

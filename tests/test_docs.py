@@ -16,7 +16,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from conftest import tracked
+from conftest import _AMBIENT_GIT_CONFIG, tracked
 from private_evidence import (EXPORT, needs_corpus, needs_design_records,
                               publish_excludes)
 
@@ -333,6 +333,196 @@ def test_adopting_workflow_snippet_shas_match_the_real_workflow():
     assert not drift, (
         "Adopting.md pins a different sha than .github/workflows/ci.yml "
         f"runs: {drift}")
+
+
+# ── Adopting.md step 4: the hand-written gate a consumer copies ──────────────
+#
+# agentops-hy6o.51: the snippet called `.warden/bin/warden`, a shim nothing
+# on the page installs, so a verbatim copy failed at its first warden step;
+# and it ran verify and review in one job, the shape the hy6o.9 ruling refuses
+# because a verify command a pull request controls could switch the gate off.
+
+_PLATFORM_GIT = "git+https://github.com/NightWatchEng/nightgate@"
+_WARDEN_LINE = re.compile(r"^\s*warden \w", re.M)
+
+
+def _adopting_jobs() -> dict:
+    from test_init import _adopting_snippets
+    return _adopting_snippets()[1]["jobs"]
+
+
+def _installs_warden(step: dict) -> bool:
+    return f'"{_PLATFORM_GIT}' in step.get("run", "") and (
+        "uv tool install --no-config --no-cache" in step["run"])
+
+
+def test_the_adopting_gate_installs_warden_before_any_warden_step():
+    """Every job installs warden from the public platform repository before
+    its first step that runs warden, with no secret but the job token; a job
+    has its own runner, so an install in another job puts nothing on PATH."""
+    jobs = _adopting_jobs()
+    assert set(jobs) == {"verify", "gate"}, sorted(jobs)
+    installs = []
+    for name, job in jobs.items():
+        steps = job["steps"]
+        uses_warden = [i for i, s in enumerate(steps)
+                       if _WARDEN_LINE.search(s.get("run", ""))]
+        install = [i for i, s in enumerate(steps) if _installs_warden(s)]
+        assert uses_warden and len(install) == 1, (name, uses_warden, install)
+        assert install[0] < uses_warden[0], (
+            f"the {name} job runs warden before the step that installs it")
+        installs.append(steps[install[0]])
+    assert installs[0] == installs[1], "the two install steps have drifted apart"
+    text = _adopting_snippets_text()
+    assert ".warden/bin/warden" not in text, (
+        "the snippet calls the shim, which nothing on the page installs")
+    assert re.findall(r"secrets\.(\w+)", text) == ["GITHUB_TOKEN"], (
+        "the snippet reads a secret: the public platform installs without one")
+
+
+def _adopting_snippets_text() -> str:
+    from test_init import _adopting_snippets
+    return _adopting_snippets()[2]
+
+
+def _run_install_step(tmp_path: Path, repo_yaml: str | None
+                      ) -> tuple[subprocess.CompletedProcess, list[str], dict]:
+    """The install step's bash, run with a `uv` that records its argv."""
+    step = next(s for s in _adopting_jobs()["gate"]["steps"]
+                if _installs_warden(s))
+    work, bin_dir = tmp_path / "work", tmp_path / "bin"
+    work.mkdir()
+    bin_dir.mkdir()
+    if repo_yaml is not None:
+        (work / "repo.yaml").write_text(repo_yaml)
+    log = tmp_path / "uv.log"
+    uv = bin_dir / "uv"
+    uv.write_text('#!/bin/sh\nprintf "%s|%s\\n" "$GIT_TERMINAL_PROMPT" "$*" '
+                  f'>> "{log}"\n'
+                  '[ "$1 $2" = "tool dir" ] && echo /tools/bin\nexit 0\n')
+    uv.chmod(0o755)
+    env = {**_AMBIENT_GIT_CONFIG, "PATH": f"{bin_dir}:/usr/bin:/bin",
+           "GITHUB_PATH": str(tmp_path / "github_path")}
+    bash = ["bash", "--noprofile", "--norc", "-eo", "pipefail", "-c", step["run"]]
+    result = subprocess.run(bash, cwd=work, env=env, capture_output=True,
+                            text=True, timeout=30)
+    calls = log.read_text().splitlines() if log.exists() else []
+    return result, calls, env
+
+
+def test_the_adopting_install_step_installs_the_tag_platform_pin_names(tmp_path):
+    """Run as written against the page's own repo.yaml: one `uv tool install`
+    of the public repository at `platform.pin`, with no prompt for a
+    credential, and uv's tool bin directory put on PATH for later steps."""
+    from test_init import _adopting_snippets
+    repo_yaml = next(b for k, b in re.findall(
+        r"```(yaml)\n(.*?)```", (WIKI / "Adopting.md").read_text(), re.S)
+        if "verify:" in b)
+    pin = _adopting_snippets()[0]["platform"]["pin"]
+    result, calls, env = _run_install_step(tmp_path, repo_yaml)
+    assert result.returncode == 0, result.stderr
+    assert calls == [
+        f"0|tool install --no-config --no-cache {_PLATFORM_GIT}v{pin.removeprefix('v')}",
+        "|tool dir --bin"], calls
+    assert Path(env["GITHUB_PATH"]).read_text() == "/tools/bin\n"
+
+
+@pytest.mark.parametrize("repo_yaml", [
+    None,
+    "platform:\n  pin: main\n",
+    "platform: {pin: v3.0.3}\n",
+    "version: 1\n",
+])
+def test_the_adopting_install_step_refuses_a_pin_that_is_not_a_tag(tmp_path, repo_yaml):
+    """No repo.yaml, a branch name, the flow form the awk does not read, or no
+    pin at all: exit 2, DID NOT RUN, and nothing installed."""
+    result, calls, _ = _run_install_step(tmp_path, repo_yaml)
+    assert result.returncode == 2, result
+    assert "DID NOT RUN" in result.stderr and calls == [], (result.stderr, calls)
+
+
+def test_the_adopting_gate_keeps_review_out_of_the_job_that_runs_verify():
+    """The hy6o.9 ruling, held on the hand-written gate: the job that runs the
+    repository's verify commands runs no review and no attestation check, and
+    the job that does runs no repository code — no verify, no repo-local
+    checkers — takes the verify results rather than re-running them, and
+    still fails on a verify that did not pass.
+
+    Round 1 found the first version reading only lines that START with
+    `warden`: `make lint` or a local action in the gate job, or `warden
+    verify ... && warden review ...` in the verify job, passed it. So every
+    warden subcommand each job runs is read wherever it sits on a line, the
+    gate job's actions are a whitelist, and the programs its steps run are an
+    exact set, so a new one reddens here.
+    """
+    from test_init import _invoked_binaries
+    jobs = _adopting_jobs()
+
+    def warden_lines(job: dict) -> list[str]:
+        return [line.strip() for s in job["steps"]
+                for line in s.get("run", "").splitlines()
+                if _WARDEN_LINE.match(line)]
+
+    def subcommands(job: dict) -> set[str]:
+        return {m for s in job["steps"] for m in re.findall(
+            r"\bwarden (?!gate:)([a-z-]+)", s.get("run", ""))}
+
+    assert subcommands(jobs["verify"]) == {"verify"}, subcommands(jobs["verify"])
+    assert subcommands(jobs["gate"]) == {"take", "review", "attest"}, (
+        subcommands(jobs["gate"]))
+    allowed = ("actions/checkout@", "astral-sh/setup-uv@",
+               "actions/download-artifact@", "actions/upload-artifact@")
+    for step in jobs["gate"]["steps"]:
+        assert step.get("uses", allowed[0]).startswith(allowed), step
+    programs = {b for s in jobs["gate"]["steps"]
+                for b in _invoked_binaries(s.get("run", ""))}
+    assert programs == {"echo", "exit", "fi", "grep", "if", "then", "uv",
+                        "warden"}, sorted(programs)
+    verify, gate = warden_lines(jobs["verify"]), warden_lines(jobs["gate"])
+    assert verify and all(line.startswith("warden verify ") for line in verify), verify
+    assert not any(line.startswith("warden verify") for line in gate), gate
+    review = [line for line in gate if line.startswith("warden review")]
+    assert review == [
+        'warden review --no-project-checkers --event "$GITHUB_EVENT_PATH"'], gate
+    assert any(line.startswith("warden attest check") for line in gate), gate
+    assert gate[0].startswith("warden take --from"), gate
+    assert jobs["gate"]["needs"] == "verify", jobs["gate"]
+    checkout = jobs["gate"]["steps"][0]
+    assert checkout["uses"].startswith("actions/checkout@")
+    assert checkout["with"]["persist-credentials"] is False, checkout
+    assert any("needs.verify.result" in str(s.get("env", {}))
+               for s in jobs["gate"]["steps"]), (
+        "the gate job never reads whether verify passed")
+
+
+def test_the_adopting_step_says_it_is_the_hand_written_emitted_gate():
+    """The page says what the snippet is, why it is two jobs, and what the
+    gate job will not run: the fixture run that proved the snippet found
+    review exiting 2 on hello-svc's `engine: python` rule, whose checker is
+    repository code the gate job refuses to import."""
+    page = (WIKI / "Adopting.md").read_text()
+    section = page[page.index("## 4 · Add the CI job"):]
+    section = " ".join(section[:section.index("\n## 5 ")].split())
+    for needle in ("hand-written form of the one `warden init` emits",
+                   "a language `init` does not detect",
+                   "One job that runs both is a gate the pull request can switch off",
+                   "with no secret",
+                   "The gate runs no project checker."):
+        assert needle in section, needle
+    # The rules step 2 copies that the gate job cannot run, derived: every
+    # `engine: python` rule of hello-svc's that no core checker serves.
+    from warden import plugins
+    from warden import rules as rules_mod
+    unserved = sorted(
+        r.id for r in rules_mod.load_rules(
+            ROOT / "examples" / "hello-svc" / ".warden" / "rules")
+        if r.engine == "python" and r.id not in plugins.CORE_CHECKERS)
+    assert unserved == ["handler-response-contract"], unserved
+    assert all(f"leave `{rule_id}` out" in section for rule_id in unserved), unserved
+    step2 = page[page.index("## 2 · Add the rules"):page.index("## 3 · ")]
+    step2 = " ".join(step2.split())
+    assert all(f"except `{rule_id}`" in step2 for rule_id in unserved), (
+        "step 2 still copies a rule step 4's gate cannot run")
 
 
 def test_the_example_invokes_no_local_file_it_does_not_ship():
