@@ -749,3 +749,219 @@ def test_recommend_fails_closed_on_an_unreadable_rules_dir_declaration(tmp_path)
     assert report.gap_known is False
     assert report.enforced == ()
     assert any("repo.yaml" in n for n in report.notes)
+
+
+# --------------------------------------------------------------------------
+# language: an entry whose starter reads one language's idioms is not
+# recommended to a repo that declares only others (agentops-elsx.22)
+# --------------------------------------------------------------------------
+
+# The shipped entries whose starters read Python idioms (`shell=True`,
+# `os.system`, `pickle.loads`, `except: pass`, `Path(root).resolve()`). Seen
+# recommended on a node:http service right after `warden init`
+# (NightWatchEng/nightgate-demo, 2026-10-04).
+PYTHON_IDIOM_ENTRIES = {
+    "sql-injection", "os-command-injection", "unsafe-deserialization",
+    "path-traversal", "security-misconfiguration", "weak-cryptography",
+    "swallowed-exceptions",
+}
+
+
+def enrolled(root: Path) -> None:
+    """The ruleset `warden init` writes: one rule, implementing one entry."""
+    rule_file(root, "secrets-in-diff", implements=["hardcoded-credentials"])
+
+
+def declare_components(root: Path, **langs: str) -> None:
+    enrolled(root)
+    comps = {name: {"path": ".", "lang": lang} for name, lang in langs.items()}
+    (root / "repo.yaml").write_text(yaml.safe_dump({"components": comps}))
+
+
+def test_rules_recommend_on_a_node_repo_proposes_no_python_engine_rules(tmp_path):
+    """What `warden init` writes for a package.json repo: one component,
+    `lang: node`. No row may carry a Python-idiom starter — not the
+    python-engine path-traversal sketch, not the shell-true / os-system
+    checks — and each one set aside is named, with the language its starter
+    reads, rather than dropped."""
+    declare_components(tmp_path, node="node")
+    report = advisor.recommend(tmp_path)
+    assert report.gap_known
+    recommended = {r.entry_id for r in report.recommendations}
+    assert not recommended & PYTHON_IDIOM_ENTRIES
+    by_id = {e.id: e for e in cat.load_catalog()}
+    check_ids = {c["id"] for eid in recommended
+                 for c in ((by_id[eid].starter or {}).get("checks") or [])}
+    assert not check_ids & {"shell-true", "os-system"}
+    assert dict(report.set_aside) == {eid: ("python",)
+                                      for eid in PYTHON_IDIOM_ENTRIES}
+    text = advisor.render(report)
+    assert "shell-true" not in text and "os-system" not in text
+    assert "OTHER LANGUAGES (7)" in text
+    assert "no node starter exists for these yet" in text
+    # The language-neutral rows stay: the class matters whatever the
+    # language, and their starters (or prose) do not read one.
+    assert {"xss-unescaped-output", "supply-chain-pinning", "ssrf",
+            "review-lens-tests"} <= recommended
+    assert report.to_dict()["set_aside_by_language"] == {
+        eid: ["python"] for eid in sorted(PYTHON_IDIOM_ENTRIES)}
+
+
+def test_a_node_repo_is_told_what_engine_python_means(tmp_path):
+    """engine:python names what the CHECKER is written in. On a repo that
+    declares no Python, a bare `engine:python` row reads as 'a Python rule',
+    which is how supply-chain-pinning (it reads package.json) was misread."""
+    declare_components(tmp_path, node="node")
+    text = advisor.render(advisor.recommend(tmp_path))
+    assert "supply-chain-pinning [A03:2025, engine:python]" in text
+    assert "engine:python names the language the CHECKER is written in" in text
+    declare_components(tmp_path, app="python")
+    text = advisor.render(advisor.recommend(tmp_path))
+    assert "the CHECKER is written in" not in text
+
+
+def test_python_repo_recommendations_are_unchanged_by_the_language_filter(tmp_path):
+    """A Python repo, declared or not, gets exactly the rows it got before."""
+    enrolled(tmp_path)
+    undeclared = advisor.recommend(tmp_path)
+    declare_components(tmp_path, app="python", docs="md")
+    declared = advisor.recommend(tmp_path)
+    assert undeclared.gap_known and declared.gap_known
+    assert ([r.to_dict() for r in declared.recommendations]
+            == [r.to_dict() for r in undeclared.recommendations])
+    assert declared.set_aside == () and undeclared.set_aside == ()
+    assert PYTHON_IDIOM_ENTRIES <= {r.entry_id for r in declared.recommendations}
+    assert "OTHER LANGUAGES" not in advisor.render(declared)
+
+
+def test_no_declared_language_sets_nothing_aside_and_says_so(tmp_path):
+    """Components with no language the catalog tags: the filter cannot know,
+    so it filters nothing — a row too many is the safe direction for a gap
+    report — and the LIMITS line says why."""
+    declare_components(tmp_path, docs="md")
+    report = advisor.recommend(tmp_path)
+    assert report.set_aside == ()
+    assert PYTHON_IDIOM_ENTRIES <= {r.entry_id for r in report.recommendations}
+    assert any("no entry is set aside by language" in lim
+               for lim in report.limits)
+
+
+@pytest.mark.parametrize("spelling", ["typescript", "JavaScript", "js", "nodejs"])
+def test_hand_written_node_spellings_read_as_node(tmp_path, spelling):
+    """`lang:` is free text in the schema; a hand-written repo.yaml that says
+    typescript means node, and must not fall back to recommending Python."""
+    declare_components(tmp_path, web=spelling)
+    assert dict(advisor.recommend(tmp_path).set_aside).keys() == PYTHON_IDIOM_ENTRIES
+
+
+def test_an_answered_entry_in_another_language_stays_answered(tmp_path):
+    """An answer is checked before the language filter: setting an answered
+    entry aside would drop its record from the report."""
+    declare_components(tmp_path, node="node")
+    answer = {"id": "sql-injection", "verdict": "not-applicable",
+              "reason": "No database and no SQL surface anywhere in the "
+                        "tree; flips the day it stores anything."}
+    (tmp_path / ".warden" / "catalog-answers.yaml").write_text(
+        yaml.safe_dump({"version": 1, "answers": [answer]}))
+    report = advisor.recommend(tmp_path)
+    assert [a.entry_id for a in report.answered] == ["sql-injection"]
+    assert "sql-injection" not in dict(report.set_aside)
+
+
+def test_catalog_langs_must_name_a_language_init_detects(tmp_path):
+    bad = dict(ENTRY, langs=["pyhton"])
+    with pytest.raises(cat.CatalogError, match="pyhton"):
+        cat.load_catalog(write_catalog(tmp_path, bad))
+
+
+def test_catalog_langs_belong_only_to_an_entry_with_a_starter(tmp_path):
+    """`langs` says which language a STARTER reads; a judgment rule's prose
+    reads none, so declaring one would hide it for no reason."""
+    claude = {k: v for k, v in ENTRY.items() if k != "starter"}
+    claude.update(engine="claude", langs=["python"])
+    with pytest.raises(cat.CatalogError, match="langs"):
+        cat.load_catalog(write_catalog(tmp_path, claude))
+
+
+def test_catalog_languages_are_the_ones_init_detects():
+    from warden import enroll
+    assert cat.LANGS == enroll.ALL_LANGUAGES
+
+
+def test_the_shipped_catalog_tags_exactly_the_python_idiom_entries():
+    tagged = {e.id: e.langs for e in cat.load_catalog() if e.langs}
+    assert tagged == {eid: ("python",) for eid in PYTHON_IDIOM_ENTRIES}
+
+
+# Review round 1 (agentops-elsx.22): what the set-aside path must never hide.
+
+
+def test_a_contradicted_answer_on_another_language_still_counts_unanswered(tmp_path):
+    """A `not-applicable` answer the code contradicts falls through into the
+    gap. Setting it aside by language would let a false waiver buy its way
+    past UNANSWERED and the ceiling on any node repo."""
+    declare_components(tmp_path, node="node")
+    (tmp_path / "scripts").mkdir()
+    (tmp_path / "scripts" / "deploy.py").write_text(
+        "import subprocess\nsubprocess.run(cmd, shell=True)\n")
+    answer = {"id": "os-command-injection", "verdict": "not-applicable",
+              "reason": "This repo never shells out; every process it starts "
+                        "is an argv list."}
+    (tmp_path / ".warden" / "catalog-answers.yaml").write_text(
+        yaml.safe_dump({"version": 1, "answers": [answer]}))
+    report = advisor.recommend(tmp_path)
+    assert [a.state for a in report.answered] == ["contradicted"]
+    assert "os-command-injection" in {r.entry_id for r in report.recommendations}
+    assert "os-command-injection" not in dict(report.set_aside)
+
+
+@pytest.mark.parametrize("path, text, entry_id", [
+    ("src/config.js", "const cfg = yaml.load(fs.readFileSync(p));\n",
+     "unsafe-deserialization"),
+    ("src/hash.js", "const digest = md5(password);\n", "weak-cryptography"),
+    ("scripts/deploy.py", "subprocess.run(cmd, shell=True)\n",
+     "os-command-injection"),
+])
+def test_a_python_idiom_starter_that_matches_a_node_tree_is_still_recommended(
+        tmp_path, path, text, entry_id):
+    """The patterns are not confined to Python: js-yaml's `yaml.load(` and
+    the md5 package's `md5(` match in JavaScript, and a node repo can carry
+    `.py` scripts init never declared. A match keeps the row, with a caveat
+    saying why it is there."""
+    declare_components(tmp_path, node="node")
+    (tmp_path / path).parent.mkdir(parents=True, exist_ok=True)
+    (tmp_path / path).write_text(text)
+    report = advisor.recommend(tmp_path)
+    rows = {r.entry_id: r for r in report.recommendations}
+    assert entry_id in rows and entry_id not in dict(report.set_aside)
+    assert rows[entry_id].measured_hits
+    assert any("does not declare (node)" in c for c in rows[entry_id].caveats)
+
+
+@pytest.mark.parametrize("spelling", ["python", "python3.12", "Python 3",
+                                      "py3", "cpython", "pypy", "PyPy3.10"])
+def test_versioned_python_spellings_read_as_python(tmp_path, spelling):
+    """A mixed repo keeps every entry one of its languages reads: a Python
+    component, however spelled, beside a node one is not node-only."""
+    declare_components(tmp_path, api=spelling, web="node")
+    report = advisor.recommend(tmp_path)
+    assert report.repo_langs == ("node", "python")
+    assert report.set_aside == ()
+
+
+@pytest.mark.parametrize("spelling", ["gopher", "pythonic-docs", "markdown"])
+def test_a_name_that_only_starts_like_a_language_is_not_one(spelling):
+    assert advisor._catalog_lang(spelling) is None
+
+
+def test_a_paused_rules_entry_on_another_language_reopens_into_the_gap(tmp_path):
+    """A paused rule's entry reopens into the gap with the pause named. Set
+    aside instead, its LIMITS line would describe a path it never took."""
+    declare_components(tmp_path, node="node")
+    rule_file(tmp_path, "no-shell", implements=["os-command-injection"],
+              paused=True, paused_reason="refuted three times running")
+    report = advisor.recommend(tmp_path)
+    rows = {r.entry_id: r for r in report.recommendations}
+    assert "os-command-injection" not in dict(report.set_aside)
+    assert any("PAUSED" in c for c in rows["os-command-injection"].caveats)
+    assert not any("os-command-injection" in lim for lim in report.limits)

@@ -662,6 +662,8 @@ REGISTRY: dict[str, tuple[str, str]] = {
     "test_advisor:ENTRY": (FIXTURE, "a sample advisor entry, as input"),
     "test_advisor:ENTRY_2": (
         FIXTURE, "a second sample advisor entry, as input"),
+    "test_advisor:PYTHON_IDIOM_ENTRIES": (
+        FIXTURE, "the shipped entries tagged langs: [python], as expected data"),
     "test_attest:FINDING": (FIXTURE, "a sample finding payload, as input"),
     "test_attest:REVIEWERS": (
         FIXTURE, "a sample two-reviewer roster, as input to attest.build"),

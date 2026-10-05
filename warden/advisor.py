@@ -46,7 +46,7 @@ from pathlib import Path
 import yaml
 
 from . import backtest as backtest_mod
-from .catalog import CATALOG_PATH, Entry, load_catalog
+from .catalog import CATALOG_PATH, LANGS, Entry, load_catalog
 from .memory import _EXAMINER_STATUSES, _JUDGED_STATUSES, _REVIEWER_STATUSES
 from . import yamlio
 
@@ -452,6 +452,11 @@ class Report:
     # After gap_known for the same reason; recommend passes these by keyword.
     declared_ceiling: int | None = None
     ceiling_complaints: tuple[str, ...] = ()
+    # (entry id, the languages its starter reads) for each entry set aside
+    # because this repo declares none of them, and the catalog languages it
+    # DOES declare. Passed by keyword, like the two above.
+    set_aside: tuple[tuple[str, tuple[str, ...]], ...] = ()
+    repo_langs: tuple[str, ...] = ()
 
     def to_dict(self) -> dict:
         return {"schema": 1,
@@ -465,7 +470,10 @@ class Report:
                 "declared_ceiling": self.declared_ceiling,
                 "ceiling_complaints": list(self.ceiling_complaints),
                 "notes": list(self.notes),
-                "limits": list(self.limits)}
+                "limits": list(self.limits),
+                "repo_langs": list(self.repo_langs),
+                "set_aside_by_language": {eid: list(langs)
+                                          for eid, langs in self.set_aside}}
 
 
 def _nested_checkout_dirs(root: Path) -> set[Path]:
@@ -718,6 +726,79 @@ def _pause_note(rule_id: str, reason: str, *, reopened: bool) -> str:
             f"a paused rule produces no findings, {outcome}")
 
 
+# `lang:` is free text in repo.yaml's schema, and a hand-written one says
+# what its author calls the language — `python3.12`, `Python 3`, `pypy`,
+# `TypeScript`, `node.js`, `golang 1.22`. Each pattern reads a NAME followed by
+# nothing, a version, or a space, so `python3.12` is python and `gopher` is
+# not go. A spelling none of them reads is not a catalog language; what keeps
+# a misread from hiding a row is that a set-aside entry must also match
+# nothing in the tree (`_matches_nothing_here`).
+_LANG_SPELLINGS = (
+    ("python", re.compile(r"\A(?:c?python|pypy|py)(?:[\s\d.]|\Z)")),
+    ("node", re.compile(r"\A(?:node(?:\.?js)?|javascript|js|typescript|ts"
+                        r"|deno|bun)(?:[\s\d.]|\Z)")),
+    ("go", re.compile(r"\A(?:go|golang)(?:[\s\d.]|\Z)")),
+)
+
+
+def _catalog_lang(spelling: str) -> str | None:
+    text = spelling.strip().lower()
+    return next((name for name, pat in _LANG_SPELLINGS if pat.match(text)),
+                None)
+
+
+def declared_languages(root: Path) -> tuple[frozenset[str], str]:
+    """The catalog languages repo.yaml's components declare, and a problem.
+
+    Lenient, like `config.declared_rules_dir`, and for the same reason: the
+    advisor holds a root, not a validated config. An empty set means the
+    filter cannot know which languages apply, and the caller then sets
+    NOTHING aside — a row too many is the safe direction for a report whose
+    job is the gap. `problem` is non-empty when repo.yaml could not be read
+    or its components are not a mapping, so the caller can say why.
+    """
+    from .config import CONFIG_NAME, read_repo_yaml
+    try:
+        doc = yamlio.load(read_repo_yaml(root).decode("utf-8"))
+    except FileNotFoundError:
+        return frozenset(), f"no {CONFIG_NAME}"
+    except (OSError, ValueError, yaml.YAMLError) as e:
+        return frozenset(), f"{CONFIG_NAME} cannot be read ({e})"
+    comps = doc.get("components") if isinstance(doc, dict) else None
+    if not isinstance(comps, dict):
+        return frozenset(), f"{CONFIG_NAME} declares no components mapping"
+    langs = set()
+    for spec in comps.values():
+        lang = spec.get("lang") if isinstance(spec, dict) else None
+        if isinstance(lang, str) and (name := _catalog_lang(lang)):
+            langs.add(name)
+    return frozenset(langs), ""
+
+
+def _matches_nothing_here(entry: Entry, root: Path,
+                          targets: list[Path]) -> bool:
+    """True only when setting `entry` aside hides no match in THIS tree.
+
+    A starter's patterns are written for one language's idioms, but nothing
+    confines them to it: js-yaml's load call and the md5 package's are
+    JavaScript the Python checks match, and a node repo can carry loose `.py`
+    scripts that `warden init` never declared. So an entry is set aside only on a MEASURED zero, and the
+    measurement fails closed exactly as `answer_state` does — a truncated
+    scan, an unreadable file or an uncompilable pattern keeps the row. An
+    entry whose starter is a python-engine SKETCH has no pattern to run: what
+    it reads is prose in its language's idioms, and there is nothing in any
+    tree for it to match.
+    """
+    if not (entry.starter and entry.starter.get("checks")):
+        return True
+    if len(targets) >= _MAX_SCAN_FILES:
+        return False
+    hits, _samples, caveats = measure(entry, root, targets)
+    if any(k in c for c in caveats for k in _BLOCKING_CAVEAT):
+        return False
+    return not hits
+
+
 def recommend(root: Path, *, catalog_path: Path | None = None,
               records: list[dict] | None = None,
               rules_dir: Path | None = None,
@@ -826,6 +907,13 @@ def recommend(root: Path, *, catalog_path: Path | None = None,
     recs: list[Recommendation] = []
     enforced: list[Enforced] = []
     declined: list[str] = []
+    set_aside: list[tuple[str, tuple[str, ...]]] = []
+    repo_langs, langs_problem = declared_languages(root)
+    if not repo_langs and any(e.langs for e in entries):
+        why = langs_problem or ("no component declares a language the "
+                                f"catalog tags ({', '.join(LANGS)})")
+        limits.append(f"{why}, so no entry is set aside by language — every "
+                      "row below is shown whatever language its starter reads")
 
     limits.extend(answer_complaints)
     # Reported here as well as on the row, because the row is not guaranteed
@@ -884,6 +972,19 @@ def recommend(root: Path, *, catalog_path: Path | None = None,
             declined.append(entry.id)
             continue
 
+        off_language = bool(repo_langs and entry.langs
+                            and not repo_langs & set(entry.langs))
+        # Set aside only what nothing else claims. An ANSWERED entry reached
+        # here because its answer was contradicted or unmeasured, and that
+        # must count in the gap; a PAUSED rule's entry reopens into it; and a
+        # starter that matches this tree is evidence the idiom is here,
+        # whatever the repo declares. Named, never dropped.
+        if (off_language and entry.id not in answers
+                and entry.id not in paused_by
+                and _matches_nothing_here(entry, root, targets)):
+            set_aside.append((entry.id, entry.langs))
+            continue
+
         corpus_n = sum(by_class.get(slug, 0) for slug in entry.corpus_classes)
         refuted_n = sum(argued_against.get(slug, 0) for slug in entry.corpus_classes)
         hits, samples, caveats = measure(entry, root, targets)
@@ -891,6 +992,13 @@ def recommend(root: Path, *, catalog_path: Path | None = None,
             caveats = (_pause_note(*paused_by[entry.id], reopened=True),
                        ) + caveats
             reopened_ids.add(entry.id)
+        if off_language:
+            caveats = (f"its starter reads {'/'.join(entry.langs)}, which "
+                       f"this repo does not declare "
+                       f"({', '.join(sorted(repo_langs))}) — kept because it "
+                       f"is answered, its rule is paused, or the starter "
+                       f"matches this tree or could not be measured",
+                       ) + caveats
         basis = "evidence" if corpus_n >= EVIDENCE_MIN_N else "prior-art"
 
         if basis == "evidence":
@@ -961,7 +1069,9 @@ def recommend(root: Path, *, catalog_path: Path | None = None,
     return Report(tuple(recs), tuple(enforced), tuple(unsupported),
                   tuple(declined), tuple(answered), notes,
                   tuple(limits), declared_ceiling=ceiling,
-                  ceiling_complaints=ceiling_complaints)
+                  ceiling_complaints=ceiling_complaints,
+                  set_aside=tuple(set_aside),
+                  repo_langs=tuple(sorted(repo_langs)))
 
 
 def render(report: Report) -> str:
@@ -1027,6 +1137,12 @@ def render(report: Report) -> str:
 
     lines.append("")
     lines.append(f"PRIOR ART ({len(prior)}) — published sources, no local verdict")
+    if (report.repo_langs and "python" not in report.repo_langs
+            and any(r.engine == "python" for r in report.recommendations)):
+        # On a repo with no Python, `engine:python` reads as "a Python rule".
+        lines.append("  engine:python names the language the CHECKER is "
+                     "written in (a warden checker), not the language it "
+                     "reads")
     for rec in prior:
         lines.append(f"  {rec.entry_id} [{rec.taxonomy}, engine:{rec.engine}]")
         lines.append(f"      {rec.rationale}")
@@ -1086,6 +1202,18 @@ def render(report: Report) -> str:
                      "its argument and on review. An answer the scan could "
                      "not REACH this run is counted as unanswered rather "
                      f"than believed. See {ANSWERS_PATH}.")
+
+    if report.set_aside:
+        declared = ", ".join(report.repo_langs)
+        lines.append("")
+        lines.append(f"OTHER LANGUAGES ({len(report.set_aside)}) — each "
+                     f"starter reads a language this repo does not declare "
+                     f"(it declares {declared}), so none is recommended")
+        lines.append("  " + ", ".join(f"{eid} [{'/'.join(langs)}]"
+                                      for eid, langs in report.set_aside))
+        lines.append(f"  The class may still matter here: no {declared} "
+                     "starter exists for these yet. `warden catalog show "
+                     "<id>` says what each one guards.")
 
     if report.declined:
         lines.append("")

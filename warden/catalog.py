@@ -58,7 +58,13 @@ _TAXONOMIES = {
 
 _REQUIRED = ("id", "taxonomy", "name", "guards", "engine", "applies_when",
              "false_positive_cost", "sources")
-_KNOWN_KEYS = set(_REQUIRED) | {"starter", "instead", "corpus_classes"}
+_KNOWN_KEYS = set(_REQUIRED) | {"starter", "instead", "corpus_classes",
+                                 "langs"}
+
+# The languages `warden init` detects (enroll.ALL_LANGUAGES, pinned equal by
+# tests/test_advisor.py — enroll imports this module, so it is not imported
+# back). An entry's `langs:` names some of these.
+LANGS = ("python", "node", "go")
 
 _USER_AGENT = "nightgate-warden-catalog-check"
 _TIMEOUT = 15
@@ -89,6 +95,14 @@ class Entry:
     #                                 and the corpus speaks this repo's defect
     #                                 classes, and inferring the join would
     #                                 dress prior art up as local evidence.
+    langs: tuple[str, ...] = ()   # the languages whose idioms the STARTER
+    #                               reads (os-command-injection's checks
+    #                               read Python's subprocess spellings).
+    #                               Empty means it reads none in particular.
+    #                               `rules recommend` sets an entry aside on
+    #                               a repo that declares none of them, when
+    #                               its starter matches nothing in the tree;
+    #                               the class may still matter there.
 
 
 def taxonomy_kind(taxonomy: str) -> str:
@@ -234,6 +248,19 @@ def _parse_entry(raw: object, index: int) -> Entry:
                 f"{where}: corpus_classes entry {slug!r} is not a well-formed "
                 "slug — it would match no corpus key and link nothing")
 
+    raw_langs = raw.get("langs", [])
+    if (not isinstance(raw_langs, list) or not raw_langs and "langs" in raw
+            or not all(isinstance(x, str) for x in raw_langs)):
+        raise CatalogError(f"{where}: 'langs' must be a non-empty list of "
+                           f"languages from {LANGS}")
+    unknown_langs = [x for x in raw_langs if x not in LANGS]
+    if unknown_langs:
+        raise CatalogError(f"{where}: 'langs' names {unknown_langs}, not a "
+                           f"language warden init detects {LANGS}")
+    if raw_langs and engine in ("claude", "not-a-rule"):
+        raise CatalogError(f"{where}: 'langs' names the language a STARTER "
+                           f"reads, and engine:{engine} ships none")
+
     return Entry(
         id=entry_id,
         taxonomy=taxonomy,
@@ -246,6 +273,7 @@ def _parse_entry(raw: object, index: int) -> Entry:
         starter=_starter(raw, engine, where),
         instead=instead,
         corpus_classes=tuple(raw_classes),
+        langs=tuple(raw_langs),
     )
 
 

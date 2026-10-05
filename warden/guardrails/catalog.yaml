@@ -23,6 +23,15 @@
 # and a catalog that quietly invented one for tidiness would be a checklist
 # of things that technically pass. Those entries carry `instead:`.
 #
+# `langs:` names the languages whose idioms an entry's STARTER reads —
+# `shell=True`, `pickle.loads`, `except: pass` are Python spellings. An entry
+# without it reads none in particular. `warden rules recommend` sets an entry
+# aside on a repo whose components declare none of its languages, and names it
+# there, because the class may matter in that repo while this starter would
+# match nothing in it. xss-unescaped-output carries no `langs:` on purpose:
+# its checks read browser DOM writes, which live in JavaScript whatever
+# language the server is written in.
+#
 # A catalog entry is a CANDIDATE. Nothing here is enforced until a repo
 # copies a starter into .warden/rules/ and a human merges it.
 version: 1
@@ -65,6 +74,7 @@ entries:
       Queries assembled from untrusted text, which lets a caller rewrite the
       query instead of only filling in its values.
     engine: declarative
+    langs: [python]
     applies_when: >-
       the repo issues SQL — an ORM escape hatch, a raw cursor, or any string
       handed to a database driver
@@ -104,6 +114,7 @@ entries:
       Shell strings built from untrusted input, where a semicolon in a
       filename becomes a second command.
     engine: declarative
+    langs: [python]
     applies_when: the repo shells out at all
     false_positive_cost: >-
       A constant command run through the shell is flagged; the author either
@@ -129,6 +140,7 @@ entries:
       Formats that reconstruct arbitrary objects, where parsing input is
       indistinguishable from executing it.
     engine: declarative
+    langs: [python]
     applies_when: >-
       the repo reads pickles, unrestricted YAML, or any format that can
       instantiate types named in the payload
@@ -211,6 +223,7 @@ entries:
       Paths built from untrusted input that resolve outside the directory
       they were meant to stay inside.
     engine: python
+    langs: [python]
     applies_when: >-
       the repo opens, serves, or extracts files whose names come from a
       request, an archive, or a config
@@ -377,6 +390,7 @@ entries:
       are the same class but are NOT checked by this starter: they have no
       single-line spelling a regex can find without flagging every allowlist.
     engine: declarative
+    langs: [python]
     applies_when: the repo carries deployable configuration
     false_positive_cost: >-
       Test fixtures legitimately disable verification; without an exclude for
@@ -424,6 +438,7 @@ entries:
       Broken primitives and predictable randomness used where the security of
       the system depends on them.
     engine: declarative
+    langs: [python]
     applies_when: the repo hashes, signs, encrypts, or generates tokens
     false_positive_cost: >-
       MD5 as a cache key or a content digest is fine and will be flagged; the
@@ -541,6 +556,7 @@ entries:
       Failures caught and discarded, so a check that errored is
       indistinguishable from a check that passed.
     engine: declarative
+    langs: [python]
     applies_when: always — every language has a way to ignore an error
     false_positive_cost: >-
       A genuinely optional cleanup step is flagged; the author adds a comment
