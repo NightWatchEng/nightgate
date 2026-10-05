@@ -6,6 +6,14 @@ Nightgate is a CLI, a CI workflow and a skill pack. You declare in config what a
 must satisfy. The gate refuses a pull request that does not satisfy it, and every review
 leaves a record committed with the code. There is no server to run and no paid API to call.
 
+## The problem
+
+An agent writes a change and the tests for it, and reports that they pass. A person skims a long diff
+and merges it. Afterwards the PR shows green CI and an approval. It does not show which rules applied,
+who reviewed the change, what they found, or whether it was fixed. The review that would catch a real
+defect is the step that gets skipped. Nightgate makes that review a step CI checks, refusing what fails
+and recording what passed against the commit it reviewed.
+
 **[Wiki](docs/wiki/Home.md)** · [Quickstart](docs/wiki/Quickstart.md) · [Installation](docs/wiki/Installation.md) ·
 [Adopting](docs/wiki/Adopting.md) · [Cost and Throughput](docs/wiki/Cost-and-Throughput.md) ·
 [Architecture](docs/wiki/Architecture.md) · [Why This Exists](docs/wiki/Why-This-Exists.md)
@@ -103,11 +111,7 @@ PR, platform CI runs `warden init` and `warden certify` with that PR's wheel on 
 Make `warden gate` a required check on `main`. Other CI follows the manual steps in [the GitHub-only limit](docs/wiki/Adopting.md#another-ci-the-github-only-limit).
 No job calls a model. The review skills and `engine: claude` rules run as Claude Code sessions, before the PR opens.
 
-## Why
-
-The agent wrote the change and the tests, and says they pass. A person skims the diff and merges it.
-Afterwards the PR shows green CI and an approval. It does not show which rules applied, who reviewed the
-change, or what they found.
+## How it works
 
 - **The gate.** `warden review` runs your rules over the diff and `warden verify` runs your declared commands, in CI on every PR.
 - **Two judges.** A finder lists candidate defects, and a judge in a separate context confirms or refutes each one.
