@@ -297,7 +297,8 @@ DIR=.
 scratch=$(mktemp -d)
 git init -q "$scratch"
 mkdir -p "$scratch/$DIR"
-for m in pyproject.toml package.json go.mod; do
+for m in pyproject.toml package.json go.mod pom.xml build.gradle build.gradle.kts \
+         settings.gradle settings.gradle.kts gradlew; do
   if [ -f "$DIR/$m" ]; then cp "$DIR/$m" "$scratch/$DIR/"; fi
 done
 (cd "$scratch/$DIR" && warden init)
@@ -306,8 +307,8 @@ diff -u ".github/workflows/$f" "$scratch/.github/workflows/$f"
 cp "$scratch/.github/workflows/$f" .github/workflows/
 ```
 
-The workflow depends only on the directory, the manifests found there and the
-release, so the copied file is byte for byte what a fresh enrollment at
+The workflow depends only on the directory, the manifests found there (and,
+for a Gradle build, whether `gradlew` is beside them) and the release, so the copied file is byte for byte what a fresh enrollment at
 v3.0.3 writes. Copy the whole file, not a job: a release can change the
 header comment and steps outside the `gate` job (v3.0.2 changed the `warden
 verify --scope` steps in the `verify` job and added an `id: warden` to its

@@ -64,7 +64,7 @@ _KNOWN_KEYS = set(_REQUIRED) | {"starter", "instead", "corpus_classes",
 # The languages `warden init` detects (enroll.ALL_LANGUAGES, pinned equal by
 # tests/test_advisor.py — enroll imports this module, so it is not imported
 # back). An entry's `langs:` names some of these.
-LANGS = ("python", "node", "go")
+LANGS = ("python", "node", "go", "java")
 
 _USER_AGENT = "nightgate-warden-catalog-check"
 _TIMEOUT = 15

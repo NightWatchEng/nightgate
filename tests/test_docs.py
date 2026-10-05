@@ -1756,8 +1756,8 @@ _ADOPTING_ADAPTATIONS = (
     # The remediation hint. setup-go/setup-node is right for the enrollment
     # the render is rendered for and wrong for the one the page describes, so
     # the page names the pair a python3 consumer actually needs.
-    ("actions/setup-go and actions/setup-node",
-     "astral-sh/setup-uv and actions/setup-python"),
+    ("actions/setup-go, actions/setup-node, actions/setup-java and "
+     "gradle/actions/setup-gradle", "astral-sh/setup-uv and actions/setup-python"),
 )
 
 

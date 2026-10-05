@@ -886,6 +886,10 @@ def test_catalog_langs_belong_only_to_an_entry_with_a_starter(tmp_path):
 def test_catalog_languages_are_the_ones_init_detects():
     from warden import enroll
     assert cat.LANGS == enroll.ALL_LANGUAGES
+    # and the advisor reads each as itself: a `lang: java` component, which
+    # init writes, is a catalog language rather than an other one (round 1, F4)
+    for lang in cat.LANGS:
+        assert advisor._read_lang(lang) == frozenset({lang}), lang
 
 
 def test_the_shipped_catalog_tags_exactly_the_python_idiom_entries():
@@ -1028,7 +1032,7 @@ def test_a_component_with_no_readable_lang_sets_nothing_aside(tmp_path, spec):
 
 
 @pytest.mark.parametrize("spelling", ["md", "Markdown", "rust 1.80", "shell",
-                                      "c++17", "java-21", "docs"])
+                                      "c++17", "kotlin-2", "docs"])
 def test_a_known_other_language_beside_node_still_sets_python_aside(
         tmp_path, spelling):
     """A declared, known non-catalog language is read, not unread: it names

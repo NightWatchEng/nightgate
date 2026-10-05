@@ -9,7 +9,8 @@ Prerequisites: [Installation](Installation.md) — the CLI from a release tag
 ## Enroll your repository with `warden init`
 
 From a directory in a git repository that has a `pyproject.toml`, a
-`package.json` or a `go.mod` in it (`init` reads manifests only there). That is
+`package.json`, a `go.mod`, a `pom.xml` or a Gradle build or settings file in
+it (`init` reads manifests only there). That is
 usually the git root; below it, see *Below the git root* after the table:
 
 ```sh

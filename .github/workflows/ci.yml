@@ -260,6 +260,29 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
         with:
           node-version: "26"
+      # The Java toolchain, for the same reason: tests/test_init.py enrolls a
+      # pom.xml fixture and runs `mvn -q -B test`. The ubuntu-latest image
+      # ships Temurin 17, Maven and Gradle today, which is the undeclared
+      # dependency the comment above retires. setup-java installs the JDK
+      # only, and no first-party action installs Maven, so Maven comes from
+      # stCarolas/setup-maven, pinned by SHA like every action here. Unlike
+      # the go and node inputs, the Maven and Gradle versions are EXACT:
+      # setup-maven downloads the release named and setup-gradle takes a
+      # release or `current`, so neither accepts a minor, and Dependabot does
+      # not bump either input. The Gradle cache is off: nothing here builds
+      # with Gradle, and its default cache provider is a commercial service.
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6  # v6.0.1
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: stCarolas/setup-maven@12eb41b233df95d49b0c11fc1b5bc8312e5d4ce0  # v5.1
+        with:
+          maven-version: "3.9.16"
+      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6  # v6.4.0
+        with:
+          gradle-version: "9.8.0"
+          cache-disabled: true
+          add-job-summary: never
       - name: ruff (pyflakes + syntax)
         run: uv run --locked --with ruff==0.16.5 --python "${{ matrix.python }}" ruff check warden cage tests --select F,E9
       # The checkout contract the suite assumes, ASSERTED rather than declared.
@@ -416,6 +439,19 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
         with:
           node-version: "26"
+      # The Java toolchain, as in the `tests` job and for its reasons.
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6  # v6.0.1
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: stCarolas/setup-maven@12eb41b233df95d49b0c11fc1b5bc8312e5d4ce0  # v5.1
+        with:
+          maven-version: "3.9.16"
+      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6  # v6.4.0
+        with:
+          gradle-version: "9.8.0"
+          cache-disabled: true
+          add-job-summary: never
       - name: the checkout provides the base ref the suite compares against
         run: |
           git rev-parse --verify --quiet origin/main >/dev/null || {

@@ -2330,7 +2330,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_init = sub.add_parser(
         "init",
-        help="enroll the repository in the current directory: detect pyproject.toml, package.json or go.mod and write repo.yaml, starter rules, .warden/skills-policy.md, the CI workflow and .gitignore entries. Refuses (exit 1, naming each) when any file it would write exists")
+        help="enroll the repository in the current directory: detect pyproject.toml, package.json, go.mod, pom.xml or a Gradle build or settings file and write repo.yaml, starter rules, .warden/skills-policy.md, the CI workflow and .gitignore entries. Refuses (exit 1, naming each) when any file it would write exists")
     p_init.set_defaults(func=_cmd_init)
 
     p_explain = sub.add_parser("explain", help="render repo.yaml as an orientation brief")

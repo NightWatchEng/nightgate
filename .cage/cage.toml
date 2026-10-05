@@ -202,4 +202,10 @@ path = ["/usr/local/go/bin"]
 # `command -v` on the machine that will run, which is the only place the
 # answer is true. Not listed: `claude`, `gh` and `python3` — the runner probes
 # those three by name itself, in the same pre-flight, a few lines up.
-require = ["uv", "go", "npm", "bd"]
+# `java`, `mvn` and `gradle`: the founder named this list on 2026-10-05 for
+# Java enrollment (agentops-elsx.26.1). test_init.py's Java fixtures run
+# `mvn -q -B test` and `gradle test`, both on `java`. On a machine with no
+# JDK, Maven or Gradle the runner's pre-flight skips the whole run, naming the
+# first absent one, before a bead is claimed, rather than the strict suite
+# failing those cells at ship.
+require = ["uv", "go", "npm", "bd", "java", "mvn", "gradle"]

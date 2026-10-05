@@ -63,20 +63,22 @@ pull request (`scripts/tracker-from-a-clone.sh`).
 ## What the suite needs on your machine
 
 Beyond Python and [uv](https://docs.astral.sh/uv/), this repo's tests need
-**Go** and **npm** installed:
+**Go** and **npm** installed, and for the Java cells a JDK (`java`), Maven
+(`mvn`) and Gradle (`gradle`):
 
 ```sh
 brew install go node          # macOS; see go.dev/dl and nodejs.org otherwise
+brew install openjdk@17 maven gradle   # adoptium.net, maven.apache.org, gradle.org otherwise
 ```
 
 They are not build dependencies of the platform — Nightgate is Python. They are
 there because `tests/test_init.py` enrolls a fixture repo *per language* and
 then RUNS the verify scope `warden init` wrote for it, so the suite shells out
-to a real `go` and a real `npm`. That is the only executable proof here that
+to a real `go`, `npm` and `mvn`. That is the only executable proof here that
 the enrollment surface works for languages the platform is not written in,
 which is the portability claim itself, so it is not something to stub.
 
-Without them the suite still runs: the five affected cells arrive as **named
+Without them the suite still runs: the affected cells arrive as **named
 skips** telling you exactly which binary is missing and how to get it, and
 everything else passes.
 
@@ -84,7 +86,7 @@ Where the toolchain was *promised*, the same absence is a **named failure**
 instead — that is CI, and this repo's own gate, `warden verify --scope tests`.
 The switch is the `NIGHTGATE_REQUIRE_TOOLCHAIN` environment variable, and it
 falls back to `CI` when unset. So if your shell exports `CI` (direnv, some tool
-wrappers, a nested harness) you will get those five as failures rather than
+wrappers, a nested harness) you will get those cells as failures rather than
 skips; `NIGHTGATE_REQUIRE_TOOLCHAIN=0 uv run pytest -q` opts back out. The old
 name, `AGENTOPS_REQUIRE_TOOLCHAIN`, is still read when the new one is unset,
 and the run prints a deprecation line saying so; it stops being read in v4.0.0.

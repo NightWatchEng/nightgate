@@ -1302,7 +1302,10 @@ def test_the_cage_declares_every_toolchain_the_enrollment_surface_runs():
     with tempfile.TemporaryDirectory() as probe:
         for lang in enroll_mod.LANGUAGES:
             for command in enroll_mod.verify_commands(Path(probe), lang):
-                binary = verify_mod.first_binary(command)
+                # A wrapper (`./gradlew`) resolves against the repository, not
+                # PATH; what it needs from PATH is what enroll says it runs on.
+                binary = (verify_mod.first_binary(command)
+                          or enroll_mod.WRAPPER_RUNS_ON.get(command.split()[0]))
                 if binary is None:
                     unparseable.append(f"{lang.name}: {command!r}")
                 else:

@@ -53,6 +53,17 @@ FIXTURES = {
              "index.js": "exports.add = (a, b) => a + b;\n"},
     "go": {"go.mod": "module example.com/demo\n\ngo 1.22\n",
            "demo.go": "package demo\n\nfunc Add(a, b int) int { return a + b }\n"},
+    "java": {"pom.xml": (
+        '<project xmlns="http://maven.apache.org/POM/4.0.0">\n'
+        "  <modelVersion>4.0.0</modelVersion>\n"
+        "  <groupId>com.example</groupId><artifactId>demo</artifactId>"
+        "<version>0.1.0</version>\n"
+        "  <properties><maven.compiler.release>17</maven.compiler.release>"
+        "<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>"
+        "</properties>\n</project>\n"),
+        "src/main/java/demo/Demo.java": (
+            "package demo;\n\npublic class Demo {\n"
+            "    public static int add(int a, int b) { return a + b; }\n}\n")},
 }
 
 
@@ -143,7 +154,8 @@ def test_init_takes_a_fresh_repo_to_level_3_with_no_hand_written_file(
     ("python", ["PYTHONDONTWRITEBYTECODE=1 uv run --isolated --with pytest "
                 "python -m pytest -q || [ $? -eq 5 ]"]),
     ("node", ["npm install --no-package-lock", "npm test"]),
-    ("go", ["go vet ./...", "go test ./..."])])
+    ("go", ["go vet ./...", "go test ./..."]),
+    ("java", ["mvn -q -B test"])])
 def test_init_detects_the_manifest_and_writes_its_verify_scope(
         lang, scope, tmp_path, monkeypatch):
     repo = _repo(tmp_path, FIXTURES[lang])
@@ -194,7 +206,80 @@ def test_init_refuses_a_directory_with_no_manifest_and_writes_nothing(
     assert _warden(repo, monkeypatch, "init") == 2
     err = capsys.readouterr().err
     assert "pyproject.toml" in err and "package.json" in err and "go.mod" in err
+    assert "pom.xml" in err and "build.gradle" in err
     assert _snapshot(repo) == before
+
+
+@pytest.mark.parametrize("files, manifest, command, preflight, ignores", [
+    ({"build.gradle": "plugins { id 'java' }\n"}, "build.gradle", "gradle test",
+     '"gradle:java"', ("build/", ".gradle/")),
+    ({"build.gradle.kts": "plugins { java }\n"}, "build.gradle.kts", "gradle test",
+     '"gradle:java"', ("build/", ".gradle/")),
+    ({"build.gradle": "plugins { id 'java' }\n", "gradlew": "#!/bin/sh\n"},
+     "build.gradle", "./gradlew test", '"java:java"', ("build/", ".gradle/")),
+    # `gradle init`'s own layout: the build file is in app/, and only the
+    # settings file and the wrapper are at the root (round 1, F1)
+    ({"settings.gradle.kts": 'include("app")\n', "gradlew": "#!/bin/sh\n",
+      "app/build.gradle.kts": "plugins { java }\n"},
+     "settings.gradle.kts", "./gradlew test", '"java:java"', ("build/", ".gradle/")),
+    ({"pom.xml": FIXTURES["java"]["pom.xml"], "build.gradle": ""}, "pom.xml",
+     "mvn -q -B test", '"mvn:java"', ("target/",))])
+def test_init_writes_gradle_test_or_the_wrapper_for_a_gradle_build(
+        files, manifest, command, preflight, ignores, tmp_path, monkeypatch, capsys):
+    """A Gradle build runs its own wrapper when it has one and `gradle test`
+    when it does not; a tree with both manifests runs Maven. The pre-flight
+    requires what THAT build runs, so a Maven repository is never refused for
+    want of gradle, and a wrapper build requires the JDK it starts. Each build
+    ignores its own output and no other's (round 1, F0)."""
+    source = "src/main/java/demo/Demo.java"
+    repo = _repo(tmp_path, {**files, source: FIXTURES["java"][source]})
+    assert _warden(repo, monkeypatch, "init") == 0
+    assert f"java ({manifest})" in capsys.readouterr().out
+    config = config_mod.load(repo)
+    assert {n: [s.run for s in steps] for n, steps in config.verify.items()} \
+        == {"java": [command]}
+    assert [c.lang for c in config.components] == ["java"]
+    workflow = (repo / enroll.WORKFLOW_PATH).read_text()
+    assert f"for pair in {preflight}; do" in workflow
+    added = (repo / ".gitignore").read_text().splitlines()
+    assert [e for e in ("target/", "build/", ".gradle/") if e in added] == list(ignores)
+
+
+def test_a_gradle_build_with_no_tests_verifies_and_leaves_the_tree_clean(
+        tmp_path, monkeypatch):
+    """The Gradle half of the java scope, RUN rather than read (round 1, F2):
+    `gradle test` on a build file with no settings file and no test passes,
+    and its `build/` and `.gradle/` output is ignored."""
+    source = "src/main/java/demo/Demo.java"
+    repo, _ = _enrolled(tmp_path, monkeypatch, {
+        "build.gradle": "plugins { id 'java' }\n", source: FIXTURES["java"][source]})
+    code, result = _verify(repo, monkeypatch, "java")
+    assert code == 0, result
+    assert result["dirty"] is False, _git(repo, "status", "--porcelain")
+    assert (repo / "build").is_dir(), "the control: gradle really built"
+
+
+def test_init_warns_when_a_java_repo_has_no_test_under_src_test(
+        tmp_path, monkeypatch, capsys):
+    repo = _repo(tmp_path, FIXTURES["java"])
+    assert _warden(repo, monkeypatch, "init") == 0
+    assert "warning: no java test found (Test*, *Test" in capsys.readouterr().out
+    # Surefire's default includes, Kotlin, and a module's own src/test (round 1, F3)
+    for path in ("src/test/java/demo/DemoTest.java", "src/test/java/demo/DemoTests.java",
+                 "src/test/java/demo/TestDemo.java", "src/test/java/demo/DemoTestCase.java",
+                 "src/test/kotlin/demo/DemoTest.kt", "core/src/test/java/demo/DemoTest.java"):
+        tested = _repo(tmp_path, {**FIXTURES["java"], path: "class X {}\n"},
+                       name=path.replace("/", "-"))
+        assert enroll.missing_test_warnings(tested, enroll.detect(tested)) == [], path
+    helper = _repo(tmp_path, {**FIXTURES["java"],
+                              "src/test/java/demo/Fixtures.java": "class X {}\n"},
+                   name="helper")
+    assert enroll.missing_test_warnings(helper, enroll.detect(helper)), (
+        "a src/test class no runner collects is not a test")
+    elsewhere = _repo(tmp_path, {**FIXTURES["java"], "DemoTest.java": "class X {}\n"},
+                      name="elsewhere")
+    assert enroll.missing_test_warnings(elsewhere, enroll.detect(elsewhere)), (
+        "a test file outside src/test is one Maven and Gradle never run")
 
 
 def test_repo_yaml_declares_a_repair_budget_within_the_platform_cap(tmp_path, monkeypatch):
@@ -275,7 +360,8 @@ def test_an_existing_gitignore_is_extended_never_rewritten(tmp_path, monkeypatch
 @pytest.mark.parametrize("lang, expected", [
     ("python", {"secrets-in-diff", "swallowed-exceptions"}),
     ("node", {"secrets-in-diff"}),
-    ("go", {"secrets-in-diff"})])
+    ("go", {"secrets-in-diff"}),
+    ("java", {"secrets-in-diff"})])
 def test_starter_rules_come_from_the_catalog_and_fit_the_language(
         lang, expected, tmp_path, monkeypatch):
     repo = _repo(tmp_path, FIXTURES[lang])
@@ -3512,6 +3598,17 @@ def test_every_language_declares_what_its_verify_commands_invoke(tmp_path):
         invoked = set().union(*(_invoked_binaries(cmd) for cmd in
                                 enroll.verify_commands(tmp_path, lang)))
         assert set(lang.tools) == invoked, lang.name
+    # java's detected forms: each one's tools are what its command invokes,
+    # or for a wrapper, the binary enroll says the wrapper runs on.
+    for files in ({"build.gradle": ""}, {"build.gradle": "", "gradlew": ""}):
+        root = tmp_path / "-".join(files)
+        root.mkdir()
+        for rel, text in files.items():
+            (root / rel).write_text(text)
+        (java,) = enroll.detect(root)
+        (cmd,) = enroll.verify_commands(root, java)
+        invoked = _invoked_binaries(cmd) or {enroll.WRAPPER_RUNS_ON[cmd.split()[0]]}
+        assert set(java.tools) == invoked, files
     # A language without the field does not import, which is why no test can
     # be the only thing standing between a new one and an undeclared runner.
     with pytest.raises(TypeError):
@@ -3546,7 +3643,8 @@ def test_the_preflight_names_every_absent_binary_not_just_the_first(tmp_path):
 def test_the_preflight_passes_and_says_nothing_when_the_toolchain_is_there(
         tmp_path):
     doc = _workflow(enroll.ALL_LANGUAGES)
-    bindir = _toolbin(tmp_path, ("go", "npm"))
+    bindir = _toolbin(tmp_path, tuple(t for lang in enroll.LANGUAGES for t in lang.tools
+                                      if t not in enroll.GATE_INSTALLS))
     result = _run_step(doc, "verify", _step(doc, "verify", enroll.TOOLCHAIN_STEP),
                        {**_AMBIENT_GIT_CONFIG, "PATH": str(bindir)}, tmp_path)
     assert result.returncode == 0, result

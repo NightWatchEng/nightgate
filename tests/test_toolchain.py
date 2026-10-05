@@ -50,6 +50,11 @@ _INSTALLER = {
     "uv": "astral-sh/setup-uv",
     "go": "actions/setup-go",
     "npm": "actions/setup-node",
+    "java": "actions/setup-java",
+    # No first-party action installs Maven: setup-java installs the JDK only.
+    # stCarolas/setup-maven downloads the exact release from Maven Central.
+    "mvn": "stCarolas/setup-maven",
+    "gradle": "gradle/actions/setup-gradle",
 }
 
 
@@ -91,6 +96,9 @@ def test_the_declaration_covers_every_binary_the_enrollment_surface_runs():
         "npm-tested": {"package.json": '{"name":"demo","scripts":{"test":"node --test"}}\n'},
         "npm-placeholder": {"package.json": json.dumps(
             {"name": "demo", "scripts": {"test": enroll_mod.NPM_INIT_PLACEHOLDER}}) + "\n"},
+        "maven": {"pom.xml": "<project/>\n"},
+        "gradle": {"build.gradle": ""},
+        "gradle-wrapper": {"build.gradle.kts": "", "gradlew": "#!/bin/sh\n"},
     }
     needed, commands = set(), set()
     for shape, files in shapes.items():
@@ -100,7 +108,11 @@ def test_the_declaration_covers_every_binary_the_enrollment_surface_runs():
             for lang in enroll_mod.LANGUAGES:
                 for command in enroll_mod.verify_commands(Path(probe), lang):
                     commands.add(command)
-                    binary = verify_mod.first_binary(command)
+                    # A repository's own wrapper resolves against its checkout,
+                    # never PATH, so `first_binary` declines it; what it needs
+                    # from PATH is the binary enroll says it runs on.
+                    binary = (verify_mod.first_binary(command)
+                              or enroll_mod.WRAPPER_RUNS_ON.get(command.split()[0]))
                     assert binary, (
                         f"`warden init` can write the verify step {command!r} "
                         f"(repo shape {shape!r}) and `verify.first_binary` "
@@ -111,11 +123,11 @@ def test_the_declaration_covers_every_binary_the_enrollment_surface_runs():
     # EXACT, not a floor (round 2 nit): a floor one short lets a probe shape
     # leave without tripping anything. Changing this number is a deliberate
     # edit that says a branch was added or removed.
-    assert len(commands) == 7, (
+    assert len(commands) == 10, (
         f"the probe shapes walked {len(commands)} distinct verify commands "
-        f"({sorted(commands)}), not the 7 branches `enroll.verify_commands` "
+        f"({sorted(commands)}), not the 10 branches `enroll.verify_commands` "
         "holds (python x2 lock states, node install x2 plus `npm test`, go "
-        "x2). Fewer means this guard samples rather than covers and a new "
+        "x2, java mvn, gradle and the gradle wrapper). Fewer means this guard samples rather than covers and a new "
         "branch could carry an undeclared binary; more means a branch was "
         "added and this number should move with it")
 

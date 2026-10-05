@@ -70,7 +70,7 @@ dev = ["pytest>=8", "pytest-xdist>=3.6"]
 # chose — nothing here runs without them, including the checkout that got you
 # the file, so an absence has no failure mode left to name.
 [tool.nightgate.toolchain]
-require = ["uv", "go", "npm"]
+require = ["uv", "go", "npm", "java", "mvn", "gradle"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]

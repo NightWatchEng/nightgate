@@ -88,6 +88,9 @@ _INSTALL_HINT = {
     "go": "https://go.dev/dl/ (or `brew install go`)",
     "npm": "https://nodejs.org/ (or `brew install node`)",
     "uv": "https://docs.astral.sh/uv/getting-started/installation/",
+    "java": "https://adoptium.net/ (or `brew install openjdk@17`)",
+    "mvn": "https://maven.apache.org/download.cgi (or `brew install maven`)",
+    "gradle": "https://gradle.org/install/ (or `brew install gradle`)",
 }
 
 

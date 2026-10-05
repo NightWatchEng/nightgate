@@ -2,7 +2,9 @@
 
 Detection is by file presence in the working directory, never the network.
 Every manifest found enrolls its language: `pyproject.toml` is python,
-`package.json` is node, `go.mod` is go. Each detected language gets its own
+`package.json` is node, `go.mod` is go, and `pom.xml` or a Gradle build or
+settings file (`build.gradle`, `settings.gradle`, or their `.kts` forms) is
+java. Each detected language gets its own
 component, verify scope and CI verify step, and the starter rules that read
 its source.
 
@@ -11,10 +13,14 @@ they found it: python runs pytest against `uv.lock` when there is one and in a
 throwaway environment when there is not, writes no bytecode, and takes pytest's
 exit 5 (nothing collected) as a pass; node installs without writing a lockfile
 and runs `npm test` only for a test script that is not npm init's placeholder;
-go runs `go vet` and `go test`, which already pass with no test files. What a
-build leaves behind is ignored instead: `*.egg-info/` for python, which a
-setuptools project writes on every run, and `node_modules/` for node. Init
-warns, and still enrolls, where it finds no test.
+go runs `go vet` and `go test`, which already pass with no test files; java
+runs `mvn -q -B test` for a `pom.xml`, else the repository's own Gradle wrapper
+when it has one and `gradle test` when it does not, each of which passes with
+no tests. What a build leaves behind is ignored instead: `*.egg-info/` for
+python, which a setuptools project writes on every run, `node_modules/` for
+node, `target/` for a Maven build and `build/` and `.gradle/` for a Gradle one,
+as each tool's own generated `.gitignore` spells them. Init warns, and still
+enrolls, where it finds no test.
 
 The generated gate DECLARES the toolchain those commands invoke and installs
 no toolchain of the enrolled repository's own. Where there is
@@ -65,7 +71,7 @@ import os
 import re
 import sys
 import textwrap
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 import yaml
@@ -87,7 +93,8 @@ POLICY_PATH = ".warden/skills-policy.md"
 RULES_DIR = config_mod.DEFAULT_RULES_DIR
 GITIGNORE_ENTRIES = (".warden/out/", ".warden/memory/findings.jsonl",
                      ".warden/memory/gate/")
-BUILD_OUTPUT_IGNORES = {"python": ("*.egg-info/",), "node": ("node_modules/",)}
+BUILD_OUTPUT_IGNORES = {"python": ("*.egg-info/",), "node": ("node_modules/",),
+                        "pom.xml": ("target/",), "gradle": ("build/", ".gradle/")}
 # The repository the emitted gate installs the platform from: anonymously from
 # PLATFORM_PUBLIC_URL with no secret, or over ssh with a read-only deploy key
 # stored as DEPLOY_KEY_SECRET when a pin needs one. A consumer that stored only the old
@@ -120,14 +127,45 @@ class Language:
     tools: tuple[str, ...]
 
 
+# java's entry is its Maven form. A Gradle repository is the same language
+# with another manifest, command and toolchain, so `detect` returns the form
+# `java_build` reads off the tree and the pre-flight requires what THAT build
+# runs: a Maven repository is never refused for want of gradle.
 LANGUAGES = (
     Language("python", "pyproject.toml", ("**/*.py",), ("uv",)),
     Language("node", "package.json",
              ("**/*.js", "**/*.jsx", "**/*.mjs", "**/*.cjs", "**/*.ts", "**/*.tsx"),
              ("npm",)),
     Language("go", "go.mod", ("**/*.go",), ("go",)),
+    Language("java", "pom.xml", ("**/*.java",), ("mvn",)),
 )
 ALL_LANGUAGES = tuple(lang.name for lang in LANGUAGES)
+
+# The settings files are manifests too: `gradle init` writes its build file in
+# `app/` and only the settings file and the wrapper at the root.
+GRADLE_MANIFESTS = ("build.gradle", "build.gradle.kts",
+                    "settings.gradle", "settings.gradle.kts")
+#: A repository's own build wrapper, which PATH does not resolve
+#: (`verify.first_binary` declines a path-bearing name), mapped to the binary
+#: it runs on: `gradlew` starts the JDK from JAVA_HOME or PATH and downloads
+#: its own Gradle. The pre-flight requires that binary for a wrapper build,
+#: and the toolchain guards in tests/ read this map rather than retyping it.
+WRAPPER_RUNS_ON = {"./gradlew": "java"}
+
+
+def java_build(root: Path) -> tuple[str, str, tuple[str, ...]]:
+    """The java build at ROOT: (manifest, verify command, tools). `pom.xml`
+    first when a tree has both, since one scope runs one build; a Gradle
+    manifest runs the repository's own wrapper when `gradlew` is beside it.
+    A tree with neither reads as the Maven form, which is the entry's own."""
+    if (root / "pom.xml").is_file():
+        return "pom.xml", "mvn -q -B test", ("mvn",)
+    for manifest in GRADLE_MANIFESTS:
+        if (root / manifest).is_file():
+            if (root / "gradlew").is_file():
+                return manifest, "./gradlew test", (WRAPPER_RUNS_ON["./gradlew"],)
+            return manifest, "gradle test", ("gradle",)
+    return "pom.xml", "mvn -q -B test", ("mvn",)
 
 
 @dataclass(frozen=True)
@@ -149,7 +187,15 @@ STARTERS = {
 
 
 def detect(root: Path) -> tuple[Language, ...]:
-    return tuple(lang for lang in LANGUAGES if (root / lang.manifest).is_file())
+    found = []
+    for lang in LANGUAGES:
+        if lang.name == "java":
+            if any((root / m).is_file() for m in ("pom.xml", *GRADLE_MANIFESTS)):
+                manifest, _, tools = java_build(root)
+                found.append(replace(lang, manifest=manifest, tools=tools))
+        elif (root / lang.manifest).is_file():
+            found.append(lang)
+    return tuple(found)
 
 
 NPM_INIT_PLACEHOLDER = 'echo "Error: no test specified" && exit 1'
@@ -174,6 +220,21 @@ def _has_file(root: Path, match) -> bool:
     return False
 
 
+def _has_java_test(root: Path) -> bool:
+    """A test class under any module's `src/test`, named as Maven Surefire's
+    default includes name one (Gradle runs whatever compiles there)."""
+    for folder, dirs, files in os.walk(root):
+        dirs[:] = [d for d in dirs if d not in _NOT_SOURCE and not d.startswith(".")]
+        if "/src/test/" not in f"/{Path(folder).relative_to(root).as_posix()}/":
+            continue
+        for name in files:
+            stem, dot, ext = name.rpartition(".")
+            if dot and ext in ("java", "kt") and (
+                    stem.startswith("Test") or stem.endswith(("Test", "Tests", "TestCase"))):
+                return True
+    return False
+
+
 def verify_commands(root: Path, lang: Language) -> tuple[str, ...]:
     if lang.name == "python":
         env = "--locked" if (root / "uv.lock").is_file() else "--isolated"
@@ -183,6 +244,8 @@ def verify_commands(root: Path, lang: Language) -> tuple[str, ...]:
         install = "npm ci" if (root / "package-lock.json").is_file() \
             else "npm install --no-package-lock"
         return (install, "npm test") if node_test_script(root) else (install,)
+    if lang.name == "java":
+        return (java_build(root)[1],)
     return ("go vet ./...", "go test ./...")
 
 
@@ -202,6 +265,10 @@ def missing_test_warnings(root: Path, langs: tuple[Language, ...]) -> list[str]:
         elif lang.name == "go" and not _has_file(root, lambda n: n.endswith("_test.go")):
             out.append("no go test found (*_test.go): go test passes with no test "
                        "files until you add one")
+        elif lang.name == "java" and not _has_java_test(root):
+            out.append("no java test found (Test*, *Test, *Tests or *TestCase .java "
+                       "or .kt under a src/test directory): the java scope passes "
+                       "with no tests run until you add one")
     return out
 
 
@@ -364,7 +431,7 @@ def render_toolchain_step(langs: tuple[Language, ...]) -> str:
             missing="$missing $tool"
           done
           if [ -n "$missing" ]; then
-            echo "This gate declares the toolchain its verify commands run and installs no toolchain of this repository's own. Add a step to this workflow, above this one, that installs${{missing}} — actions/setup-go and actions/setup-node are the usual ones, each pinned to a commit sha — or change the verify commands in repo.yaml to a toolchain this runner already carries." >&2
+            echo "This gate declares the toolchain its verify commands run and installs no toolchain of this repository's own. Add a step to this workflow, above this one, that installs${{missing}} — actions/setup-go, actions/setup-node, actions/setup-java and gradle/actions/setup-gradle are the usual ones, each pinned to a commit sha — or change the verify commands in repo.yaml to a toolchain this runner already carries." >&2
             echo "PATH=$PATH" >&2
             exit 2
           fi
@@ -511,7 +578,8 @@ def plan(root: Path) -> Plan:
     langs = detect(root)
     if not langs:
         raise EnrollError(
-            f"no pyproject.toml, package.json or go.mod in {root}; init reads "
+            f"no pyproject.toml, package.json, go.mod, pom.xml, build.gradle or "
+            f"settings.gradle (or their .kts forms) in {root}; init reads "
             "manifests only in the directory it enrolls, so run it in the "
             "directory that holds one")
     files = {config_mod.CONFIG_NAME: render_repo_yaml(root, langs)}
@@ -528,9 +596,17 @@ def plan(root: Path) -> Plan:
     return Plan(langs, files, prefix)
 
 
+def _build_output_key(lang: Language) -> str:
+    """java's build output is its build tool's, so it is keyed by the
+    manifest `detect` found: a Maven repository is not handed Gradle's."""
+    if lang.name != "java":
+        return lang.name
+    return "pom.xml" if lang.manifest == "pom.xml" else "gradle"
+
+
 def gitignore_entries(langs: tuple[Language, ...]) -> tuple[str, ...]:
     return GITIGNORE_ENTRIES + tuple(
-        e for lang in langs for e in BUILD_OUTPUT_IGNORES.get(lang.name, ()))
+        e for lang in langs for e in BUILD_OUTPUT_IGNORES.get(_build_output_key(lang), ()))
 
 
 def _gitignore_addition(root: Path, langs: tuple[Language, ...]) -> bytes:

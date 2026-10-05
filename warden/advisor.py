@@ -737,7 +737,7 @@ _CATALOG_WORDS = {
     "python": "python", "cpython": "python", "pypy": "python", "py": "python",
     "node": "node", "nodejs": "node", "javascript": "node", "js": "node",
     "typescript": "node", "ts": "node", "deno": "node", "bun": "node",
-    "go": "go", "golang": "go",
+    "go": "go", "golang": "go", "java": "java",
 }
 # Words that name something no catalog starter reads. A spelling made only
 # of these declares a known other language, which is what lets a node repo
@@ -747,7 +747,7 @@ _OTHER_WORDS = frozenset((
     "html", "css", "scss", "sass", "yaml", "yml", "json", "toml", "xml",
     "shell", "sh", "bash", "zsh", "fish", "powershell", "sql",
     "terraform", "hcl", "docker", "dockerfile", "make", "makefile", "nix",
-    "proto", "protobuf", "graphql", "rust", "java", "kotlin", "scala",
+    "proto", "protobuf", "graphql", "rust", "kotlin", "scala",
     "groovy", "ruby", "php", "swift", "c", "c++", "cpp", "c#", "csharp",
     "f#", "dotnet", "elixir", "erlang", "haskell", "ocaml", "clojure",
     "dart", "lua", "perl", "r", "julia", "zig", "nim", "solidity",
