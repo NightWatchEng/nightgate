@@ -186,7 +186,7 @@ rules dir and a human merges it.
 
 `warden rules recommend` leads with **UNANSWERED: N**. Three things shrink it:
 adopting an entry, answering it in `.warden/catalog-answers.yaml`, or — on a
-warden newer than v3.0.2 — declaring each component's `lang:` in `repo.yaml`.
+warden at v3.0.3 or later — declaring each component's `lang:` in `repo.yaml`.
 
 ```yaml
 version: 1
@@ -234,7 +234,7 @@ Python, a report recommending an `engine:python` entry says, under PRIOR ART,
 that the engine names the language the checker is written in, not the one it
 reads.
 
-No tagged release carries any of this paragraph yet: v3.0.2 and earlier have
+v3.0.3 is the first release that carries this paragraph: v3.0.2 and earlier have
 no `langs:` key and no OTHER LANGUAGES section, so on a repo pinned there a
 declared `lang:` sets nothing aside and moves no count.
 

@@ -5,7 +5,9 @@ A release is a tag on `main` whose name is
 `platform.pin` names one, and every `warden` command compares that pin
 against the running version and fails closed on a mismatch
 (`warden/config.py` `enforce_platform_pin`). A builder prepares the release PR;
-the founder merges it and pushes the tag. What v3.0.2 carries is in
+the founder merges it and pushes the tag. What v3.0.3 carries is in
+[release-notes-v3.0.3](../design/release-notes-v3.0.3.md), a patch release;
+v3.0.2's is
 [release-notes-v3.0.2](../design/release-notes-v3.0.2.md), a patch release;
 v3.0.1's is
 [release-notes-v3.0.1](../design/release-notes-v3.0.1.md), a patch release;
@@ -27,7 +29,7 @@ v2.3.0's is [release-notes-v2.3.0](../design/release-notes-v2.3.0.md).
    | `repo.yaml` | `platform.pin` | `enforce_platform_pin`: every `warden` command in the suite, first `tests/test_declare_check.py::test_this_repo_has_no_declaration_drift` |
    | `examples/hello-svc/repo.yaml` | `platform.pin` | `enforce_platform_pin`; `tests/test_declare_check.py`; the `portability proof` CI job |
    | `docs/wiki/Adopting.md` | the `repo.yaml` snippet, byte-identical to hello-svc's | `tests/test_docs.py::test_adopting_repo_yaml_snippet_is_the_real_file` |
-   | `README.md` Install and Try it | the `@vX.Y.Z` install lines, `warden X.Y.Z`, the `ls-remote` check | `tests/test_install_tag_check.py` (the install lines and `warden X.Y.Z` by `test_each_install_page_names_the_current_release_in_its_install_and_version_lines`); `tests/test_init_proof.py`; the `warden init proof` CI job, whose `scripts/init-proof.sh` refuses a Try it install line that is not `@v` + the version of the wheel it built |
+   | `README.md` Install and Try it | the `@vX.Y.Z` install lines, `warden X.Y.Z`, the `ls-remote` check, the marketplace `#vX.Y.Z` | `tests/test_install_tag_check.py` (the install lines and `warden X.Y.Z` by `test_each_install_page_names_the_current_release_in_its_install_and_version_lines`); `tests/test_init_proof.py`; the `warden init proof` CI job, whose `scripts/init-proof.sh` refuses a Try it install line that is not `@v` + the version of the wheel it built; the marketplace line by `tests/test_init.py::test_every_doc_adds_the_skill_pack_marketplace_by_its_github_url` |
    | `docs/wiki/Installation.md` sections 1 and 3 and *Upgrading an enrolled repository* | the install line, `warden X.Y.Z`, the `ls-remote` check, the marketplace `#vX.Y.Z` | `tests/test_install_tag_check.py`; `tests/test_init.py::test_every_doc_adds_the_skill_pack_marketplace_by_its_github_url`; `tests/test_packpin.py::test_the_documented_install_and_init_name_the_pin_and_the_manifest`; the upgrade section's install line by `tests/test_init.py::test_the_upgrade_sections_recopy_rewrites_the_workflow_to_a_fresh_enrollments` |
    | Installation.md section 3 and `Skill-Pack.md` | the sentence `warden/packpin.py` `check_step(pin)` returns for hello-svc's pin | `tests/test_packpin.py::test_the_wiki_sentence_is_the_one_for_the_adopted_pin`, `test_no_wiki_page_offers_skills_pin_to_a_pin_that_lacks_it`, `test_the_pages_drift_at_the_pin_on_the_other_side_of_the_command` |
 
