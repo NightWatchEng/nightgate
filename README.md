@@ -73,7 +73,7 @@ cannot find `v3.0.2`, run `git ls-remote --tags https://github.com/NightWatchEng
 It prints one line when the tag is published and nothing when it is not.
 
 The skill pack, which holds `deliver` and `pre-pr-review`, installs into Claude Code as below.
-[Installation](docs/wiki/Installation.md) covers it in full, with the deploy key and [the cage](docs/wiki/The-Cage.md).
+[Installation](docs/wiki/Installation.md) covers it in full, with [the cage](docs/wiki/The-Cage.md).
 
 ```bash
 claude plugin marketplace add 'https://github.com/NightWatchEng/nightgate#v3.0.2'
@@ -90,26 +90,32 @@ warden init
 warden certify --level 3
 ```
 
-`warden init` writes `repo.yaml`, starter rules, a skills policy and the CI gate.
-`warden certify --level 3` then reports `certification: LEVEL 3 (Reviewed)` with no file written
-by hand. For every PR, platform CI installs that PR's wheel in place of the tag and runs the
-other two commands on fresh Python, Node and Go repositories. [Quickstart](docs/wiki/Quickstart.md) goes on from here.
+`warden certify --level 3` then reports `certification: LEVEL 3 (Reviewed)` with no file written by hand. For every
+PR, platform CI runs `warden init` and `warden certify` with that PR's wheel on fresh Python, Node and Go repositories.
+
+**What runs in CI.** `warden init` writes `repo.yaml`, starter rules, a skills policy and the gate,
+`.github/workflows/warden.yml`. Commit and push them. Every pull request then runs three GitHub Actions jobs:
+
+1. **install** fetches the platform release that `repo.yaml` pins.
+2. **verify** runs the test and lint commands that `repo.yaml` declares.
+3. **gate** runs `warden review`, `warden attest check` and `warden certify`. It fails if verify failed.
+
+Make `warden gate` a required check on `main`. Other CI follows the manual steps in [the GitHub-only limit](docs/wiki/Adopting.md#another-ci-the-github-only-limit).
+No job calls a model. The review skills and `engine: claude` rules run as Claude Code sessions, before the PR opens.
 
 ## Why
 
-The agent wrote the change and the tests, and says they pass. A person skims the
-diff and merges it. Afterwards the PR shows green CI and an approval. It does not
-show which rules applied, who reviewed the change, or what they found.
+The agent wrote the change and the tests, and says they pass. A person skims the diff and merges it.
+Afterwards the PR shows green CI and an approval. It does not show which rules applied, who reviewed the
+change, or what they found.
 
 - **The gate.** `warden review` runs your rules over the diff and `warden verify` runs your declared commands, in CI on every PR.
 - **Two judges.** A finder lists candidate defects, and a judge in a separate context confirms or refutes each one.
 - **The record.** Each review ends in `warden attest write`, its record is committed with the code, and `warden attest check` refuses a PR with no record.
 - **The memory.** Past findings feed the next plan and the next review, and the `retro` skill proposes rules from them.
 
-Three rules hold throughout. Hard stops live outside the model. A person holds merge
-authority. Nothing needs a server of its own. `examples/hello-svc` certifies LEVEL 3
-(Reviewed) in this repository's CI on every PR. [Cost and Throughput](docs/wiki/Cost-and-Throughput.md)
-has the measured costs, and [Why This Exists](docs/wiki/Why-This-Exists.md) says what is not yet proven.
+Two rules hold throughout. Hard stops live outside the model, and a person holds merge authority. The measured
+costs are in [Cost and Throughput](docs/wiki/Cost-and-Throughput.md), and [Why This Exists](docs/wiki/Why-This-Exists.md) says what is not yet proven.
 
 ## Documentation
 
@@ -124,7 +130,6 @@ and they land as [Landing a change here](CONTRIBUTING.md#landing-a-change-here) 
 
 ## License
 
-Nightgate is **source-available, not open source**, under the [PolyForm Shield
-License 1.0.0](LICENSE.md), copyright NightWatchEng. You may use it and copy it into
-your own repositories. You may not offer it, or anything substantially derived from
-it, as a competing product or service. The license text is authoritative.
+Nightgate is **source-available, not open source**, under the [PolyForm Shield License 1.0.0](LICENSE.md),
+copyright NightWatchEng. You may use it and copy it into your own repositories. You may not offer it, or
+anything substantially derived from it, as a competing product or service. The license text is authoritative.
