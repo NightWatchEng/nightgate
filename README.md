@@ -98,8 +98,10 @@ warden init
 warden certify --level 3
 ```
 
-`warden certify --level 3` then reports `certification: LEVEL 3 (Reviewed)` with no file written by hand. For every
-PR, platform CI runs `warden init` and `warden certify` with that PR's wheel on fresh Python, Node and Go repositories.
+`warden certify --level 3` then reports `certification: LEVEL 3 (Reviewed)` with no file written by hand. `warden init`
+writes `repo.yaml` for Python, Node and Go, and for every PR, platform CI runs `warden init` and `warden certify` with
+that PR's wheel on a fresh repository of each. Any other language works with a hand-written `repo.yaml`, the other
+files [Adopting](docs/wiki/Adopting.md) shows, and a gate job that installs `warden` as [Install](#install) does.
 
 **What runs in CI.** `warden init` writes `repo.yaml`, starter rules, a skills policy and the gate,
 `.github/workflows/warden.yml`. Commit and push them. Every pull request then runs three GitHub Actions jobs:
