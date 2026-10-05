@@ -631,8 +631,10 @@ def _pytest_clause(results: Sequence[dict],
 # connect` printed outside it name none; a node id's `::` parts hold no space,
 # and its bracketed parametrize id is read whole up to the first `]` the
 # message can follow, so `test_a[x - y] - assert 0` keeps its ` - `. Inside the
-# section a line of a test's own message, which `-vv` and `CI=true` print whole
-# at column 0, is still read as an entry when it has an entry's shape.
+# section a line of a test's own message, which `-vv` and `CI=true` (set on
+# every GitHub Actions job) print whole at column 0, is still read as an entry
+# when it has an entry's shape, so another pytest run's output carried in a
+# message names that run's tests beside the outer run's.
 _FAILING = (
     re.compile(r"^\s*not ok \d+ - (?!.*#\s*(?:TODO|SKIP)\b)(.+?)\s*$", re.I),
     re.compile(r"^\s*\u2716 (.+?) \(\d+(?:\.\d+)?ms\)$"),
@@ -642,9 +644,19 @@ _FAILING = (
 _PYTEST_FAILING = _FAILING[2]
 # The section opens on its own `=` rule and closes only on pytest's closing
 # count line, `=`-ruled or, under `-q`, bare: a line of a multi-line message
-# can begin with `=` too. A text that holds no header at all, such as the
-# 4000-character tail `warden deploy` reads, keeps the pytest lines that carry
-# a `::` node id, which a log line naming a file does not.
+# can begin with `=` too, and can be shaped like the count line itself when it
+# carries another pytest run's output. So a count line closes the section only
+# when it is the output's last count line, or when another header follows it
+# and no node-id entry comes before that header. With no header after it, it
+# sits in the outer run's own section, whose later entries, a collection
+# error's `ERROR test_db.py` included, are still read; an inner run printed in
+# a test's captured output, ahead of the outer header, still closes at its
+# own. Residual: a raw node-id entry printed after such a captured inner run,
+# before the outer header, keeps that inner section open and is named; and an
+# entry without `::` whose own message carries an inner run's header, past an
+# earlier inner count line, is not read. A text that holds no header at all,
+# such as the 4000-character tail `warden deploy` reads, keeps the pytest lines
+# that carry a `::` node id, which a log line naming a file does not.
 _PYTEST_SHORT_SUMMARY = re.compile(r"^=+ short test summary info =+$")
 _FAILING_SHOWN = 20
 
@@ -656,12 +668,25 @@ def failing_tests(output: str) -> list[str]:
     names: list[str] = []
     lines = _ANSI_SGR.sub("", output).splitlines()
     headerless = not any(map(_PYTEST_SHORT_SUMMARY.match, lines))
+    counts = [i for i, line in enumerate(lines) if _PYTEST_SUMMARY.match(line)]
+    last_count = counts[-1] if counts else -1
+    # keep_open[i]: no header follows line i, or a node-id entry comes before
+    # the next one.
+    keep_open = [True] * len(lines)
+    ahead, header_after = False, False
+    for i in range(len(lines) - 1, -1, -1):
+        keep_open[i] = ahead or not header_after
+        if _PYTEST_SHORT_SUMMARY.match(lines[i]):
+            ahead, header_after = False, True
+        elif (m := _PYTEST_FAILING.match(lines[i])) and "::" in m.group(1):
+            ahead = True
     in_summary = False
-    for line in lines:
+    for i, line in enumerate(lines):
         if _PYTEST_SHORT_SUMMARY.match(line):
             in_summary = True
             continue
-        if in_summary and _PYTEST_SUMMARY.match(line):
+        if (in_summary and _PYTEST_SUMMARY.match(line)
+                and (i == last_count or not keep_open[i])):
             in_summary = False
         for pattern in _FAILING:
             if pattern is _PYTEST_FAILING and not in_summary and not headerless:

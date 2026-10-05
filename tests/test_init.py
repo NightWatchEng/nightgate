@@ -4081,6 +4081,9 @@ def test_failing_tests_reads_a_pytest_id_whole_and_no_log_line_as_a_test():
     quiet = ("=== short test summary info ===\nFAILED tests/t.py::test_a - assert 0\n"
              "1 failed in 0.1s\nERROR app.py - failed to connect\n")
     assert verify_mod.failing_tests(quiet) == ["tests/t.py::test_a"]
+    assert verify_mod.failing_tests(
+        "= short test summary info =\nFAILED tests/t.py::test_a[x - y] - assert 0\n"
+    ) == ["tests/t.py::test_a[x - y]"]
 
 
 def test_failing_tests_reads_a_multiline_pytest_message_without_dropping_names():
@@ -4096,6 +4099,57 @@ def test_failing_tests_reads_a_multiline_pytest_message_without_dropping_names()
           "FAILED t.py::test_d - printed after the run\n")
     assert verify_mod.failing_tests(vv) == [
         "t.py::test_a_raise", "t.py::test_b_later", "t.py::test_c_later"]
+
+
+def test_failing_tests_names_every_outer_test_past_a_count_line_in_a_vv_message():
+    """Round 2 of hy6o.34 found the summary section closed by a line of a
+    test's own message shaped like pytest's count line: under `-vv` and
+    `CI=true`, which GitHub Actions sets on every job, a `pytest.fail()`
+    carrying another pytest run's output prints it whole at column 0, so the
+    outer run's later failing tests went unnamed. Only the last count line, or
+    one no node-id entry follows before the next header, closes it."""
+    inner = ("============================= test session starts ==============================\n"
+             "inner.py F\n"
+             "=========================== short test summary info ============================\n"
+             "FAILED inner.py::test_x - assert 0\n"
+             "============================== 1 failed in 0.01s ===============================\n")
+    vv = ("=========================== short test summary info ============================\n"
+          "FAILED test_multi.py::test_a_fail - Failed: " + inner
+          + "FAILED test_multi.py::test_b_later - assert 0\n"
+          "FAILED test_multi.py::test_c_later - RuntimeError: x\n"
+          "============================== 3 failed in 0.01s ===============================\n"
+          "FAILED test_multi.py::test_d - printed after the run\n")
+    named = verify_mod.failing_tests(vv)
+    for outer in ("test_multi.py::test_a_fail", "test_multi.py::test_b_later",
+                  "test_multi.py::test_c_later"):
+        assert outer in named, named
+    assert "test_multi.py::test_d" not in named
+    # A run printed whole in a test's captured stdout, ahead of the outer
+    # summary, still closes at its own count line: the log line between it
+    # and the outer header is not read as a summary entry.
+    captured = ("----------------------------- Captured stdout call -----------------------------\n"
+                + inner + "ERROR app.py - failed to connect\n"
+                "=========================== short test summary info ============================\n"
+                "FAILED test_multi.py::test_a - assert 0\n"
+                "============================== 1 failed in 0.01s ===============================\n")
+    assert verify_mod.failing_tests(captured) == ["inner.py::test_x", "test_multi.py::test_a"]
+
+
+def test_failing_tests_names_a_collection_error_past_an_inner_count_line():
+    """Round 1 of hy6o.37 found the section still closed by an inner run's
+    count line when the outer entries after it are collection errors, whose
+    `ERROR test_db.py` carries no `::`: pytest lists them after the FAILED
+    entries, so `--continue-on-collection-errors` under `CI=true` dropped
+    them. No header follows that count line, so it is the outer section's."""
+    real = ("=========================== short test summary info ============================\n"
+            "FAILED test_multi.py::test_a_fail - Failed: "
+            "=========================== short test summary info ============================\n"
+            "FAILED inner_dir/inner_t.py::test_x - assert 0\n"
+            "============================== 1 failed in 0.01s ===============================\n"
+            "ERROR test_db.py\n"
+            "========================== 1 failed, 1 error in 0.20s ==========================\n")
+    named = verify_mod.failing_tests(real)
+    assert "test_multi.py::test_a_fail" in named and "test_db.py" in named, named
 
 
 def test_failing_tests_names_node_ids_off_a_tail_the_summary_header_fell_out_of():
@@ -4117,6 +4171,3 @@ def test_failing_tests_names_node_ids_off_a_tail_the_summary_header_fell_out_of(
          "output_tail": tail}]}
     summary = verify_mod.render_summary(doc, which="deploy")
     assert f"    failing tests ({len(named)}):\n" in summary, summary
-    assert verify_mod.failing_tests(
-        "= short test summary info =\nFAILED tests/t.py::test_a[x - y] - assert 0\n"
-    ) == ["tests/t.py::test_a[x - y]"]
