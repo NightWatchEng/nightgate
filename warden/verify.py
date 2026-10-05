@@ -635,11 +635,22 @@ def _pytest_clause(results: Sequence[dict],
 # every GitHub Actions job) print whole at column 0, is still read as an entry
 # when it has an entry's shape, so another pytest run's output carried in a
 # message names that run's tests beside the outer run's.
+# Maven Surefire's per-test line is `[ERROR] <class>.<method> -- Time elapsed:
+# N s <<< FAILURE!` (`<<< ERROR!` for an exception); Surefire 2 printed no
+# ` -- `, and before 2.20 no `[ERROR] ` prefix and `sec`. No line that begins
+# `Tests run:` is read, which is the class line in every version, and the
+# Results block's `AppTest.m:12` has no elapsed time, so neither names a test. Gradle's console line for a JUnit
+# test is `<class> > <test> FAILED` at column 0, whose first token is a class
+# name with no space, so `> Task :test FAILED` names none; a class given a
+# `@DisplayName` with a space in it is not read, and the tail stands.
 _FAILING = (
     re.compile(r"^\s*not ok \d+ - (?!.*#\s*(?:TODO|SKIP)\b)(.+?)\s*$", re.I),
     re.compile(r"^\s*\u2716 (.+?) \(\d+(?:\.\d+)?ms\)$"),
     re.compile(r"^(?:FAILED|ERROR) (\S+?\.py(?:::[^\s\[]+)*(?:\[.*?\])?)(?: - .*)?$"),
     re.compile(r"^\s*--- FAIL: (\S+)"),
+    re.compile(r"^(?:\[ERROR\] )?(?!Tests run:)(\S.*?)(?: --)? +Time elapsed: [\d.,]+ s(?:ec)? +"
+               r"<<< (?:FAILURE|ERROR)!\s*$"),
+    re.compile(r"^([\w.$]+ > .+?) FAILED\s*$"),
 )
 _PYTEST_FAILING = _FAILING[2]
 # The section opens on its own `=` rule and closes only on pytest's closing

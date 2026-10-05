@@ -4046,6 +4046,30 @@ FAILING_OUTPUTS = {
     "go": ("=== RUN   TestSlugCap\n    app_test.go:12: got 200\n--- FAIL: TestSlugCap (0.00s)\n"
            "    --- FAIL: TestSlugCap/overlong (0.00s)\nFAIL\nFAIL\texample.com/app\t0.01s\n",
            ["TestSlugCap", "TestSlugCap/overlong"]),
+    # `mvn -q -B test`: Surefire 3's per-test line, `<<< FAILURE!` for an
+    # assertion and `<<< ERROR!` for an exception; the class line above it
+    # and the Results block's `AppTest.slugCap:12` name no test.
+    "maven-surefire": (
+        "[ERROR] Tests run: 3, Failures: 1, Errors: 1, Skipped: 0, Time elapsed: 0.041 s "
+        "<<< FAILURE! -- in com.example.AppTest\n"
+        "[ERROR] com.example.AppTest.slugCap -- Time elapsed: 0.012 s <<< FAILURE!\n"
+        "org.opentest4j.AssertionFailedError: expected: <400> but was: <200>\n"
+        "\tat com.example.AppTest.slugCap(AppTest.java:12)\n"
+        "[ERROR] com.example.AppTest.conn -- Time elapsed: 0.002 s <<< ERROR!\n"
+        "java.lang.IllegalStateException: boom\n[ERROR] Failures: \n"
+        "[ERROR]   AppTest.slugCap:12 expected: <400> but was: <200>\n"
+        "[ERROR] Tests run: 3, Failures: 1, Errors: 1, Skipped: 0\n",
+        ["com.example.AppTest.slugCap", "com.example.AppTest.conn"]),
+    # `gradle test` (and `./gradlew test`): the JUnit Platform console line,
+    # class and test joined by ` > `, nested classes by another; the task
+    # line `> Task :test FAILED` names none.
+    "gradle-junit": (
+        "> Task :test FAILED\n\nAppTest > slugCap() FAILED\n"
+        "    org.opentest4j.AssertionFailedError at AppTest.java:12\n\n"
+        "AppTest > Overlong > rejects(String)[1] FAILED\n"
+        "    java.lang.IllegalStateException at AppTest.java:30\n\n"
+        "3 tests completed, 2 failed\n\nFAILURE: Build failed with an exception.\n",
+        ["AppTest > slugCap()", "AppTest > Overlong > rejects(String)[1]"]),
 }
 
 
@@ -4098,12 +4122,29 @@ def test_failing_tests_names_no_test_off_a_line_another_tool_prints():
     """Round 1 found `failing_tests` reading names off lines no test runner
     printed and cutting a parametrized id at its first space."""
     noise = ("✖ 3 problems (3 errors, 0 warnings)\nFAILED (failures=2)\n"
-             "ERROR connecting to db\n")
+             "ERROR connecting to db\n> Task :compileJava FAILED\n"
+             "[ERROR] Tests run: 1, Failures: 1, Errors: 0, Skipped: 0, "
+             "Time elapsed: 0.1 s <<< FAILURE! -- in com.example.AppTest\n"
+             "[ERROR]   AppTest.slugCap:12 expected: <400> but was: <200>\n"
+             "Execution failed for task ':test'.\n"
+             "> There were failing tests. See the report at: file:///r/index.html\n"
+             "BUILD FAILED in 2s\n")
     assert verify_mod.failing_tests(noise) == []
     assert verify_mod.failing_tests(
         "=== short test summary info ===\n"
         "FAILED tests/t.py::test_a[a b] - assert 0\nERROR tests/t.py\n") == [
         "tests/t.py::test_a[a b]", "tests/t.py"]
+    # Surefire 2.12.4, which Maven 3.0 to 3.8 binds when no version is pinned,
+    # prints its lines with no level prefix and `sec`: the per-test line is
+    # read, and its class line, which also ends on `<<< FAILURE!`, is not;
+    # 2.20 to 2.22 print the same per-test line with `[ERROR] ` and `s`
+    assert verify_mod.failing_tests(
+        "Running com.example.AppTest\n"
+        "Tests run: 2, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 0.05 sec "
+        "<<< FAILURE!\n"
+        "slugCap(com.example.AppTest)  Time elapsed: 0.012 sec  <<< FAILURE!\n"
+        "[ERROR] conn(com.example.AppTest)  Time elapsed: 0.002 s  <<< ERROR!\n"
+    ) == ["slugCap(com.example.AppTest)", "conn(com.example.AppTest)"]
 
 
 UPGRADE = "Upgrading an enrolled repository"
