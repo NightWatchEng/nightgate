@@ -604,7 +604,13 @@ REGISTRY: dict[str, tuple[str, str]] = {
         UNSWEPT, "the bare-`warden` matcher of the warden-spelling guard — one "
         "lookbehind, no character class, no deletable alternative. Covered by "
         "test_every_warden_invocation_in_the_pack_is_spelled_from_the_"
-        "consumer_bin, which reddens the moment a bare spelling is back"),
+        "resolved_warden, which reddens the moment a bare spelling is back"),
+    "test_skillpack:UNRESOLVED": (
+        UNSWEPT, "the skills still calling the launcher outright, until "
+        "agentops-hy6o.32.1 empties it. Covered by test_every_skill_that_runs_"
+        "warden_resolves_it_first_in_one_shared_step, which compares it by "
+        "EQUALITY with the set derived from the tree, so a deleted or extra "
+        "member is already red without a sweep"),
     "test_skillpack:_PROBE_FENCE": (
         UNSWEPT, "the if/then/else/fi probe-fence reader of the probe-fence guard — "
         "no deletable alternative. Covered by test_every_probe_fence_"

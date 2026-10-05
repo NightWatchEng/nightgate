@@ -4,6 +4,13 @@ The platform is its own consumer: it ships this contract, so it writes one.
 (`warden certify` scored the repo Level 2 for exactly this omission — the
 ladder caught its author.)
 
+Which warden a skill runs is resolved by the skill, not stated here: its
+`## Which warden` step takes this repo's `.warden/bin/warden` launcher (it
+runs the package this checkout contains), else `warden` on PATH when its
+`--version` is `repo.yaml`'s `platform.pin`, and refuses otherwise. Every
+`warden` command this file names means the one that step resolved; a skill
+still spelling the launcher outright runs only where one exists, as here.
+
 ## Verify
 
 - Any change: `uv run pytest -q -n auto` and

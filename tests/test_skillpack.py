@@ -15,7 +15,7 @@ from pathlib import Path
 
 import pytest
 
-from conftest import tracked
+from conftest import _AMBIENT_GIT_CONFIG, tracked
 from private_evidence import needs_corpus
 
 ROOT = Path(__file__).parent.parent
@@ -1751,10 +1751,10 @@ _FOREIGN_FLAGS = {
 # `progress record` — is the most likely way one of these argv lines goes
 # wrong, and a union passes it.
 _WIRED_COMMANDS = (
-    ("warden progress record", ("progress", "record")),
-    ("warden progress show", ("progress", "show")),
-    ("warden review", ("review",)),
-    ("warden ship", ("ship",)),
+    ("progress record", ("progress", "record")),
+    ("progress show", ("progress", "show")),
+    ("review", ("review",)),
+    ("ship", ("ship",)),
 )
 
 # The wired sections: (skill, start marker, end marker, minimum flags).
@@ -1795,7 +1795,9 @@ def _command_spans(body: str) -> list[tuple[tuple[str, ...], str]]:
     """
     spans, claimed = [], []
     for literal, path in _WIRED_COMMANDS:
-        for m in re.finditer(re.escape(literal), body):
+        # either spelling of the binary: the launcher (whose last word is
+        # `warden`) or the `$WARDEN` a resolving skill writes
+        for m in re.finditer(r"(?:\$WARDEN|warden) " + re.escape(literal), body):
             if any(s <= m.start() < e for s, e in claimed):
                 continue          # already read as a longer command
             i = m.end()
@@ -1876,7 +1878,7 @@ def test_the_boundary_the_repair_loop_records_is_in_the_vocabulary():
     from warden import progress as progress_mod
     ppr = (ROOT / "skills" / "nightgate-skills" / "skills" / "pre-pr-review"
            / "SKILL.md").read_text()
-    named = set(re.findall(r"warden progress record ([a-z-]+)", ppr))
+    named = set(re.findall(r"\$WARDEN progress record ([a-z-]+)", ppr))
     assert named, "pre-pr-review records no boundary at all"
     assert named <= set(progress_mod.BOUNDARIES), (
         f"pre-pr-review names {sorted(named - set(progress_mod.BOUNDARIES))}, "
@@ -1884,7 +1886,7 @@ def test_the_boundary_the_repair_loop_records_is_in_the_vocabulary():
         f"{list(progress_mod.BOUNDARIES)}")
     # the two the commands record for the unit must NOT be re-recorded by hand
     for automatic in ("round-minted", "round-attested"):
-        assert f"warden progress record {automatic}" not in ppr, (
+        assert f"progress record {automatic}" not in ppr, (
             f"pre-pr-review records {automatic} by hand — `warden round new` "
             "and `warden attest write` already pass it, and a duplicate "
             "boundary makes the age column report a step twice")
@@ -1893,12 +1895,12 @@ def test_the_boundary_the_repair_loop_records_is_in_the_vocabulary():
 # --- one spelling of warden, pack-wide --------------------------
 
 SKILL_FILES = sorted((ROOT / "skills" / "nightgate-skills" / "skills").glob("*/SKILL.md"))
-# A bare `warden <sub>` in command position: `.warden/bin/warden` is excluded
-# by the `/` before its second word. One lookbehind and no character class, so
+# A bare `warden <sub>` in command position: `$WARDEN` is excluded by case
+# and `.warden/bin/warden` by the `/` before its second word. One lookbehind and no character class, so
 # the guard-mutation sweep has nothing to take apart — its reach is pinned by
 # the guard that reads it, which reddens the moment a bare spelling is back.
 _BARE_WARDEN = re.compile(r"(?<!/)warden\s+\w")
-CONSUMER_WARDEN = ".warden/bin/warden"
+CONSUMER_WARDEN = "$WARDEN"
 
 
 def _fenced_lines(text: str) -> list[tuple[int, str]]:
@@ -1982,15 +1984,17 @@ def test_an_inline_span_that_wraps_a_line_break_is_still_scanned():
     assert not any("inside a fence" in s for _, s in spans), spans
 
 
-def test_every_warden_invocation_in_the_pack_is_spelled_from_the_consumer_bin():
-    """docs/wiki/Installation.md makes `.warden/bin/warden` the consumer
-    contract (a consumer never installs warden globally), so a bare `warden`
-    in a skill exits 127 on a checkout that has the command. Inside a probe
-    the `>/dev/null 2>&1` swallows `command not found`, so the wrong spelling
-    does not fail loudly — it silently selects a branch.
+def test_every_warden_invocation_in_the_pack_is_spelled_from_the_resolved_warden():
+    """A consumer warden init enrolled has `warden` on PATH and no
+    `.warden/bin/` launcher, and this repo has the launcher; a hard-coded
+    spelling exits 127 on one of the two. Inside a probe the `>/dev/null
+    2>&1` swallows `command not found`, so the wrong spelling does not fail
+    loudly — it silently selects a branch.
 
     One spelling, pack-wide, guarded here: every fenced invocation and every
-    inline-code invocation in skills/**/SKILL.md names the consumer bin.
+    inline-code invocation in skills/**/SKILL.md names `$WARDEN`, which
+    each skill's first step resolves (agentops-hy6o.32), or — in a skill
+    `UNRESOLVED` still lists — the launcher.
     Prose ("a pinned warden older than...") is the tool's name, not a
     command, and is not scanned.
     """
@@ -2003,15 +2007,175 @@ def test_every_warden_invocation_in_the_pack_is_spelled_from_the_consumer_bin():
         for n, span in _inline_spans(text):
             if _BARE_WARDEN.match(span):
                 offenders.append(f"{path.parent.name}:{n} span: `{span[:70]}`")
-        spelled += text.count(CONSUMER_WARDEN)
+        spelled += text.count(CONSUMER_WARDEN) + text.count(LAUNCHER)
     assert spelled >= 30, (
         f"only {spelled} `{CONSUMER_WARDEN}` invocation(s) across the pack — "
         "the scan below is checking a pack that no longer invokes warden, so "
         "its empty offender list proves nothing")
     assert not offenders, (
-        "bare `warden` invocations — a consumer has no warden on PATH, and "
-        f"inside a probe the failure is silent. Spell `{CONSUMER_WARDEN}`:\n  "
+        "bare `warden` invocations — the resolution step decides which "
+        "warden runs, and inside a probe a wrong one fails silently. Spell "
+        f"`{CONSUMER_WARDEN}`:\n  "
         + "\n  ".join(offenders))
+
+
+# --- which warden: one resolution step, the same in every skill ---------
+
+LAUNCHER = ".warden/bin/warden"
+RESOLVE_HEADING = "## Which warden — resolve it before any other step"
+# Skills still calling the launcher outright, converted by agentops-hy6o.32.1
+# (the Small-PR contract's 400-line cap split the item); empty when it lands.
+UNRESOLVED = {"autonomous-run", "deliver", "intake", "orchestrate", "retro",
+              "rule-advisor"}
+
+
+def _resolve_section(text: str) -> str:
+    start = text.index(RESOLVE_HEADING)
+    return text[start:text.index("\n## ", start + 1)]
+
+
+def _resolve_snippet() -> str:
+    section = _resolve_section(
+        (ROOT / "skills" / "nightgate-skills" / "skills" / "pre-pr-review"
+         / "SKILL.md").read_text())
+    return section.split("```sh\n", 1)[1].split("```", 1)[0]
+
+
+def test_every_skill_that_runs_warden_resolves_it_first_in_one_shared_step():
+    """warden init enrolls a consumer with `warden` on PATH at the pin and no
+    `.warden/bin/` launcher, so a skill calling the launcher outright exits
+    127 there (agentops-hy6o.28, PR #3 on the demo). Each skill that runs
+    warden resolves it in ONE step, byte-identical pack-wide and the first
+    `##` section of the page, and the launcher's path appears nowhere else:
+    every other command spells `$WARDEN`."""
+    invoking = [p for p in SKILL_FILES if CONSUMER_WARDEN in p.read_text()]
+    still = {p.parent.name for p in SKILL_FILES
+             if p not in invoking and LAUNCHER in p.read_text()}
+    assert still == UNRESOLVED, (
+        f"the skills spelling the launcher outright are {sorted(still)}; "
+        f"UNRESOLVED lists {sorted(UNRESOLVED)}")
+    sections = set()
+    for path in invoking:
+        text = path.read_text()
+        assert RESOLVE_HEADING in text, f"{path.parent.name} never resolves warden"
+        first = text[text.index("\n## ") + 1:]
+        assert first.startswith(RESOLVE_HEADING), (
+            f"{path.parent.name}: the resolution is not the first step")
+        section = _resolve_section(text)
+        sections.add(section)
+        assert text.count(LAUNCHER) == section.count(LAUNCHER), (
+            f"{path.parent.name} names {LAUNCHER} outside the resolution step")
+    assert len(sections) == 1, "the resolution step differs between skills"
+
+
+UNSET_GUARD = ': "${WARDEN:?is unset; run the resolution step first}"'
+
+
+def test_every_probe_of_the_resolved_warden_stops_on_an_unset_variable(tmp_path):
+    """`$WARDEN` does not survive between tool calls, and a probe run with it
+    unset runs `graph`, `round`... as the command, swallows command-not-found
+    and takes its old-pin arm in silence. Every probe fence opens with the
+    guard line, and the guard stops the shell, naming the variable."""
+    import subprocess
+    probes = 0
+    for path in SKILL_FILES:
+        text = path.read_text()
+        for fence in text.split("```")[1::2]:
+            if "if $WARDEN" in fence and "--help" in fence:
+                probes += 1
+                body = fence.split("\n", 1)[1]   # past the info string
+                assert body.startswith(UNSET_GUARD), (
+                    f"{path.parent.name}: a probe fence does not open with "
+                    f"the unset guard:\n{fence[:200]}")
+    assert probes >= 4, f"only {probes} probe fence(s) read; the scan is vacuous"
+    run = subprocess.run(["sh", "-c", UNSET_GUARD + "\necho ran"],
+                         env={**_AMBIENT_GIT_CONFIG, "PATH": "/usr/bin:/bin"},
+                         capture_output=True, text=True, timeout=30)
+    assert run.returncode != 0 and "ran" not in run.stdout, run
+    assert "WARDEN" in run.stderr, run.stderr
+
+
+def test_pre_pr_review_names_the_path_fallback_in_prose():
+    section = _resolve_section(
+        (ROOT / "skills" / "nightgate-skills" / "skills" / "pre-pr-review"
+         / "SKILL.md").read_text())
+    flat = " ".join(section.split())
+    assert "else `warden` on PATH" in flat
+    assert "platform.pin" in flat and "refusal is a stop" in flat
+
+
+def _run_resolve(cwd: Path, path_dirs: list[Path]):
+    import subprocess
+    env = {**_AMBIENT_GIT_CONFIG,
+           "PATH": ":".join([*map(str, path_dirs), "/usr/bin", "/bin"])}
+    return subprocess.run(["sh", "-c", _resolve_snippet()], cwd=cwd, env=env,
+                          capture_output=True, text=True, timeout=30)
+
+
+def _fake_warden(tmp_path: Path, version: str) -> Path:
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir(exist_ok=True)
+    exe = bin_dir / "warden"
+    exe.write_text(f'#!/bin/sh\necho "warden {version}"\n')
+    exe.chmod(0o755)
+    return bin_dir
+
+
+def _consumer(tmp_path: Path, pin: str) -> Path:
+    repo = tmp_path / "consumer"
+    repo.mkdir()
+    (repo / "repo.yaml").write_text(
+        f"version: 1\nrepo: demo\n\nplatform:\n  pin: {pin}   # the release\n\n"
+        "components:\n  app: {path: src/}\n")
+    return repo
+
+
+@pytest.mark.parametrize("pin", ["v3.0.1", "3.0.1", '"v3.0.1"'])
+def test_resolution_takes_warden_on_path_when_the_repo_has_no_launcher(tmp_path, pin):
+    run = _run_resolve(_consumer(tmp_path, pin), [_fake_warden(tmp_path, "3.0.1")])
+    assert (run.returncode, run.stdout) == (0, "warden\n"), run
+
+
+def test_resolution_reads_past_a_column_0_comment_in_the_platform_block(tmp_path):
+    """The gate `warden init` renders reads past a column-0 comment in the
+    platform block, so the skill's reader does too, or it refuses a pin the
+    gate builds."""
+    repo = tmp_path / "consumer"
+    repo.mkdir()
+    (repo / "repo.yaml").write_text("platform:\n# the release\n  pin: v3.0.1\n")
+    run = _run_resolve(repo, [_fake_warden(tmp_path, "3.0.1")])
+    assert (run.returncode, run.stdout) == (0, "warden\n"), run
+
+
+def test_resolution_takes_the_launcher_on_this_repo():
+    run = _run_resolve(ROOT, [])
+    assert (run.returncode, run.stdout) == (0, f"{LAUNCHER}\n"), run
+
+
+def test_resolution_refuses_a_path_warden_at_another_release(tmp_path):
+    run = _run_resolve(_consumer(tmp_path, "v3.0.1"),
+                       [_fake_warden(tmp_path, "3.0.0")])
+    assert run.returncode != 0 and run.stdout == "", run
+    assert "REFUSED" in run.stderr and "3.0.0" in run.stderr \
+        and "3.0.1" in run.stderr, run.stderr
+
+
+def test_resolution_refuses_when_there_is_no_warden_at_all(tmp_path):
+    run = _run_resolve(_consumer(tmp_path, "v3.0.1"), [])
+    assert run.returncode != 0 and run.stdout == "", run
+    assert "REFUSED" in run.stderr and "none on PATH" in run.stderr, run.stderr
+
+
+@pytest.mark.parametrize("version", ["3.0.1", ""])
+def test_resolution_refuses_when_the_pin_cannot_be_read(tmp_path, version):
+    """The empty version is the case the `-n "$pin"` guard exists for: an
+    empty pin must not equal an empty version and resolve."""
+    repo = tmp_path / "consumer"
+    repo.mkdir()
+    (repo / "repo.yaml").write_text("version: 1\ncomponents: {}\n")
+    run = _run_resolve(repo, [_fake_warden(tmp_path, version)])
+    assert run.returncode != 0 and run.stdout == "", run
+    assert "unreadable" in run.stderr, run.stderr
 
 
 # --- the probe fences are pinned structurally -----------------
@@ -2020,7 +2184,7 @@ def test_every_warden_invocation_in_the_pack_is_spelled_from_the_consumer_bin():
 # several. Both arms are captured so the guard can read them, not merely find
 # the left half of the `if`.
 _PROBE_FENCE = re.compile(
-    r"if\s+(?P<cmd>\S*warden(?:\s+\w+)+)\s+--help\s+>/dev/null\s+2>&1;\s*then"
+    r"if\s+(?P<cmd>(?:\$WARDEN|\S*warden)(?:\s+\w+)+)\s+--help\s+>/dev/null\s+2>&1;\s*then"
     r"\s*(?P<then>.*?)\s*;?\s*\belse\b\s*(?P<else>.*?)\s*;?\s*\bfi\b",
     re.DOTALL)
 # Which skills the structural guard reads, and WHICH command each fence
@@ -2037,9 +2201,7 @@ _PROBE_FENCE = re.compile(
 PROBED_SKILLS = {
     "deliver": (".warden/bin/warden round classify", ".warden/bin/warden ship"),
     "orchestrate": (".warden/bin/warden progress", ".warden/bin/warden ship"),
-    "pre-pr-review": (".warden/bin/warden graph crew",
-                      ".warden/bin/warden round",
-                      ".warden/bin/warden progress"),
+    "pre-pr-review": ("$WARDEN graph crew", "$WARDEN round", "$WARDEN progress"),
 }
 _PROBE_MARK = "--help >/dev/null 2>&1"
 
@@ -2090,7 +2252,7 @@ def test_every_probe_fence_branches_with_two_distinct_arms_of_the_right_polarity
             sub = cmd.split()[1]
             uses_then = sub in then_arm or "=yes" in then_arm
             uses_else = (re.search(rf"\b{re.escape(sub)}\b", else_arm)
-                         and "warden" in else_arm) or "=yes" in else_arm
+                         and "warden" in else_arm.lower()) or "=yes" in else_arm
             assert uses_then, (
                 f"{where}: the `then` arm neither runs the probed command nor "
                 f"records it available — polarity inverted? then={then_arm!r}")

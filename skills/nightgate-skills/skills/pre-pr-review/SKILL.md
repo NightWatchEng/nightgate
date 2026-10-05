@@ -9,18 +9,44 @@ The incidents and reasoning behind these steps live in the Nightgate
 platform's docs/design/pre-pr-review-rationale.md; this page is the steps.
 
 You are orchestrating the judgment half of this repo's review gate. CI's
-deterministic `.warden/bin/warden gate` checks the mechanical HIGH rules; **this skill
+deterministic `$WARDEN gate` checks the mechanical HIGH rules; **this skill
 owns the `engine: claude` rules** plus general defect-hunting.
 
 Project specifics come from `.warden/skills-policy.md` (the policy file
 contract, see the Nightgate platform's docs/wiki/Skills-Policy.md). No policy file →
 stop and report; never guess.
 
+## Which warden — resolve it before any other step
+
+Run this from the repo root before anything else; every command below is
+written `$WARDEN <subcommand>`.
+
+```sh
+if [ -x .warden/bin/warden ]; then echo .warden/bin/warden
+elif ! command -v warden >/dev/null 2>&1; then
+  echo "REFUSED: no .warden/bin/warden in this repo and none on PATH; install the release repo.yaml's platform.pin names" >&2; false
+else
+  pin=$(awk '/^platform:/ {p=1; next} p && /^[^[:space:]#]/ {exit} p && /^[[:space:]]+pin:/ {sub(/^[[:space:]]+pin:[[:space:]]*/, ""); sub(/[[:space:]].*$/, ""); gsub(/["'\'']/, ""); sub(/^v/, ""); print; exit}' repo.yaml 2>/dev/null)
+  have=$(warden --version 2>/dev/null | awk '{sub(/^v/, "", $2); print $2}')
+  if [ -n "$pin" ] && [ "$have" = "$pin" ]; then echo warden
+  else echo "REFUSED: PATH has warden ${have:-of no readable version}, repo.yaml's platform.pin is ${pin:-unreadable}; install the pinned release" >&2; false; fi
+fi
+```
+
+It prints this repo's `.warden/bin/warden` launcher when there is one, else
+`warden` on PATH when its `--version` is `repo.yaml`'s `platform.pin` (warden
+init enrolls a consumer with no launcher). A refusal is a stop: report it and
+never substitute another warden. Put the printed word wherever `$WARDEN`
+appears, or start each shell command with `WARDEN=<that word>;` — a variable
+does not survive between tool calls. Each probe below opens with a line that
+stops on an unset `$WARDEN`, which would otherwise fall silently into the
+probe's fallback arm.
+
 ## Procedure
 
 ### 1. Scope
 
-Run `.warden/bin/warden explain --base origin/main` — note the risk tiers of
+Run `$WARDEN explain --base origin/main` — note the risk tiers of
 changed files and which rules fire. Read the `engine: claude` rule bodies
 from the repo's rules dir (they are the review charter, verbatim). Where the
 graph resolves a crew, the extra checklists are the `lenses` the crew command
@@ -28,7 +54,7 @@ below prints; the policy file's `## Review charter` names them and says where
 each one is stated.
 
 If the repo declares an org graph (`graph.yaml`), read it first —
-`.warden/bin/warden graph render` — and honor what it says rather than what
+`$WARDEN graph render` — and honor what it says rather than what
 this skill assumes: which nodes hold `judge` authority, the
 `verification.convergence` rules, and each node's failure policy (retry
 budgets, escalation targets). The graph is the org's declared topology; this
@@ -45,7 +71,7 @@ whole adjudication, stated in the graph and quoted into its dispatch by
 step 2. Reading the rule the other way — as an instruction to produce the
 judge the round lacks — is how a session dispatches a role the graph does not
 declare and then cannot file what it raised: the graph names who runs and
-nothing else does, in whichever tier this range takes — `.warden/bin/warden
+nothing else does, in whichever tier this range takes — `$WARDEN
 graph crew --round N` for a numbered round, `--light` for a range that earns
 the proportionate tier (step 2), and, where the org declares a closure round,
 `--round N` past the cap (step 5). `attest write --review-dir` refuses a
@@ -58,8 +84,9 @@ step 4 for the finding an undeclared lens has already raised.
 round, and dispatch exactly what it prints:
 
 ```
-if .warden/bin/warden graph crew --help >/dev/null 2>&1; then
-  CREW="$(.warden/bin/warden graph crew --round 1)"
+: "${WARDEN:?is unset; run the resolution step first}"
+if $WARDEN graph crew --help >/dev/null 2>&1; then
+  CREW="$($WARDEN graph crew --round 1)"
 else
   CREW=""
 fi
@@ -115,7 +142,7 @@ Nothing records that the roster was this skill's default rather than a
 declared crew, and no shard can: the attestation schema is closed
 (`additionalProperties: false`) and carries no field for a roster's SOURCE.
 What it does carry is the one claim warden can check — run
-`.warden/bin/warden attest write` without `--review-dir` and the shard is
+`$WARDEN attest write` without `--review-dir` and the shard is
 stamped `unverified-roster`, a roster nothing cross-checked, which is exactly
 what a default roster is.
 
@@ -123,8 +150,8 @@ Then load **split memory** for the changed files — the two roles get
 DISJOINT priors on purpose, which is what keeps the judges decorrelated:
 
 ```
-.warden/bin/warden memory recall --files <changed files> --for reviewer
-.warden/bin/warden memory recall --files <changed files> --for examiner
+$WARDEN memory recall --files <changed files> --for reviewer
+$WARDEN memory recall --files <changed files> --for examiner
 ```
 
 Keep the two outputs separate. Never show the examiner's precedents to the
@@ -137,7 +164,7 @@ both print "no relevant history" and the passes run exactly as before.
 chosen:
 
 ```
-.warden/bin/warden attest classify --base origin/main
+$WARDEN attest classify --base origin/main
 ```
 
 `FULL` — the answer for almost every change — means the numbered rounds below,
@@ -152,13 +179,13 @@ raw HTML that no reader short of a full parser tells from its sentences, so
 none is trusted to. It prints the verdict file by file, with the reason each
 one earned.
 
-A `LIGHT` range takes ONE round with ONE role — `.warden/bin/warden graph crew
+A `LIGHT` range takes ONE round with ONE role — `$WARDEN graph crew
 --light` names it — instead of the numbered rounds (not on this repository,
 where the Small-PR contract below keeps every range on the numbered
 rounds). Everything else is
 identical: mint the round the same way, dispatch that one role as a subagent in
 its own context, triage and disposition its findings the same way, and write
-and commit the attestation the same way. `.warden/bin/warden attest check` is
+and commit the attestation the same way. `$WARDEN attest check` is
 unchanged and still requires a clean attestation covering every commit.
 
 **The light round's brief is not a shorter adversarial review — it is a
@@ -167,7 +194,7 @@ no logic to attack. What such a diff can still get wrong is a CLAIM: a comment
 or a docstring that describes behaviour the code does not have. So the single
 role audits exactly that: **is every claim this diff edits true of the tree?**
 
-You cannot choose this tier. `.warden/bin/warden attest write` recomputes the
+You cannot choose this tier. `$WARDEN attest write` recomputes the
 proof from the trees and refuses the light roster over a range that does not clear it, and
 CI recomputes it again over the pushed range. Asking for it is `attest
 classify`; earning it is the diff's business.
@@ -180,7 +207,7 @@ payload too:
 
 ```
 git fetch origin
-ROUND="$(.warden/bin/warden round new --base origin/main)" || exit 1
+ROUND="$($WARDEN round new --base origin/main)" || exit 1
 PKG="$ROUND/review-package.md"
 ```
 
@@ -205,7 +232,7 @@ going with `ROUND=""`, and every path below becomes `/review-package.md` —
 a round that reads as running while writing to the filesystem root. A refusal
 must stop the round, on the primary line and not only in the fall-back.
 
-`.warden/bin/warden round new` derives the directory from the UTC microsecond,
+`$WARDEN round new` derives the directory from the UTC microsecond,
 your branch, your head sha and the pid, creates it with `exist_ok=False`,
 refuses loudly rather than reusing one that exists, writes the package into it
 and mints an empty `$ROUND/reviewers/`. It prints the path and nothing else on
@@ -215,11 +242,12 @@ stdout, so the command substitution above is the whole of the ceremony.
 Probe for the SUBCOMMAND, then run it for real — never skip the isolation:
 
 ```
-if .warden/bin/warden round --help >/dev/null 2>&1; then
-  ROUND="$(.warden/bin/warden round new --base origin/main)" || exit 1
+: "${WARDEN:?is unset; run the resolution step first}"
+if $WARDEN round --help >/dev/null 2>&1; then
+  ROUND="$($WARDEN round new --base origin/main)" || exit 1
 else
   ROUND="$(mktemp -d)"; mkdir -p "$ROUND/reviewers"
-  .warden/bin/warden diff --base origin/main -o "$ROUND/review-package.md"
+  $WARDEN diff --base origin/main -o "$ROUND/review-package.md"
 fi
 ```
 
@@ -239,7 +267,7 @@ exists for, there is no such field and no such line — silence there means the
 check does not exist, not that it passed.
 
 The package is the bytes being judged; the candidates and the attestation
-payload are the JUDGMENTS, and those are what `.warden/bin/warden attest write` turns
+payload are the JUDGMENTS, and those are what `$WARDEN attest write` turns
 into committed, append-only evidence. The file with the worse failure mode
 must not be the one with the weaker rule.
 
@@ -292,7 +320,7 @@ Instruct it to:
   no rule enforces files as `unmapped:<the lens's slug>`, and a lens whose
   `rule:` pointer names a rule files under THAT rule's id, not the lens's
   (this repo's `consumer-blast-radius` lens files as `blast-radius-named`;
-  `unmapped:consumer-blast-radius` is refused). `.warden/bin/warden attest
+  `unmapped:consumer-blast-radius` is refused). `$WARDEN attest
   write` rejects any other id, a slug that names no defect class
   (`unmapped:general`, `unmapped:misc`), and a slug that duplicates a
   declared rule id (`unmapped:tests-required` — file it as the rule), and a
@@ -387,8 +415,9 @@ default branch while each repo pins a warden VERSION and a pin predating #201
 has no `progress` at all:
 
 ```
-if .warden/bin/warden progress --help >/dev/null 2>&1; then
-  .warden/bin/warden progress record repair-committed \
+: "${WARDEN:?is unset; run the resolution step first}"
+if $WARDEN progress --help >/dev/null 2>&1; then
+  $WARDEN progress record repair-committed \
     --detail "<what this round fixed>"
 else
   : # pinned warden predates the boundary log — say so in your report
@@ -396,7 +425,7 @@ fi
 ```
 
 It is one line and it is the ONE boundary in this loop no command passes for
-you. `.warden/bin/warden round new` records `round-minted` and `attest write`
+you. `$WARDEN round new` records `round-minted` and `attest write`
 records `round-attested` as they finish, so a repair loop that skips this
 leaves a unit looking, from outside, exactly like one that attested a round
 and then stopped — and the AGE of the last boundary is the only thing that
@@ -437,7 +466,7 @@ only in a session transcript.
 
 **Tag every finding** with a short taxonomy before attesting — tags are a
 recall key, so they decide what future reviews can find. Reuse a tag from the declared
-vocabulary (`.warden/memory/tags.yaml`, echoed by `.warden/bin/warden memory stats`)
+vocabulary (`.warden/memory/tags.yaml`, echoed by `$WARDEN memory stats`)
 whenever one fits; coin a new one only for a genuinely new class, and say so
 in the attestation so the retro can adopt or merge it. Where that file declares
 a `ceiling:` with no room left (at `max_undecided: 0`, always), a coined tag
@@ -484,7 +513,7 @@ entry, and `role` spelled from ONE vocabulary — the schema's `$defs.lens`:
 `code-reviewer`, `cross-examiner`, `scoped-re-reviewer`, `builder`,
 `closure-attestor` (the closure round's role, below), `claims-auditor` (the
 light round's role: the single lens dispatched for a range that
-`.warden/bin/warden attest classify` has PROVEN cannot alter behaviour — every
+`$WARDEN attest classify` has PROVEN cannot alter behaviour — every
 changed file Python and identical once docstrings are stripped, and nothing
 under the gate's own machinery. It audits the one thing such a diff can still get wrong, which is
 whether the claims it edits are true of the tree. Eligibility is recomputed
@@ -496,7 +525,7 @@ what the crew command prints
 `-`, never a bare `fail-closed`, never `crew-fail-closed`). Spell `role` from the
 vocabulary on EVERY pin, enforced or not: the corpus is one corpus.
 
-Rounds: **one by default.** Round 1 is the crew `.warden/bin/warden graph
+Rounds: **one by default.** Round 1 is the crew `$WARDEN graph
 crew --round 1` prints, dispatched in that order, carrying that command's
 `lenses` as checklists. Round 2 runs only when a round-1 finding that counts
 was repaired, and its crew is whatever `--round 2` prints — a SMALLER crew
@@ -504,12 +533,12 @@ than round 1 wherever the graph declares one, and the command's answer is
 what decides, never this page's memory of it. A roster that adds a role
 round 2 does not declare is an extra role, and `attest write --review-dir`
 refuses it. Round 2's payload re-files every round-1 finding it does not
-verdict addressed as `confirmed`, because `.warden/bin/warden round classify`
+verdict addressed as `confirmed`, because `$WARDEN round classify`
 reads only the payload it is given. What else round 2 is handed and may
 file, and what happens at the cap, are the round contract (step 4 names
 where it is stated). **Mint every one of them, round 1
 included** (step 2), and that includes the round the scoped re-reviewer runs
-in — the directory is what the chain is counted from. `.warden/bin/warden round classify` reads the repair chain
+in — the directory is what the chain is counted from. `$WARDEN round classify` reads the repair chain
 from the manifests `round new` writes, so a round nobody minted is invisible
 to it: its repair commit lands inside what classify then measures as the
 ORIGINAL diff, and a file that repair wrote is read as the change's. A warden at or past #191 refuses a chain
@@ -521,7 +550,7 @@ repair answers was attested and sealed before it, with its findings still
 open; the cap refuses another review round; and a sealed round is never
 re-pointed at the new head. The branch then has no attestable head at all and
 its gate is red forever, which is why the round contract has the round at the cap make no repair
-commit. Where the org declares `review.closure` (check with `.warden/bin/warden graph
+commit. Where the org declares `review.closure` (check with `$WARDEN graph
 crew --round <any number past the cap>`, which prints `"closure": true` and
 the single role instead of exiting 1), mint one more round at the repaired
 head and dispatch that role alone. Its NUMBER does not matter, only that it
@@ -551,7 +580,7 @@ this round. The shard records `closure_verification: verified` so the corpus
 can tell a closure round from an ordinary one.
 
 **One attestation covers ONE round** — a recorded ruling, and
-`.warden/bin/warden decide list` carries its shard. `--review-dir` names THAT round's
+`$WARDEN decide list` carries its shard. `--review-dir` names THAT round's
 `reviewers/`; the roster declares only the dispatches that ran in that round;
 every finding it carries names that round; and no earlier round's report is
 copied, moved or renamed into it. A finding's `round` is the round
@@ -566,7 +595,7 @@ dropped by being left out — each is evidence in its OWN committed shard, and
 the PR body's evidence chain names them in order. **A finding still OPEN when a round ends is
 RE-RAISED in the next round's payload** — by the lens that re-confirms it
 there, with that round's number, which is what `attest write` joins and what
-keeps `.warden/bin/warden round classify` able to see it. Leave it out and classify reads
+keeps `$WARDEN round classify` able to see it. Leave it out and classify reads
 that round clean over a defect the review never closed, and the cap's revert
 trigger goes blind to everything older than the current round. A finding
 CLOSED in its round (`fixed`, `refuted`, `dismissed-with-reason`) drops out;
@@ -595,7 +624,7 @@ CURRENT head, so a round left unattested when the repair commit lands can
 never be attested at all. A round with findings still open attests with `verdict:
 findings-open` and exits 1; that exit is the honest verdict, not a failure to
 write, and the shard is written. Its findings are `confirmed` there, because
-the fix commit has not happened yet — so `.warden/bin/warden round classify`, reading
+the fix commit has not happened yet — so `$WARDEN round classify`, reading
 that payload, sees them OPEN. Whether that makes the round COUNT is
 classify's to say and never yours, by the round contract's counting
 definition. What the timing settles is only that the findings are open when
@@ -693,14 +722,15 @@ argument, and `returned`/`findings`/`output` fail the older schema as
 `attest check` on every PR:
 
 ```
-if .warden/bin/warden attest write --help 2>&1 | grep -q -- '--review-dir'; then
+: "${WARDEN:?is unset; run the resolution step first}"
+if $WARDEN attest write --help 2>&1 | grep -q -- '--review-dir'; then
   ROSTER=structured
-  if .warden/bin/warden attest write --help 2>&1 | grep -q 'lens'; then
+  if $WARDEN attest write --help 2>&1 | grep -q 'lens'; then
     ATTRIBUTION=lens   # the schema knows lens/round (#184)
   else
     ATTRIBUTION=none   # pinned warden predates #184
   fi
-  if .warden/bin/warden attest write --help 2>&1 | grep -q 'outcome'; then
+  if $WARDEN attest write --help 2>&1 | grep -q 'outcome'; then
     OUTCOME=derived    # warden stamps reviewers[].outcome
   else
     OUTCOME=none       # pinned warden predates the outcome field
@@ -715,7 +745,7 @@ fi
 `structured`: write the roster above and run
 
 ```
-.warden/bin/warden attest write --findings "$ROUND/attestation-payload.json" \
+$WARDEN attest write --findings "$ROUND/attestation-payload.json" \
   --base origin/main --review-dir "$ROUND/reviewers"
 ```
 
@@ -768,7 +798,7 @@ committed, a later commit is NOT unrefused: `attest check`
 refuses one no tip attestation covers that touches anything outside
 `.warden/memory/attest/` (#278), so re-running after a fix is a
 check as well as this protocol's rule. On a pin predating it, this protocol
-is the only thing there. When it fires, mint a fresh round with `.warden/bin/warden
+is the only thing there. When it fires, mint a fresh round with `$WARDEN
 round new` and **re-run every reviewer in it**. **Never copy a `reviewers/`
 file forward from an earlier round**: `attest write` compares each claimed
 report's bytes against every sibling round still under the rounds root and
@@ -790,14 +820,14 @@ PR. Report the attestation summary.
 Then **feed the corpus** so the next review starts smarter:
 
 ```
-.warden/bin/warden memory ingest
+$WARDEN memory ingest
 ```
 
 Ingest redacts secrets at the shard boundary, is idempotent, and WRITES the
 event shards under `.warden/memory/attest/` — `git add` them and include them
 in the PR. A review that judges but never ingests is a review the organization
 forgets, and the attestation left in `.warden/out/` is gitignored: it never
-reaches the corpus. `.warden/bin/warden attest check` is the CI step that says so out
+reaches the corpus. `$WARDEN attest check` is the CI step that says so out
 loud — it passes only when a committed shard names a commit on this branch.
 
 ## Boundaries
@@ -810,7 +840,7 @@ loud — it passes only when a committed shard names a commit on this branch.
 - Memory is context, never authority: a recalled pattern is a place to
   look, and a recalled precedent is an argument to weigh. Neither one
   decides a finding — only the code in front of you does.
-- `$ROUND` came from `.warden/bin/warden round new`, not from a name you chose, and no
+- `$ROUND` came from `$WARDEN round new`, not from a name you chose, and no
   file a round writes lives outside it — not the package, not the candidates,
   not the reviewer outputs, not the attestation payload. A file whose contents
   reach an attestation gets the strongest path rule this protocol has, not the
@@ -831,7 +861,7 @@ loud — it passes only when a committed shard names a commit on this branch.
   commit header, so CI's "commit messages" check validates it, and the budget
   is **100 characters** for what you write — the forge appends ` (#N)` and the
   validator strips that first. Over budget → shorten the title; never widen
-  the budget. `.warden/bin/warden ship` runs this step for you before it opens anything
+  the budget. `$WARDEN ship` runs this step for you before it opens anything
   (that is the only path on which it is already covered); on the hand-run
   tail, or any other route to `gh pr create`, it is yours.
 
@@ -896,7 +926,7 @@ steps:
     evidence: commit:410cd48e
   - step: "a finding still open when a round ends is re-raised VERBATIM in the next round's payload under the re-confirming lens and round, so the cap's revert trigger can still see it and the corpus folds the copies"
     evidence: commit:410cd48e
-  - step: "every round is minted, round 1 included — an unminted round is invisible to `.warden/bin/warden round classify`, which reads the chain from the manifests"
+  - step: "every round is minted, round 1 included — an unminted round is invisible to `$WARDEN round classify`, which reads the chain from the manifests"
     evidence: commit:410cd48e
   - step: "every finding names the lens that raised it and the round it arrived in, from the schema's vocabulary; --review-dir joins each to a returned dispatch"
     evidence: commit:fc55eb71
@@ -908,7 +938,7 @@ steps:
     evidence: tag:enforcement-claim
   - step: "exclude rule bodies from the enforcement lens — a rule body quotes the claims it hunts"
     evidence: tag:self-reference
-  - step: "warden MINTS the round directory (`.warden/bin/warden round new`) and holds every file a round writes — package, candidates, reviewer outputs, attestation payload; a collision is refused, never reused"
+  - step: "warden MINTS the round directory (`$WARDEN round new`) and holds every file a round writes — package, candidates, reviewer outputs, attestation payload; a collision is refused, never reused"
     evidence: commit:1fdda8a0
   - step: "the roster is one entry per reviewer, structured, and checked against its outputs by --review-dir"
     evidence: commit:0cc2a84e
@@ -918,7 +948,7 @@ steps:
     evidence: commit:c04733b4
   - step: "every candidate the examiner refuted is filed with status refuted and its reason — the payload is what the round RAISED, so precision is measured over raised, not over survivors"
     evidence: commit:280c5084
-  - step: "each repair commit records `.warden/bin/warden progress record repair-committed`, behind the same `--help` subcommand probe every other command here gets — round-minted and round-attested are recorded by the commands that pass them, and this is the only boundary in the loop that is not"
+  - step: "each repair commit records `$WARDEN progress record repair-committed`, behind the same `--help` subcommand probe every other command here gets — round-minted and round-attested are recorded by the commands that pass them, and this is the only boundary in the loop that is not"
     evidence: commit:1a4959a1
   - step: "the small-PR contract binds this repository's own PRs: one item per PR at most 400 changed lines, a tracked item only for a behaviour finding on runtime code, nothing committed after the final attestation, the light round unused and round 2 filing a new record only for a behaviour finding on runtime code"
     evidence: shard:20260927T0434390000-9189ab03-ca6028b6
