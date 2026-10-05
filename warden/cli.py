@@ -179,6 +179,31 @@ def _append_step_summary(text: str) -> None:
               "verdict stands", file=sys.stderr)
 
 
+def _comment_skip_reason(ctx: "github_mod.PRContext") -> str | None:
+    """Why the sticky comment is not attempted on this run, or None to post.
+
+    A `pull_request` run from a fork gets a read-only GITHUB_TOKEN, so the
+    post would 403 and say nothing about the change. The payload says where
+    the head lives, so the fork is named before any call is made.
+    `pull_request_target` runs with the base repository's write token,
+    fork or not, and posts as before."""
+    if os.environ.get("GITHUB_EVENT_NAME") == "pull_request_target":
+        return None
+    if not ctx.fork():
+        return None
+    head = ctx.head_repo or "a deleted fork"
+    return (f"fork pull request (head {head}, base {ctx.repo}) gets a "
+            "read-only GITHUB_TOKEN")
+
+
+def _comment_not_posted(why: str, *,
+                        then: str = "the findings are in the step summary "
+                                    "and this log, and the verdict stands"
+                        ) -> None:
+    print(f"warden review: sticky comment not posted: {why}; {then}",
+          file=sys.stderr)
+
+
 def _cmd_review(args: argparse.Namespace) -> int:
     config = config_mod.load()
     config_mod.enforce_platform_pin(config)
@@ -201,8 +226,14 @@ def _cmd_review(args: argparse.Namespace) -> int:
                             rules_version=version, exit_status="infra_error",
                             extra={"error": str(e)})
         if ctx and not args.no_comment:
-            github_mod.upsert_sticky_comment(
-                ctx, audit_mod.render_infra_failure(str(e), version), config.root)
+            skip = _comment_skip_reason(ctx)
+            if skip:
+                _comment_not_posted(skip, then="the gate did not run, for "
+                                    "the reason on the line above")
+            else:
+                github_mod.upsert_sticky_comment(
+                    ctx, audit_mod.render_infra_failure(str(e), version),
+                    config.root)
         return 2
 
     (run_dir / "review-findings.json").write_text(json.dumps(doc, indent=2) + "\n")
@@ -223,19 +254,32 @@ def _cmd_review(args: argparse.Namespace) -> int:
     comment = audit_mod.render(
         doc, audit_mod.verify_for_review(config.root, doc, scopes))
     _append_step_summary(audit_mod.render_step_summary(doc))
-    if ctx and not args.no_comment:
+    skip = _comment_skip_reason(ctx) if ctx and not args.no_comment else None
+    if ctx and not args.no_comment and not skip:
         try:
             github_mod.upsert_sticky_comment(ctx, comment, config.root)
         except github_mod.GitHubError as e:
             # A blocking verdict was reached — a comment-post hiccup must not
             # relabel it as "gate did not run". The artifact
             # carries the findings. A CLEAN review with no posted comment has
-            # no durable audit record in CI, so that case stays exit 2.
-            if not blocking:
+            # no durable audit record in CI, so that case stays exit 2 —
+            # except a 403 on a payload that cannot say whether the head is
+            # a fork: that is the read-only fork token the payload check
+            # above would have named, so it is named here instead. A 403
+            # on a payload that says same-repository is a workflow missing
+            # `pull-requests: write` and stays exit 2.
+            if blocking:
+                print(f"warden review: comment post failed ({e}); "
+                      "verdict stands", file=sys.stderr)
+            elif e.status == 403 and ctx.fork() is None:
+                _comment_not_posted(f"HTTP 403, read as a fork's read-only "
+                                    f"token ({e})")
+            else:
                 raise
-            print(f"warden review: comment post failed ({e}); "
-                  "verdict stands", file=sys.stderr)
+            print(comment, end="")
     else:
+        if skip:
+            _comment_not_posted(skip)
         print(comment, end="")
 
     if blocking:

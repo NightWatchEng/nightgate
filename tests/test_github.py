@@ -1,6 +1,9 @@
 """GitHub REST plumbing: pagination and sticky-comment upsert (mocked _api)."""
 
+import io
+import json
 import subprocess
+import urllib.error
 
 import pytest
 
@@ -127,3 +130,39 @@ def test_a_gate_below_the_git_root_keeps_its_own_sticky_comment(monkeypatch, tmp
     calls = _patch_api(monkeypatch, [[{"id": 8, "body": f"{marker}\nold api review"}]])
     github_mod.upsert_sticky_comment(CTX, "root review", mono)
     assert calls[-1][1] == "POST", "the root gate overwrote the subdirectory gate's comment"
+
+
+@pytest.mark.parametrize("head_extra, fork, head_repo", [
+    ({"repo": {"full_name": "someone/r"}}, True, "someone/r"),
+    ({"repo": {"full_name": "o/r"}}, False, "o/r"),
+    ({"repo": None}, True, None),          # a deleted fork
+    ({}, None, "<unknown>"),               # the payload does not say
+])
+def test_from_event_reads_where_the_head_lives(tmp_path, head_extra, fork,
+                                               head_repo):
+    """agentops-hy6o.44: `warden review` skips the sticky comment on a fork,
+    whose token is read-only, so the event payload has to say which it is
+    — and a payload that does not say is unknown, never "same repository"."""
+    event = tmp_path / "event.json"
+    event.write_text(json.dumps({
+        "repository": {"full_name": "o/r"},
+        "pull_request": {"number": 1, "base": {"sha": "a" * 40},
+                         "head": {"sha": "b" * 40, **head_extra}}}))
+    ctx = github_mod.from_event(str(event))
+    assert ctx.head_repo == head_repo
+    assert ctx.fork() is fork
+
+
+def test_an_http_error_carries_its_status(monkeypatch):
+    """The review's fork fallback tells a 403 from any other failure by the
+    status, not by matching the message."""
+    def refuse(req, timeout=None):
+        raise urllib.error.HTTPError(req.full_url, 403, "Forbidden", {},
+                                     io.BytesIO(b"Resource not accessible"))
+    monkeypatch.setenv("GITHUB_TOKEN", "t")
+    monkeypatch.setattr(github_mod.urllib.request, "urlopen", refuse)
+    with pytest.raises(github_mod.GitHubError) as e:
+        github_mod._api("repos/o/r/issues/1/comments", method="POST",
+                        payload={"body": "x"})
+    assert e.value.status == 403
+    assert "HTTP 403" in str(e.value)

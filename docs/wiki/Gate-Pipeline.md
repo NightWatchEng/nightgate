@@ -623,6 +623,19 @@ past ones. warden posts it over stdlib HTTPS with `GITHUB_TOKEN` and has no
 `warden audit` re-renders it from artifacts on disk without re-running the
 review.
 
+A `pull_request` run from a fork gets a read-only `GITHUB_TOKEN` by default, so
+there is no comment to post. `warden review --event` reads the fork off the payload
+(`pull_request.head.repo` is not the base repository, or is null because the
+fork was deleted) and does not try. It writes the findings to the step summary
+and the job log, prints one line saying why no comment was posted, and exits
+on the verdict alone: 0 clean, 1 blocking. When the payload does not say where
+the head lives, a 403 on the post gets the same treatment. On a payload that
+names the base repository, a 403 on a clean review is still exit 2, because a
+same-repository token can write and the workflow is missing
+`pull-requests: write`; with a blocking finding the exit is 1, as for any
+failed post.
+`pull_request_target` runs with the base repository's token and posts as usual.
+
 ## Exit codes
 
 `0` clean · `1` blocking finding / failed gate · `2` infra or config error —

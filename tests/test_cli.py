@@ -232,6 +232,167 @@ def test_a_step_summary_that_cannot_be_written_leaves_the_verdict(
     assert "step summary not written" in err and "no/such/f" in err
 
 
+_UNSET = object()
+
+
+def _pr_review(sample_repo: Path, tmp_path: Path,
+               monkeypatch: pytest.MonkeyPatch, *, head_repo=_UNSET,
+               high: bool, post=None) -> tuple[Path, list[str], Path]:
+    """`warden review --event` over a pull_request payload whose head repo is
+    HEAD_REPO (a dict `{"full_name": ...}`, None for a deleted fork, or left
+    out of the payload entirely), with one HIGH finding or none. POST replaces
+    the sticky-comment upsert; by default it records each body it is given."""
+    shutil.copy(sample_repo / "repo.yaml", tmp_path / "repo.yaml")
+    shutil.copytree(sample_repo / ".warden" / "rules", tmp_path / ".warden" / "rules")
+    head = {"sha": "b" * 40}
+    if head_repo is not _UNSET:
+        head["repo"] = head_repo
+    event = tmp_path / "event.json"
+    event.write_text(json.dumps({
+        "repository": {"full_name": "o/r"},
+        "pull_request": {"number": 3, "base": {"sha": "a" * 40},
+                         "head": head}}))
+    monkeypatch.chdir(tmp_path)
+    ctx_obj = DiffContext(base="a" * 40, head="b" * 40, files=("app/x.py",),
+                          added={"app/x.py": ((7, "bad"),)}, removed={},
+                          read_base=lambda p: None, read_head=lambda p: None)
+    finding = {"rule_id": "secrets-in-diff", "severity": "HIGH",
+               "file": "app/x.py", "line": 7, "finding": "AWS key in diff",
+               "evidence": "+AKIA-shaped-token"}
+    doc = {"rules_version": "v", "engine": "deterministic", "base_sha": ctx_obj.base,
+           "head_sha": ctx_obj.head, "findings": [finding] if high else [],
+           "deferred_to_pre_pr": []}
+    monkeypatch.setattr(cli.diffs_mod, "get_context", lambda *a, **k: ctx_obj)
+    monkeypatch.setattr(review_mod, "run_review", lambda *a, **k: doc)
+    posted: list[str] = []
+    monkeypatch.setattr(github_mod, "upsert_sticky_comment",
+                        post or (lambda ctx, body, root: posted.append(body)))
+    summary = tmp_path / "step-summary.md"
+    monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(summary))
+    monkeypatch.delenv("GITHUB_EVENT_NAME", raising=False)
+    return event, posted, summary
+
+
+def _forbidden(ctx, body, root):
+    raise github_mod.GitHubError(
+        "POST repos/o/r/issues/3/comments -> HTTP 403: Resource not "
+        "accessible by integration", status=403)
+
+
+def test_a_clean_fork_pr_review_exits_0_and_names_the_comment_it_skipped_regression(
+        sample_repo, tmp_path, monkeypatch, capsys):
+    """agentops-hy6o.44: a fork PR's GITHUB_TOKEN is read-only, so the sticky
+    comment 403'd, and a clean review re-raised it as exit 2 — a red required
+    check on a fork PR that broke nothing. The fork is read off the payload
+    and the post is not attempted: the verdict alone sets the exit, the
+    findings still reach the step summary and the job log, and one line says
+    why there is no comment."""
+    event, posted, summary = _pr_review(
+        sample_repo, tmp_path, monkeypatch,
+        head_repo={"full_name": "someone/r"}, high=False)
+    assert cli.main(["review", "--event", str(event)]) == 0
+    assert posted == [], "a fork PR's read-only token was asked to post"
+    out, err = capsys.readouterr()
+    assert ("warden review: sticky comment not posted: fork pull request "
+            "(head someone/r, base o/r)") in err
+    assert err.count("sticky comment not posted") == 1
+    assert out, "the comment did not reach the job log"
+    assert summary.read_text(), "the findings did not reach the step summary"
+
+
+def test_a_fork_pr_with_a_high_finding_still_exits_1_regression(
+        sample_repo, tmp_path, monkeypatch, capsys):
+    """Tolerant on the comment, fail-closed on the verdict: a blocking finding
+    on a fork PR is exit 1 with the finding in the summary and the log."""
+    event, posted, summary = _pr_review(
+        sample_repo, tmp_path, monkeypatch,
+        head_repo={"full_name": "someone/r"}, high=True)
+    assert cli.main(["review", "--event", str(event)]) == 1
+    assert posted == []
+    out, err = capsys.readouterr()
+    assert "sticky comment not posted: fork pull request" in err
+    assert "1 blocking finding(s)" in err
+    assert "secrets-in-diff" in out
+    assert "secrets-in-diff" in summary.read_text()
+
+
+def test_a_deleted_fork_is_a_fork(sample_repo, tmp_path, monkeypatch, capsys):
+    """GitHub sends `head.repo: null` when the fork has been deleted; that
+    head is not the base repository, and its token is no less read-only."""
+    event, posted, _ = _pr_review(sample_repo, tmp_path, monkeypatch,
+                                  head_repo=None, high=False)
+    assert cli.main(["review", "--event", str(event)]) == 0
+    assert posted == []
+    assert "sticky comment not posted: fork pull request" in capsys.readouterr().err
+
+
+def test_a_same_repository_pr_still_posts_the_comment(
+        sample_repo, tmp_path, monkeypatch, capsys):
+    event, posted, _ = _pr_review(sample_repo, tmp_path, monkeypatch,
+                                  head_repo={"full_name": "o/r"}, high=False)
+    assert cli.main(["review", "--event", str(event)]) == 0
+    assert len(posted) == 1
+    assert "not posted" not in capsys.readouterr().err
+
+
+def test_a_pull_request_target_fork_run_still_posts(
+        sample_repo, tmp_path, monkeypatch):
+    """`pull_request_target` runs in the base repository with its write
+    token, fork or not, so a fork head there is no reason to skip."""
+    event, posted, _ = _pr_review(sample_repo, tmp_path, monkeypatch,
+                                  head_repo={"full_name": "someone/r"}, high=False)
+    monkeypatch.setenv("GITHUB_EVENT_NAME", "pull_request_target")
+    assert cli.main(["review", "--event", str(event)]) == 0
+    assert len(posted) == 1
+
+
+def test_a_403_on_a_same_repository_pr_is_still_exit_2(
+        sample_repo, tmp_path, monkeypatch):
+    """A same-repository PR's token can write; a 403 there is a workflow
+    missing `pull-requests: write`, a real misconfiguration, and a clean
+    review with no durable comment stays exit 2."""
+    event, _, _ = _pr_review(sample_repo, tmp_path, monkeypatch,
+                             head_repo={"full_name": "o/r"}, high=False,
+                             post=_forbidden)
+    assert cli.main(["review", "--event", str(event)]) == 2
+
+
+def test_a_403_when_the_payload_names_no_head_repo_is_the_fork_fallback(
+        sample_repo, tmp_path, monkeypatch, capsys):
+    """A payload that does not say where the head lives cannot rule a fork
+    in or out; there a 403 is read as the read-only token it is on a fork,
+    named, and the verdict stands. Any other post failure is still exit 2."""
+    event, _, _ = _pr_review(sample_repo, tmp_path, monkeypatch,
+                             high=False, post=_forbidden)
+    assert cli.main(["review", "--event", str(event)]) == 0
+    err = capsys.readouterr().err
+    assert "sticky comment not posted: HTTP 403" in err
+
+    def down(ctx, body, root):
+        raise github_mod.GitHubError("GET x -> HTTP 502: bad gateway", status=502)
+    monkeypatch.setattr(github_mod, "upsert_sticky_comment", down)
+    assert cli.main(["review", "--event", str(event)]) == 2
+
+
+def test_a_fork_pr_whose_gate_did_not_run_posts_nothing_and_exits_2(
+        sample_repo, tmp_path, monkeypatch, capsys):
+    """The infra-failure path posts a comment too; on a fork it would 403 over
+    the exit 2 that names the real cause."""
+    event, posted, _ = _pr_review(sample_repo, tmp_path, monkeypatch,
+                                  head_repo={"full_name": "someone/r"}, high=False)
+
+    def broken(*a, **k):
+        raise cli.diffs_mod.DiffError("bad base")
+    monkeypatch.setattr(cli.diffs_mod, "get_context", broken)
+    assert cli.main(["review", "--event", str(event)]) == 2
+    assert posted == []
+    err = capsys.readouterr().err
+    assert "gate DID NOT RUN: bad base" in err
+    assert "sticky comment not posted: fork pull request" in err
+    # no review ran, so the line must not send a reader to findings or a verdict
+    assert "the gate did not run" in err and "verdict stands" not in err
+
+
 def _clone_fixture(sample_repo, tmp_path):
     """A committed, clean copy of the fixture repo — `attest write` refuses a
     dirty tree, and writing evidence must not dirty the session fixture."""

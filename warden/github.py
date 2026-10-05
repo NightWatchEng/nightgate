@@ -24,7 +24,17 @@ DEFAULT_TIMEOUT = 30
 
 
 class GitHubError(Exception):
-    pass
+    """A GitHub API call failed. STATUS is the HTTP status when GitHub
+    answered, None when it did not (no token, no connection)."""
+
+    def __init__(self, message: str, status: int | None = None):
+        super().__init__(message)
+        self.status = status
+
+
+# The payload's `head.repo` key absent: the run cannot say where the head
+# lives, so whether this is a fork is unknown, not "no".
+_HEAD_REPO_UNKNOWN = "<unknown>"
 
 
 @dataclass(frozen=True)
@@ -33,6 +43,17 @@ class PRContext:
     number: int
     base_sha: str
     head_sha: str
+    # owner/name of the repository the head branch lives in; None when the
+    # payload says `head.repo: null` (a deleted fork), `_HEAD_REPO_UNKNOWN`
+    # when the payload carries no `head.repo` at all.
+    head_repo: str | None = _HEAD_REPO_UNKNOWN
+
+    def fork(self) -> bool | None:
+        """True when the head lives outside the base repository, False when
+        it lives in it, None when the payload does not say."""
+        if self.head_repo == _HEAD_REPO_UNKNOWN:
+            return None
+        return self.head_repo != self.repo
 
 
 def from_event(event_path: str) -> PRContext:
@@ -40,11 +61,19 @@ def from_event(event_path: str) -> PRContext:
     try:
         event = json.loads(Path(event_path).read_text())
         pr = event["pull_request"]
+        head = pr["head"]
+        if "repo" not in head:
+            head_repo = _HEAD_REPO_UNKNOWN
+        elif head["repo"] is None:
+            head_repo = None
+        else:
+            head_repo = head["repo"]["full_name"]
         return PRContext(repo=event["repository"]["full_name"],
                          number=pr["number"],
                          base_sha=pr["base"]["sha"],
-                         head_sha=pr["head"]["sha"])
-    except (OSError, KeyError, json.JSONDecodeError) as e:
+                         head_sha=head["sha"],
+                         head_repo=head_repo)
+    except (OSError, KeyError, TypeError, json.JSONDecodeError) as e:
         raise GitHubError(f"cannot read pull_request event from {event_path}: {e}") from e
 
 
@@ -87,7 +116,8 @@ def _api(path: str, method: str = "GET", payload: dict | None = None,
             return json.loads(resp.read() or "null")
     except urllib.error.HTTPError as e:
         body = e.read().decode(errors="replace")[:400]
-        raise GitHubError(f"{method} {path} -> HTTP {e.code}: {body}") from e
+        raise GitHubError(f"{method} {path} -> HTTP {e.code}: {body}",
+                          status=e.code) from e
     except urllib.error.URLError as e:
         raise GitHubError(f"{method} {path} failed: {e.reason}") from e
 
