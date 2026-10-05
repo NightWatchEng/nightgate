@@ -5,56 +5,59 @@ the **skill pack** (the judgment protocols an agent session follows). They are
 independent — the gate works with no agent, and the skills degrade to reporting
 if the CLI is missing.
 
-## Access comes first
+## Reading the platform repository
 
-Every install below reads `NightWatchEng/nightgate`, so your account needs
-read access to it. What each install needs on top:
+Every install below reads `NightWatchEng/nightgate`, a public repository, so
+none of them needs an account, a credential or a secret to read it:
 
-- **The CLI from a tag** (section 1) fetches over https with your git
-  credentials. `gh auth setup-git` makes `gh` git's credential helper for
-  github.com, which is what `uv` uses for a `git+https` source.
-- **CI in an enrolled repo** clones the platform over https with no secret,
-  and over ssh with a read-only deploy key only for a pin of a private build
+- **The CLI from a tag** (section 1) fetches it over https.
+- **CI in an enrolled repo** clones it over https with no secret, and over
+  ssh with a read-only deploy key only for a pin of a private build
   (*CI access to the platform*).
-- **The skill pack** (section 3) is cloned from the same https URL with the
-  same credentials.
+- **The skill pack** (section 3) is cloned from the same https URL.
 
-For the CLI:
+A pin below v3.0.0 reads `NightWatchEng/agentops` instead (section 3), which
+is private: your account needs read access to it, and `gh auth login` then
+`gh auth setup-git` make `gh` git's credential helper for github.com, which
+is what `uv` uses for a `git+https` source.
+
+To check that a release tag is published:
 
 ```sh
-gh auth login
-gh auth setup-git
 git ls-remote --tags https://github.com/NightWatchEng/nightgate v3.0.2
 ```
 
 The `ls-remote` line prints one line when `v3.0.2` is published, whether the
 tag is lightweight or annotated: an object id, a tab, and `refs/tags/v3.0.2`.
 For an annotated tag the id is the tag object's, not the commit's. No output,
-with exit status 0, means the tag is not published yet. Without access, git
-exits 128 instead. Over https it asks `Username for 'https://github.com':`
-when it has no credentials. With a token that is invalid or expired, it
-prints `Invalid username or token` and `Authentication failed`; run
+with exit status 0, means the tag is not published yet. When git cannot
+read the repository, it exits 128 instead. Over https GitHub answers a
+private repository and a misspelled name alike: with no credentials git asks
+`Username for 'https://github.com':`. With a token that is invalid or
+expired, it prints `Invalid username or token` and `Authentication failed`; run
 `gh auth login` and `gh auth setup-git` again. With valid credentials for an
 account that has no access, it prints `Repository not found`.
 
 To check an ssh key, such as a deploy key, run the same line against
-`git@github.com:NightWatchEng/nightgate.git`. With no key GitHub accepts, it
-fails with `Permission denied (publickey)`; with a key whose account has no
-access, it prints `ERROR: Repository not found.`
+`git@github.com:NightWatchEng/nightgate.git`. GitHub asks for a key over ssh
+even for a public repository: with no key it accepts, git fails with
+`Permission denied (publickey)`; with a key that has no access to a private
+repository, it prints `ERROR: Repository not found.`
 
 ## Prerequisites
 
 | Tool | Why | Install |
 |---|---|---|
 | **uv** | runs warden, and usually your verify commands | `curl -LsSf https://astral.sh/uv/0.12.1/install.sh \| sh` — a *versioned* installer URL; the unversioned one runs whatever shipped last |
-| **gh** | git credentials for the private repository (`gh auth setup-git`), the PR back-pressure check and branch protection (`gh auth status`) | [cli.github.com](https://cli.github.com) |
+| **gh** | the PR back-pressure check and branch protection (`gh auth status`), and git credentials (`gh auth setup-git`) only for a pin below v3.0.0, whose repository is private | [cli.github.com](https://cli.github.com) |
 | **git** | the gate diffs `base...head`, so CI checkouts need full history (`fetch-depth: 0`) | — |
 | **Claude Code** | only if you want the skill pack | [claude.com/claude-code](https://claude.com/claude-code) |
 
 ## GitHub only
 
 The platform and its CI half assume GitHub. The repository is hosted there,
-`gh` is how you get credentials for it, and `warden init` writes a GitHub
+`gh` is the client the PR back-pressure check and branch protection use, and
+`warden init` writes a GitHub
 Actions workflow and nothing else. There is no GitLab CI or other renderer.
 The checks in `warden certify` that look for CI read only
 `.github/workflows/`, so a repository whose gate runs anywhere else
@@ -75,7 +78,7 @@ warden --version
 One package, both commands: `warden` and `cage` land on your PATH, and there is
 no clone of the platform. `warden --version` prints the tag's version, here
 `warden 3.0.2`. If the install cannot find `v3.0.2`, run the `ls-remote` check
-under *Access comes first*: no output means the release tag is not published
+under *Reading the platform repository*: no output means the release tag is not published
 yet.
 
 Nothing stops a mismatched tag from being pushed. A pushed `v*` tag whose name
@@ -195,9 +198,10 @@ claude plugin install nightgate-skills@nightgate
 
 Then check it with `warden skills pin`, which v3.0.2 carries.
 
-Claude Code clones the marketplace with your git credentials, so the https
-URL uses the `gh auth setup-git` helper above; the `NightWatchEng/nightgate`
-shorthand would clone over ssh instead. The `#v3.0.2` is `platform.pin`:
+Claude Code clones the marketplace with git. The https URL needs no
+credential, except at a pin below v3.0.0, where it uses the `gh auth
+setup-git` helper above; the `NightWatchEng/nightgate` shorthand would clone
+over ssh instead, which needs an ssh key GitHub accepts. The `#v3.0.2` is `platform.pin`:
 neither command takes a version flag, but a ref on the URL clones the
 marketplace at that tag and the pack installs from that clone. `warden skills
 pin` refuses (exit 1) a machine whose marketplace ref or installed pack version
