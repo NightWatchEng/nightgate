@@ -4007,6 +4007,62 @@ def test_failing_tests_names_no_test_off_a_line_another_tool_prints():
         "tests/t.py::test_a[a b]", "tests/t.py"]
 
 
+UPGRADE = "Upgrading an enrolled repository"
+
+
+def _upgrade_blocks() -> list[str]:
+    return re.findall(r"```sh\n(.*?)```", _section("Installation.md", UPGRADE), re.S)
+
+
+def test_the_upgrade_section_states_the_order_a_bump_takes():
+    """The demo's bump (agentops-hy6o.33) followed two pages literally and hit
+    six defects; the section is the one place the order is written. Pack
+    before pin (the bump PR's review runs the new pack), the whole file
+    re-copied, the bump PR's own attestation, then the open PRs."""
+    body = " ".join(_section("Installation.md", UPGRADE).split())
+    order = ["claude plugin install", "Set `repo.yaml`'s `platform.pin`",
+             "warden skills pin", "warden init)", "Copy the whole file",
+             "pre-PR review attestation", "Merge `main` into the PR's branch"]
+    at = [body.find(phrase) for phrase in order]
+    assert -1 not in at and at == sorted(at), dict(zip(order, at))
+    for phrase in ("never added", "no `pull_request` run", "reuses its old merge ref",
+                   "start a new session"):
+        assert phrase in body, phrase
+    link = "Installation.md#upgrading-an-enrolled-repository"
+    for page in ("Releasing.md", "Adopting.md"):
+        assert link in (WIKI / page).read_text(), f"{page} does not link the section"
+    step9 = (WIKI / "Releasing.md").read_text().split("\n9. ", 1)[1]
+    assert link in step9.split("\n\n", 1)[0], "Releasing step 9 does not link the section"
+
+
+@pytest.mark.parametrize("prefix", ["", "svc/api"])
+def test_the_upgrade_sections_recopy_rewrites_the_workflow_to_a_fresh_enrollments(
+        prefix, tmp_path, monkeypatch):
+    """The section's re-copy block, run as written, leaves the enrolled
+    repository's workflow byte for byte the one `warden init` writes for that
+    directory, at the root and below it, whatever the stale copy held."""
+    install, recopy = _upgrade_blocks()
+    assert f"@v{enroll.__version__}" in install
+    files = {f"{prefix}/{rel}".lstrip("/"): text
+             for rel, text in {**FIXTURES["python"], **FIXTURES["node"]}.items()}
+    repo = _repo(tmp_path, files)
+    assert _warden(repo / prefix, monkeypatch, "init") == 0
+    workflow = repo / ".github" / "workflows" / (
+        f"warden-{prefix.replace('/', '-')}.yml" if prefix else "warden.yml")
+    fresh = workflow.read_bytes()
+    workflow.write_text("# a gate an older release wrote\nname: warden\n")
+    script = re.sub(r"(?m)^DIR=.*$", f"DIR={prefix or '.'}", recopy)
+    bin_dir = Path(sys.executable).parent
+    result = subprocess.run(
+        ["bash", "-c", script], cwd=repo, capture_output=True, text=True, timeout=120,
+        env={**os.environ, **_AMBIENT_GIT_CONFIG, "TMPDIR": str(tmp_path),
+             "PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"})
+    assert result.returncode == 0, result
+    assert "a gate an older release wrote" in result.stdout, "the diff did not show the stale copy"
+    assert workflow.read_bytes() == fresh
+    assert sorted(p.name for p in workflow.parent.iterdir()) == [workflow.name]
+
+
 def test_failing_tests_reads_a_pytest_id_whole_and_no_log_line_as_a_test():
     """Round 2 of hy6o.30/.31 found the pytest pattern cutting a parametrize
     id at its ` - ` and naming `app.py` off a logging line. A pytest name is

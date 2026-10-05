@@ -124,6 +124,9 @@ def check(config_dir: Path, pin: str) -> tuple[str, str]:
     marketplace at PIN, and is it the version that clone serves?"""
     plugins = config_dir / "plugins"
     pin = "v" + pin.removeprefix("v")  # the schema admits `2.2.0`; every tag has the v
+    # A marketplace name refuses a changed source, so an added one is removed
+    # first; `marketplace remove` of one never added fails, so an absent one
+    # is only added.
     redo = "; ".join([f"claude plugin marketplace remove {MARKETPLACE}",
                       *install_commands(pin)])
     known, why = _load_json(plugins / "known_marketplaces.json")
@@ -132,7 +135,8 @@ def check(config_dir: Path, pin: str) -> tuple[str, str]:
     entry = (known or {}).get(MARKETPLACE)
     if not isinstance(entry, dict):
         return UNPINNED, (f"marketplace {MARKETPLACE} is not added under {plugins} — "
-                          f"the pack is not installed; repo.yaml pins {pin}: {redo}")
+                          f"the pack is not installed; repo.yaml pins {pin}: "
+                          f"{'; '.join(install_commands(pin))}")
     source = entry.get("source") if isinstance(entry.get("source"), dict) else {}
     ref = source.get("ref")
     if not isinstance(ref, str) or not ref:

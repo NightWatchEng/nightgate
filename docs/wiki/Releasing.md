@@ -28,7 +28,7 @@ v2.3.0's is [release-notes-v2.3.0](../design/release-notes-v2.3.0.md).
    | `examples/hello-svc/repo.yaml` | `platform.pin` | `enforce_platform_pin`; `tests/test_declare_check.py`; the `portability proof` CI job |
    | `docs/wiki/Adopting.md` | the `repo.yaml` snippet, byte-identical to hello-svc's | `tests/test_docs.py::test_adopting_repo_yaml_snippet_is_the_real_file` |
    | `README.md` Install and Try it | the `@vX.Y.Z` install lines, `warden X.Y.Z`, the `ls-remote` check | `tests/test_install_tag_check.py` (the install lines and `warden X.Y.Z` by `test_each_install_page_names_the_current_release_in_its_install_and_version_lines`); `tests/test_init_proof.py`; the `warden init proof` CI job, whose `scripts/init-proof.sh` refuses a Try it install line that is not `@v` + the version of the wheel it built |
-   | `docs/wiki/Installation.md` sections 1 and 3 | the install line, `warden X.Y.Z`, the `ls-remote` check, the marketplace `#vX.Y.Z` | `tests/test_install_tag_check.py`; `tests/test_init.py::test_every_doc_adds_the_skill_pack_marketplace_by_its_github_url`; `tests/test_packpin.py::test_the_documented_install_and_init_name_the_pin_and_the_manifest` |
+   | `docs/wiki/Installation.md` sections 1 and 3 and *Upgrading an enrolled repository* | the install line, `warden X.Y.Z`, the `ls-remote` check, the marketplace `#vX.Y.Z` | `tests/test_install_tag_check.py`; `tests/test_init.py::test_every_doc_adds_the_skill_pack_marketplace_by_its_github_url`; `tests/test_packpin.py::test_the_documented_install_and_init_name_the_pin_and_the_manifest`; the upgrade section's install line by `tests/test_init.py::test_the_upgrade_sections_recopy_rewrites_the_workflow_to_a_fresh_enrollments` |
    | Installation.md section 3 and `Skill-Pack.md` | the sentence `warden/packpin.py` `check_step(pin)` returns for hello-svc's pin | `tests/test_packpin.py::test_the_wiki_sentence_is_the_one_for_the_adopted_pin`, `test_no_wiki_page_offers_skills_pin_to_a_pin_that_lacks_it`, `test_the_pages_drift_at_the_pin_on_the_other_side_of_the_command` |
 
    What does not move: `packpin.LACKS_PIN_COMMAND` and
@@ -83,7 +83,14 @@ v2.3.0's is [release-notes-v2.3.0](../design/release-notes-v2.3.0.md).
 
 9. **Consumers bump their pin**, each in its own repository (shortfall is
    the live one), once step 8's `NightWatchEng/nightgate` check prints the
-   tag: a gate `warden init` writes installs from there. The bump PR moves `platform.pin` in `repo.yaml` to
+   tag: a gate `warden init` writes installs from there. A repository `warden
+   init` enrolled follows
+   [Installation](Installation.md#upgrading-an-enrolled-repository),
+   *Upgrading an enrolled repository*, in its order: the new CLI and skill
+   pack first, then the pin, then the whole workflow file re-copied from a
+   scratch enrollment, a bump PR that carries its own attestation because
+   the new gate judges it, and `main` merged into each open PR. The rest of
+   this step is for a gate written by hand. The bump PR moves `platform.pin` in `repo.yaml` to
    `vX.Y.Z`, plus any key the new schema requires or now admits. A bump does
    not rewrite a gate workflow, so a step the generator added since (v2.3.0's
    `proportionate review tier`) is the consumer's to add, and a step it has
@@ -97,9 +104,9 @@ v2.3.0's is [release-notes-v2.3.0](../design/release-notes-v2.3.0.md).
    as shortfall's hand-written one does, judges the bump PR at the old pin,
    whose warden lacks the step's command (v2.2.0 has no `attest classify`),
    so the step there would turn that PR's own gate red: it waits for a second
-   PR, opened once the bump has merged. After the bump PR, re-add the
-   skill-pack marketplace at the new tag
-   ([Installation](Installation.md) section 3) and run `warden skills pin`.
+   PR, opened once the bump has merged. The skill pack moves before the
+   bump PR, not after it: the bump PR's review runs the new pack
+   ([Installation](Installation.md#upgrading-an-enrolled-repository), step 1).
    `warden memory ingest` may then warn about tags in older review records
    that `.warden/memory/tags.yaml` does not declare; these are warnings, not
    refusals, and the vocabulary is the retro's to settle

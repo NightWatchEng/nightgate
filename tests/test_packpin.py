@@ -134,6 +134,24 @@ def test_an_absent_marketplace_or_plugin_is_refused_not_passed(
     assert code == 1 and "is not installed from it" in err, err
 
 
+def test_the_suggested_fix_removes_the_marketplace_only_when_it_is_added(
+        tmp_path, monkeypatch, capsys):
+    """`claude plugin marketplace remove nightgate` fails when no such
+    marketplace is added, so a fix that starts with it fails at its first
+    command on exactly the machine that needs the pack (agentops-hy6o.36, the
+    demo's bump). Absent: add and install. Added at another ref or with none:
+    remove first, since a name refuses a changed source."""
+    remove = f"claude plugin marketplace remove {packpin.MARKETPLACE}"
+    repo = _repo(tmp_path)
+    for name, cfg, removes in [
+            ("absent", _config_dir(tmp_path / "a", marketplace=False), False),
+            ("other ref", _config_dir(tmp_path / "b", ref="v0.0.1"), True),
+            ("no ref", _config_dir(tmp_path / "c", ref=None), True)]:
+        code, _, err = _pin(repo, cfg, monkeypatch, capsys)
+        assert code == 1 and f"add '{packpin.MARKETPLACE_URL}#{PIN}'" in err, (name, err)
+        assert (remove in err) is removes, (name, err)
+
+
 def test_an_installed_version_the_pinned_clone_does_not_serve_is_refused(
         tmp_path, monkeypatch, capsys):
     """The marketplace ref alone is not the proof: a copy installed before the

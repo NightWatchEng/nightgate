@@ -26,6 +26,12 @@ write it by hand.
 warden init
 ```
 
+**Moving `platform.pin` later** is not a re-run of `warden init`, which
+writes no file that already exists. The order a bump takes, including how the
+workflow it wrote catches up, is in
+[Installation](Installation.md#upgrading-an-enrolled-repository),
+*Upgrading an enrolled repository*.
+
 The enrollment of `examples/hello-svc` written down. Platform CI runs this
 path against that example on every PR, so it cannot rot silently. Follow it top
 to bottom; every snippet is copy-pasteable.

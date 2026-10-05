@@ -100,23 +100,24 @@ default to running in `svc/api` — carries an install step that runs before
 refuses to start a `run:` step whose working directory is missing, so that
 install job fails at its first step; the verify and gate jobs `need` it, and
 the gate never runs at all. Raising `platform.pin` alone repairs nothing. The
-repair is to copy into the workflow you have the two steps the generator now
-writes with `working-directory: "."`: `require a private repository` and
-`require repo.yaml`. Re-running `warden init` is not a route: it refuses when
-any file it would write already exists, and an enrolled directory still holds
+repair is to replace the whole workflow file with the one the generator now
+writes, whose two steps `require a private repository` and `require repo.yaml`
+carry `working-directory: "."`: *Upgrading an enrolled repository* below says
+how. Re-running `warden init` in place is not a route: it refuses when any
+file it would write already exists, and an enrolled directory still holds
 `repo.yaml` and its rules, so it writes nothing and leaves you as you were.
 
 A gate `warden init` 3.0.1 or earlier wrote has no `warden attest check` step,
 so certify's E-01 fails in its own CI, and it stops before `warden review`
 when verify failed, so a pull request with failing tests shows no rule
-finding. The repair is the same hand-edit: copy the `gate` job the generator
-now writes over yours, written for the same directory below the git root:
-there the job's name, `warden gate (<dir>)`, is the check your branch rule
-requires, and its working directory and upload path carry the directory, and the `warden verify --scope` steps, which now copy
-the summary naming the failing tests into the step summary. The new step is
-fail-closed: a pull request from your repository that carries no committed
-pre-PR review attestation is red, a Dependabot one included, and a fork's
-is exempt.
+finding. The repair is the same: replace the whole workflow file with the
+one `warden init` 3.0.2 writes for the same directory, as *Upgrading an
+enrolled repository* below shows. That changes the `gate` job, the `warden
+verify --scope` steps in the `verify` job, which now copy the summary naming
+the failing tests into the step summary, and the header comment that
+describes the gate. The new `warden attest check` step is fail-closed: a pull
+request from your repository that carries no committed pre-PR review
+attestation is red, a Dependabot one included, and a fork's is exempt.
 
 **Trust note.** `warden explain`, `warden review` and `warden rules lifecycle` load
 `.warden/checkers/*.py` from the repo they run in, executing that code at the
@@ -224,7 +225,9 @@ when the pin does: a marketplace name refuses a changed source, so a bump is
 claude plugin marketplace remove nightgate
 ```
 
-followed by the two lines above at the new tag. Then check that what the
+followed by the two lines above at the new tag. Leave out the `remove` when
+the marketplace was never added: it fails then. *Upgrading an enrolled
+repository* below puts this in the order a bump takes. Then check that what the
 harness serves is what the skills assume:
 
 ```sh
@@ -244,6 +247,85 @@ run-time surprise.
 
 `cage` ships in the same package as `warden`. Nothing to install separately —
 see [The Cage](The-Cage.md) for enrollment.
+
+## Upgrading an enrolled repository
+
+This is the order a `platform.pin` bump takes on a repository `warden init`
+enrolled, written for the move to v3.0.2. Read the release's notes first
+([Releasing](Releasing.md) lists them): they say what changes in `repo.yaml`
+and in the workflow `warden init` writes.
+
+**1. Install the new CLI and the new skill pack, before the bump.**
+
+```sh
+uv tool install --force git+https://github.com/NightWatchEng/nightgate@v3.0.2
+warden --version
+claude plugin marketplace remove nightgate
+claude plugin marketplace add 'https://github.com/NightWatchEng/nightgate#v3.0.2'
+claude plugin install nightgate-skills@nightgate
+```
+
+Leave out the `marketplace remove` line when the marketplace was never
+added: it fails then. The pack comes first because the bump PR needs a pre-PR
+review (step 4), and the pack and the CLI are one release: before v3.0.2,
+`pre-pr-review` ran only the `.warden/bin/warden` launcher, which `warden init`
+does not write. A plugin installed during a Claude Code session does not load
+in it, so start a new session. From here this machine's `warden` refuses a
+repository still pinned at the old tag.
+
+**2. On a branch, move the pin.** Set `repo.yaml`'s `platform.pin` to
+`v3.0.2`, with any key the release notes say the schema now requires. Then
+`warden skills pin` reads the new pin and exits 0.
+
+**3. Replace the whole workflow file with the one the new release writes.**
+A bump does not rewrite a workflow, and `warden init` writes no file that
+already exists; no command rewrites an enrolled repository's workflow in
+place. So enroll a scratch repository at the same directory below the git
+root, with the same manifests, and copy the file it writes. From the git
+root, with `DIR` set to the enrolled directory (`.` at the root):
+
+```sh
+DIR=.
+scratch=$(mktemp -d)
+git init -q "$scratch"
+mkdir -p "$scratch/$DIR"
+for m in pyproject.toml package.json go.mod; do
+  if [ -f "$DIR/$m" ]; then cp "$DIR/$m" "$scratch/$DIR/"; fi
+done
+(cd "$scratch/$DIR" && warden init)
+f=$(ls "$scratch/.github/workflows")
+diff -u ".github/workflows/$f" "$scratch/.github/workflows/$f"
+cp "$scratch/.github/workflows/$f" .github/workflows/
+```
+
+The workflow depends only on the directory, the manifests found there and the
+release, so the copied file is byte for byte what a fresh enrollment at
+v3.0.2 writes. Copy the whole file, not a job: a release can change the
+header comment and steps outside the `gate` job (v3.0.2 changed the `warden
+verify --scope` steps in the `verify` job and added an `id: warden` to its
+install step). The `diff` shows what the copy discards: re-apply any edit you
+made to your own copy, such as a `warden memory ingest` step on push. A
+manifest added since you enrolled adds a verify step for a scope your
+`repo.yaml` does not declare; leave it out of the scratch repository. A
+hand-written gate is not this file: [Releasing](Releasing.md) step 9 says
+which of its steps can go in the bump PR.
+
+**4. Expect the bump PR to need its own attestation.** The workflow runs on
+`pull_request` from the PR's copy and reads `repo.yaml` from the PR, so the
+bump PR is judged by the new gate at the new pin. From v3.0.2 that gate runs
+`warden attest check`, so the bump PR stays red until it carries a committed
+pre-PR review attestation: run the verify scopes, then
+`/nightgate-skills:pre-pr-review`, then `warden memory ingest`, and commit the
+shard it writes under `.warden/memory/attest/`.
+
+**5. After the bump merges, bring each open PR onto the new gate.**
+Re-running an open PR's old run reuses its old merge ref and the old
+workflow. Merge `main` into the PR's branch and push. A PR that conflicts with
+`main` gets no `pull_request` run at all, so an empty commit does not start
+one: resolve the conflict in that merge. No attestation covers the merge
+commit, which carries `main`'s changes, so the new gate's `warden attest
+check` refuses it: re-run the pre-PR review on the merged head and commit its
+shard.
 
 ## Verify the install
 
