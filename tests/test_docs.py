@@ -2667,3 +2667,183 @@ def test_the_github_only_limit_holds_a_gitlab_gate_is_invisible_to_certify(
             check = {**check, "type": "ci_step_enforced"}
         ok, detail = certify_mod._run_check(check, tmp_path)
         assert not ok, f"{check['id']} passed on a GitLab-only gate: {detail}"
+
+
+# ── CONTRIBUTING's map of scripts/ ──────────────────────────────────────────
+
+def _scripts_rows(text: str) -> dict[str, list[str]]:
+    """The rows of CONTRIBUTING.md's `## The scripts` table, keyed by the
+    entry the first cell names (a directory keeps its trailing `/`), each
+    with its cells. A missing section yields no rows."""
+    start = text.find("\n## The scripts\n")
+    if start < 0:
+        return {}
+    end = text.find("\n## ", start + 1)
+    section = text[start:end if end >= 0 else len(text)]
+    rows = {}
+    for line in section.splitlines():
+        if not line.startswith("| `"):
+            continue
+        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        rows[cells[0].strip("`")] = cells
+    return rows
+
+
+def _scripts_entries() -> set[str]:
+    """Every entry git tracks directly under scripts/: a file by its name, a
+    directory (scripts/mermaid) once, as `name/`."""
+    entries = set()
+    for p in tracked("scripts/"):
+        parts = p.relative_to(ROOT / "scripts").parts
+        entries.add(parts[0] + ("/" if len(parts) > 1 else ""))
+    return entries
+
+
+def test_contributing_maps_every_entry_under_scripts():
+    """A new script cannot land unlisted, and a deleted one cannot leave its
+    row behind: the table names exactly what git tracks under scripts/, and
+    every row fills its four columns. The README's sentence on the repository
+    gating itself links the table by its heading."""
+    rows = _scripts_rows((ROOT / "CONTRIBUTING.md").read_text())
+    entries = _scripts_entries()
+    assert "mermaid/" in entries and "commit-lint.sh" in entries, entries
+    assert set(rows) - entries == set(), (
+        f"CONTRIBUTING.md's scripts table names {sorted(set(rows) - entries)}, "
+        "which scripts/ does not hold")
+    assert entries - set(rows) == set(), (
+        f"scripts/ holds {sorted(entries - set(rows))} with no row in "
+        "CONTRIBUTING.md's `## The scripts` table")
+    short = sorted(n for n, c in rows.items() if len(c) != 4 or not all(c))
+    assert not short, f"rows without four filled cells: {short}"
+    assert "(CONTRIBUTING.md#the-scripts)" in (ROOT / "README.md").read_text()
+
+
+def test_the_scripts_map_refuses_a_missing_row():
+    """The check above reads rows, not prose: a table with one row cut out no
+    longer covers scripts/, and a document without the section has no rows."""
+    text = (ROOT / "CONTRIBUTING.md").read_text()
+    cut = "\n".join(line for line in text.splitlines()
+                    if not line.startswith("| `readme-try-it.sh`"))
+    assert "readme-try-it.sh" in _scripts_rows(text)
+    assert _scripts_entries() - set(_scripts_rows(cut)) == {"readme-try-it.sh"}
+    assert _scripts_rows(text.replace("## The scripts", "## Scripts")) == {}
+
+
+# A workflow file followed by the job ids the row names in it:
+# "`ci.yml` `gate`, `corpus`, `enrollment` and `tracker`".
+_ROW_JOBS = re.compile(r"`([\w-]+\.yml)` (`[\w-]+`(?:(?:, | and )`[\w-]+`)*)")
+# A file that calls the script: a hook, a test, or another script.
+_ROW_FILE_CALLER = re.compile(
+    r"`((?:\.githooks|tests)/[\w.-]+|[\w-]+\.(?:sh|py))`")
+
+
+def _code_only(rel: str, text: str) -> str:
+    """TEXT with what does not run left out: for Python, comments and
+    docstrings (by way of the AST); otherwise, every line that is a comment."""
+    if rel.endswith(".py"):
+        tree = ast.parse(text)
+        for node in ast.walk(tree):
+            body = getattr(node, "body", None)
+            if (isinstance(body, list) and body
+                    and isinstance(body[0], ast.Expr)
+                    and isinstance(body[0].value, ast.Constant)
+                    and isinstance(body[0].value.value, str)):
+                body[0] = ast.Pass()
+        return ast.unparse(tree)
+    return "\n".join(line for line in text.splitlines()
+                     if not line.lstrip().startswith("#"))
+
+
+def _stale_script_callers(rows: dict[str, list[str]],
+                          read) -> tuple[list[str], int]:
+    """Every caller a row's `Who runs it` names that does not run the script,
+    and how many callers were checked. A named job must exist in the named
+    workflow and carry the script's path in a step's `run`, outside a
+    comment; a named hook, test or script must carry its name outside a
+    comment or docstring. READ maps a repo-relative path to its text."""
+    stale, checked = [], 0
+    for name, cells in rows.items():
+        script = name.rstrip("/")
+        who = cells[2]
+        for workflow, jobs in _ROW_JOBS.findall(who):
+            doc = yaml.safe_load(read(f".github/workflows/{workflow}"))
+            for job in re.findall(r"`([\w-]+)`", jobs):
+                checked += 1
+                steps = (doc.get("jobs") or {}).get(job, {}).get("steps", [])
+                runs = "\n".join(_code_only("run", s.get("run", ""))
+                                 for s in steps)
+                if f"scripts/{script}" not in runs:
+                    stale.append(f"{name} -> {workflow} {job}")
+        for caller in _ROW_FILE_CALLER.findall(who):
+            rel = caller if "/" in caller else f"scripts/{caller}"
+            checked += 1
+            if script not in _code_only(rel, read(rel)):
+                stale.append(f"{name} -> {rel}")
+    return stale, checked
+
+
+def _read_repo(rel: str) -> str:
+    return (ROOT / rel).read_text()
+
+
+def test_each_scripts_row_names_a_caller_that_runs_it():
+    """Where a row's `Who runs it` names a workflow job, a hook, a test or
+    another script, that caller runs the script: the job's steps name its
+    path in a `run`, and the file names it outside a comment. A path left
+    only in a comment or an `on.push.paths` filter does not count, so the
+    column cannot go on naming a job that stopped running it."""
+    rows = _scripts_rows((ROOT / "CONTRIBUTING.md").read_text())
+    stale, checked = _stale_script_callers(rows, _read_repo)
+    assert not stale, f"rows naming a caller that does not run them: {stale}"
+    # Exact, so a reader that stops seeing a caller is red: a row that adds
+    # or drops a caller changes this number with it.
+    assert checked == 26, f"{checked} callers were checked, not 26"
+
+
+def _replacing(rel: str, old: str, new: str):
+    """A reader of the repository in which REL's one OLD reads NEW."""
+    def read(path: str) -> str:
+        text = _read_repo(path)
+        if path != rel:
+            return text
+        assert text.count(old) == 1, f"{rel} no longer holds {old!r} once"
+        return text.replace(old, new)
+    return read
+
+
+@pytest.mark.parametrize("rel, old, new, row", [
+    # the step stops running it; the path survives in a comment above the job
+    (".github/workflows/ci.yml", "run: bash scripts/readme-try-it.sh",
+     "run: echo none", "readme-try-it.sh"),
+    # the step stops running it; the path survives in the on.push.paths filter
+    (".github/workflows/wiki-sync.yml", "run: bash scripts/build-wiki.sh",
+     "run: echo none", "build-wiki.sh"),
+    (".githooks/commit-msg", "/scripts/commit-lint.sh\"", "/scripts/x.sh\"",
+     "commit-lint.sh"),
+    # the call is gone; the name survives in the header comments
+    ("scripts/init-proof.sh", '/readme-try-it.sh" "$readme"',
+     '/x.sh" "$readme"', "readme-try-it.sh"),
+    # the load is gone; the name survives in the module docstring
+    ("scripts/publish-sync.py", '/ "publish-public.py")', '/ "x.py")',
+     "publish-public.py"),
+])
+def test_the_caller_check_refuses_a_caller_that_stopped_running_it(
+        rel, old, new, row):
+    rows = _scripts_rows((ROOT / "CONTRIBUTING.md").read_text())
+    assert not _stale_script_callers(rows, _read_repo)[0]
+    stale, _ = _stale_script_callers(rows, _replacing(rel, old, new))
+    assert any(s.startswith(f"{row} -> ") for s in stale), stale
+
+
+def test_the_caller_check_reads_the_job_id_the_row_names():
+    """A row moved to a job that does not run the script, or to one that
+    does not exist, is refused."""
+    rows = _scripts_rows((ROOT / "CONTRIBUTING.md").read_text())
+    for job in ("gate", "no-such-job"):
+        moved = dict(rows)
+        moved["portability-sim.sh"] = [
+            c.replace("`ci.yml` `enrollment`", f"`ci.yml` `{job}`")
+            for c in rows["portability-sim.sh"]]
+        assert moved["portability-sim.sh"] != rows["portability-sim.sh"]
+        stale, _ = _stale_script_callers(moved, _read_repo)
+        assert stale == [f"portability-sim.sh -> ci.yml {job}"], stale

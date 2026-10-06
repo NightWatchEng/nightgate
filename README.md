@@ -120,6 +120,8 @@ No job calls a model. The review skills and `engine: claude` rules run as Claude
 - **The record.** Each review ends in `warden attest write`, its record is committed with the code, and `warden attest check` refuses a PR with no record.
 - **The memory.** Past findings feed the next plan and the next review, and the `retro` skill proposes rules from them.
 
+This repository gates itself: its CI runs `warden init` and `warden certify` on fresh Python, Node, Go and Java repositories, plants a secret in an example project and checks that the gate refuses it, and lints every commit message; each commit on `main` is then published to the repository [Install](#install) names ([what each script does](CONTRIBUTING.md#the-scripts)).
+
 Two rules hold throughout. Hard stops live outside the model, and a person holds merge authority. The measured
 costs are in [Cost and Throughput](docs/wiki/Cost-and-Throughput.md), and [Why This Exists](docs/wiki/Why-This-Exists.md) says what is not yet proven.
 

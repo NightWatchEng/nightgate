@@ -228,6 +228,18 @@ REGISTRY: dict[str, tuple[str, str]] = {
     "test_docs:HOME_PATH_EXEMPT": (
         SWEPT, "the committed shards quoting a real home path, each exempted "
         "BY PATH — deleting them must make the tree scan fire"),
+    "test_docs:_ROW_JOBS": (
+        UNSWEPT, "the reader that finds each workflow and the job ids a row "
+        "of CONTRIBUTING.md's scripts table names in it. Covered by "
+        "test_each_scripts_row_names_a_caller_that_runs_it, which pins the "
+        "exact number of callers checked: deleting either separator drops "
+        "job ids from the private-evidence.py row, and the count fails"),
+    "test_docs:_ROW_FILE_CALLER": (
+        UNSWEPT, "the reader that finds a hook, test or script named as a "
+        "caller in CONTRIBUTING.md's scripts table. Covered by the same "
+        "exact count, since each alternative matches at least one row, and "
+        "by test_the_caller_check_refuses_a_caller_that_stopped_running_it "
+        "for the hook, .sh and .py shapes"),
 
     # ── test_init: warden init's fixture repos and the workflow step runner.
     "test_init:SHELLS": (

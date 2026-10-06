@@ -136,16 +136,45 @@ The gate runs the same tests in parallel, and CLAUDE.md's `## Build & test`
 block writes both commands with that difference marked. Same tests, same pass
 count; if the two disagree, the parallel run has found an isolation bug.
 
+## The scripts
+
+Everything under `scripts/` is plumbing this repository uses to gate itself;
+none of it is part of what an adopter installs. Each row says what the script
+proves or does, which CI job or hook runs it, and whether you ever run it
+yourself. A job is named by its workflow file and its job id.
+`tests/test_docs.py` fails when an entry lands under `scripts/` without a row
+here.
+
+| Script | What it proves or does | Who runs it | By hand |
+| --- | --- | --- | --- |
+| `ast-identity.py` | Proves a change touches only comments and docstrings: every changed `.py` file has the same AST before and after, docstrings removed. | No job or hook. An author or reviewer runs it on a diff that claims to change only comments. | Yes, for such a diff |
+| `build-wiki.sh` | Renders `docs/wiki/*.md` into `build/wiki/` for the GitHub wiki tab, rewriting the links that would not resolve there. | `wiki-sync.yml` `sync`, on a push to `main` that touches the wiki or its scripts. | No |
+| `ci-event-scope.sh` | Decides what a CI event invalidates: the whole run, or only the job that reads the PR title, when the title is all that changed. | `ci.yml` `triage`, whose answer most of the other jobs wait on. | No |
+| `commit-lint.sh` | Checks a commit message against the format in [CLAUDE.md](CLAUDE.md), or a PR title alone with `--header-only`. | `.githooks/commit-msg` (advisory), `ci.yml` `commits` on every pushed commit and the PR title, and `warden ship` on the title before the PR exists. | No, the hook runs it |
+| `example-standalone.sh` | Copies `examples/hello-svc` out as its own committed git repository, the state the Quickstart starts from. | `ci.yml` `enrollment`, and `portability-sim.sh`. | No |
+| `init-proof-isolation.sh` | Fails unless `warden` on PATH is the uv tool install, then turns off every git transport so the init proof cannot fetch the platform. | `ci.yml` `init-proof`, in the step before the proof runs. | No, it changes the global git config |
+| `init-proof.sh` | Runs the README's Try it commands, `warden init` and `warden certify --level 3`, on fresh Python, Node, Go and Java repositories, and checks each reaches Level 3 with no file written by hand. | `ci.yml` `init-proof`, and `tests/test_init_proof.py`. | No, the suite runs it |
+| `memory-watch-issue.py` | Reports one `warden memory watch` run on a standing GitHub issue, and fails the job when the watch could not be read. | `memory-watch.yml` `watch`, every Monday and on dispatch. | No |
+| `mermaid/` | `package.json` and `package-lock.json`, which pin the whole mermaid-cli dependency tree the diagram check installs. | `validate-diagrams.sh`, with `npm ci --ignore-scripts`. | Only to move the pin |
+| `portability-sim.sh` | Proves the gate gates on the example project: a clean change passes, a planted secret and a debugger hook are refused, and the tag-vocabulary check keeps its exit codes. | `ci.yml` `enrollment`, on every PR. | Yes, when a change touches `examples/`, `docs/wiki/`, rules or schemas |
+| `private-evidence.py` | Says whether a commit carries the review corpus and the tracker that the public export leaves out, so CI skips only the steps that need them. | `ci.yml` `gate`, `corpus`, `enrollment` and `tracker`. | No |
+| `publish-public.py` | Writes the export of one commit, filtered by `publish.yaml`, and the commit message the public repository gets. | `publish-sync.py`, which loads it. | No |
+| `publish-sync.py` | Carries every `main` commit the public repository lacks, one commit each, checks each against `publish.yaml`'s selection, and mirrors `v*` tags. | `publish-public.yml` `export`, on every push to `main`. | No |
+| `publish-wiki.sh` | Reconciles a wiki clone with `build/wiki/`, deleting only the pages it published before. | `wiki-sync.yml` `sync`. | No |
+| `readme-try-it.sh` | Prints the README's Try it block byte for byte, so CI runs what the README shows. | `ci.yml` `init-proof`, and `init-proof.sh`. | No |
+| `release-tag-check.py` | Refuses a release tag whose name is not `v` + `warden.__version__`. | `ci.yml` `release-tag`, on a pushed `v*` tag. | No |
+| `tracker-from-a-clone.sh` | Runs the block under *Reading the tracker* in a fresh clone, and checks that `bd show`, `bd ready` and `bd dolt pull` work without changing the clone. | `ci.yml` `tracker`, on every PR whose tree carries `.beads/`. | No |
+| `validate-diagrams.sh` | Renders every Mermaid block under a directory with the real Mermaid engine, so a diagram that will not render cannot reach the wiki. | `ci.yml` `diagrams`, on `docs/wiki` and on a known-bad fixture, and `wiki-sync.yml` `sync` before it publishes. | Yes, after editing a diagram (it needs npm) |
+| `workflow-graph-check.py` | Follows every output and artifact one job of a workflow hands another, and reports a value read from a job that does not provide it. | `ci.yml` `init-proof`, on the gate workflow `warden init` writes into each fresh repository. | No |
+
 ## Contributing from outside
 
 This repository is private and is where every change is reviewed and landed.
 The public repository, [NightWatchEng/nightgate](https://github.com/NightWatchEng/nightgate),
 is a filtered export of it, and that is where an outside pull request is
 opened. The contribution terms above bind it there, through the same PR
-template checkbox. This is the arrangement being set up, not one running yet:
-NightWatchEng/nightgate is still private, and the export that publishes this
-repository's `main` to it does not run yet, so until both are in place no
-outside pull request can arrive.
+template checkbox. The export runs on every push to `main`: the
+`publish-sync.py` row of *The scripts* above.
 
 **What CI runs on it.** The deterministic gate, and nothing that needs a
 credential the PR is not given: the commit-message lint, every verify scope
