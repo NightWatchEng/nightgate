@@ -10,11 +10,10 @@ leaves a record committed with the code. There is no server to run and no paid A
 
 ## The problem
 
-An agent writes a change and the tests for it, and reports that they pass. A person skims a long diff
-and merges it. Afterwards the PR shows green CI and an approval. It does not show which rules applied,
-who reviewed the change, what they found, or whether it was fixed. The review that would catch a real
-defect is the step that gets skipped. Nightgate makes that review a step CI checks, refusing what fails
-and recording what passed against the commit it reviewed.
+The agent writes the change and the tests, and says they pass. A person skims a long diff and approves it. Afterwards the PR
+shows green checks and an approval, and nothing requires the approval to say what it was based on: which rules the change was
+held to, what the reviewer checked and found, and whether the fix landed on the commit that merged. The review that would catch a
+real defect is the step that gets skipped. Nightgate makes that review a step CI checks, refusing what fails and recording what passed against the commit it reviewed.
 
 **[Wiki](docs/wiki/Home.md)** · [Quickstart](docs/wiki/Quickstart.md) · [Installation](docs/wiki/Installation.md) ·
 [Adopting](docs/wiki/Adopting.md) · [Cost and Throughput](docs/wiki/Cost-and-Throughput.md) ·
@@ -50,9 +49,10 @@ Each step runs because the one before it can be wrong. The [sequence page](docs/
 three commands under [Try it](#try-it). Each line below is copied from its CI on 2026-10-05, as kept in
 [the demo record](docs/design/demo-run-20261005-v302.md). A `[...]` line marks where lines were left out.
 
-**Refused.** [PR #2](https://github.com/NightWatchEng/nightgate-demo/pull/2) breaks a test, commits a string
-shaped like an AWS access key id, and carries no review record. It stays open and red. These lines are
-from the verify job, the gate's PR comment and the gate job of [run 37263095706](https://github.com/NightWatchEng/nightgate-demo/actions/runs/37263095706):
+**Refused.** [PR #2](https://github.com/NightWatchEng/nightgate-demo/pull/2) breaks a test, commits a string shaped like an
+AWS access key id, and carries no review record. It was pushed without running the review, on purpose, so CI is the only check
+left. CI holds: the PR stays open and red. Had `deliver` run, its gate-parity step would have refused the same line locally, under
+the same secrets rule. These lines are from the verify job, the gate's PR comment and the gate job of [run 37263095706](https://github.com/NightWatchEng/nightgate-demo/actions/runs/37263095706):
 
 ```text
     failing tests (1):
