@@ -18,7 +18,7 @@ import yaml
 
 from conftest import _AMBIENT_GIT_CONFIG, tracked
 from private_evidence import (EXPORT, needs_corpus, needs_design_records,
-                              publish_excludes)
+                              publish, publish_excludes)
 
 ROOT = Path(__file__).parent.parent
 WIKI = ROOT / "docs" / "wiki"
@@ -40,6 +40,156 @@ def test_relative_links_resolve():
     if excluded:  # every other link resolved; these name what the export left out
         pytest.skip("public export: these links point at records publish.yaml "
                     "leaves out: " + ", ".join(excluded))
+
+
+IMG_TAG = re.compile(r"<(?:img|source)\b[^>]*>", re.IGNORECASE)
+IMG_ATTR = re.compile(
+    r"""(?<![\w-])(?:src|srcset)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))""",
+    re.IGNORECASE)
+
+
+def _image_refs(text: str) -> list[str]:
+    """Every repo-relative file an `<img src>` or a `<source srcset>` on TEXT
+    names: either attribute, quoted either way or not at all, with or without
+    space around `=`, and each candidate of a srcset. A URL with a scheme, or
+    a protocol-relative one, is not a file in this tree and is left out."""
+    refs = []
+    for tag in IMG_TAG.findall(text):
+        for groups in IMG_ATTR.findall(tag):
+            value = next(g for g in groups if g) if any(groups) else ""
+            if re.match(r"\s*data:", value, re.I):
+                continue  # inline bytes, whose own commas are not a srcset's
+            for candidate in value.split(","):
+                ref = candidate.strip().split(" ")[0]
+                if ref and not re.match(r"[a-z][a-z0-9+.-]*:|//", ref, re.I):
+                    refs.append(ref)
+    return refs
+
+
+def _img_problems(pages, tracked: set, shipped: set | None,
+                  root: Path = ROOT) -> list[str]:
+    """Every image PAGES embed that is not a file git tracks at that exact
+    path, or that the public export leaves out. The markdown link check above
+    reads `](...)` only, so an HTML image is invisible to it, and an `<img>` is
+    how GitHub renders a README image at a chosen width. Tracked, not merely on
+    disk: GitHub and the export read the committed tree, and a case-insensitive
+    disk would accept a miscased path neither of them serves. SHIPPED is None
+    in the export itself, where everything tracked is what shipped."""
+    problems = []
+    for md in pages:
+        for src in _image_refs(md.read_text()):
+            rel = os.path.relpath(os.path.normpath(md.parent / src), root)
+            rel = Path(rel).as_posix()
+            if rel not in tracked:
+                problems.append(f"{md.name}: image git does not track -> {src}")
+            elif shipped is not None and rel not in shipped:
+                problems.append(f"{md.name}: image the export leaves out -> {rel}")
+    return problems
+
+
+def test_every_embedded_image_is_tracked_and_ships_in_the_export():
+    """The export's own selection, never a copy of it: publish-public.py's
+    `selected` over `load_manifest`, which reads a name listed in both
+    top-level lists as excluded."""
+    pages = [ROOT / "README.md", *WIKI.glob("*.md")]
+    assert any(_image_refs(md.read_text()) for md in pages), (
+        "no page embeds an image, so this check reads nothing")
+    entries = publish.tree_entries(ROOT, "HEAD")
+    shipped = None if EXPORT else set(
+        publish.selected(publish.load_manifest(ROOT, "HEAD"), entries))
+    assert _img_problems(pages, set(entries), shipped) == []
+
+
+def test_the_image_check_reads_every_spelling_and_fires_on_each_miss(tmp_path):
+    page = tmp_path / "README.md"
+    page.write_text(
+        '<img src="docs/images/a.svg" alt="x">\n'
+        "<img alt='x' src='docs/images/b.svg'>\n"
+        '<img src = "docs/images/c.svg">\n'
+        "<IMG SRC=docs/images/d.svg\nalt=x>\n"
+        "<img lowsrc='docs/images/z.svg' src=docs/images/u.svg>\n"
+        '<picture><source media="(prefers-color-scheme: dark)" '
+        'srcset="docs/images/e.svg 1x, docs/images/f.svg 2x"></picture>\n'
+        '<img data-src="docs/images/g.svg" src="https://example.com/h.svg">\n'
+        '<img src="//example.com/i.svg"><img src="data:image/png;base64,AA">\n')
+    assert _image_refs(page.read_text()) == [
+        f"docs/images/{n}.svg" for n in "abcduef"]
+    every = {f"docs/images/{n}.svg" for n in "abcduef"}
+    assert _img_problems([page], every, every, tmp_path) == []
+    assert _img_problems([page], every - {"docs/images/c.svg"}, every,
+                         tmp_path) == [
+        "README.md: image git does not track -> docs/images/c.svg"]
+    assert _img_problems([page], every, every - {"docs/images/f.svg"},
+                         tmp_path) == [
+        "README.md: image the export leaves out -> docs/images/f.svg"]
+    page.write_text('<img src="docs/images/A.svg">\n')  # git paths are case-exact
+    assert _img_problems([page], every, None, tmp_path) == [
+        "README.md: image git does not track -> docs/images/A.svg"]
+
+
+FLOW_SVG = ROOT / "docs" / "images" / "nightgate-flow.svg"
+_SVG = "{http://www.w3.org/2000/svg}"
+_PAINT = re.compile(r"#[0-9A-F]{6}|none")
+
+
+def _unpainted(svg_text: str) -> list[str]:
+    """Each drawn element whose fill or stroke is not written in the file as a
+    hex color (or `none`) on the element or a group holding it, and each
+    `<text>` with no font-size of its own."""
+    import xml.etree.ElementTree as ET
+    misses = []
+
+    def walk(node, inherited):
+        here = {k: node.get(k, inherited.get(k)) for k in ("fill", "stroke")}
+        tag = node.tag.removeprefix(_SVG)
+        if tag in ("text", "rect", "path", "line"):
+            paints = [v for v in here.values() if v is not None]
+            if not paints or not all(_PAINT.fullmatch(v) for v in paints):
+                misses.append(f"{tag} {node.attrib}")
+            if tag == "text" and not _PAINT.fullmatch(here["fill"] or ""):
+                misses.append(f"text without a fill: {node.text}")
+            if tag == "text" and "font-size" not in node.attrib:
+                misses.append(f"text without a font-size: {node.text}")
+        for child in node:
+            walk(child, here)
+
+    walk(ET.fromstring(svg_text), {})
+    return misses
+
+
+def test_the_readme_flow_image_is_static_and_self_contained():
+    """GitHub serves a repo SVG through <img>: no script runs, no stylesheet
+    variable resolves and no external font or file loads. So every color is a
+    hex attribute in the file, on the element or the group that holds it,
+    every text has its own font-size, and nothing animates."""
+    svg = FLOW_SVG.read_text()
+    for banned in ("<script", "<animate", "<set", "<style", "var(", "@import",
+                   "href=", "<image", "<foreignObject"):
+        assert banned not in svg, f"nightgate-flow.svg carries {banned}"
+    assert re.findall(r"https?://[^\s\"]+", svg) == ["http://www.w3.org/2000/svg"]
+    assert "<text" in svg and _unpainted(svg) == []
+    assert "Nightgate" in svg and "AgentOps" not in svg
+
+
+def test_the_paint_check_fires_on_a_text_with_no_fill():
+    bare = ('<svg xmlns="http://www.w3.org/2000/svg"><g font-size="9">'
+            '<text font-size="12">hi</text></g></svg>')
+    painted = bare.replace("<g ", '<g fill="#E6EBF2" ')
+    assert _unpainted(painted) == []
+    assert _unpainted(bare) == ["text {'font-size': '12'}",
+                                "text without a fill: hi"]
+    assert _unpainted(painted.replace(' font-size="12"', "")) == [
+        "text without a font-size: hi"]
+
+
+def test_the_readme_alt_text_is_the_images_own_description():
+    """Through <img>, GitHub reads the alt and never the SVG's title, so the
+    two say the same thing or a reader of one is told a different picture."""
+    title = re.search(r"<title>([^<]*)</title>", FLOW_SVG.read_text()).group(1)
+    alt = re.search(r'<img src="docs/images/nightgate-flow.svg"[^>]*\balt="([^"]*)"',
+                    (ROOT / "README.md").read_text()).group(1)
+    assert alt == title
+    assert f'aria-label="{title}"' in FLOW_SVG.read_text()
 
 
 def _fence_check(text: str, name: str) -> None:

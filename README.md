@@ -6,6 +6,8 @@ Nightgate is a CLI, a CI workflow and a skill pack. You declare in config what a
 must satisfy. The gate refuses a pull request that does not satisfy it, and every review
 leaves a record committed with the code. There is no server to run and no paid API to call.
 
+<img src="docs/images/nightgate-flow.svg" width="820" alt="One change through Nightgate. The agent writes on a branch; verify runs its tests and lint; two judges review, and the agent repairs confirmed findings, which are judged again; the attestation binds the verdict to the commit; the gate judges it in CI; and a person merges. People declare the policy the platform enforces, and memory feeds the judges and the rules.">
+
 ## The problem
 
 An agent writes a change and the tests for it, and reports that they pass. A person skims a long diff

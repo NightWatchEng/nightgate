@@ -221,6 +221,16 @@ REGISTRY: dict[str, tuple[str, str]] = {
         "pattern with no alternation, so the sweep has nothing to delete. "
         "Covered by those guards themselves, measured: against the "
         "pre-hy6o.51 page each of them fails"),
+    "test_docs:IMG_TAG": (
+        SWEPT, "the tags an embedded image is named in, `<img>` and "
+        "`<picture>`'s `<source>`"),
+    "test_docs:IMG_ATTR": (
+        SWEPT, "the attributes naming an image file and every quoting HTML "
+        "allows for them, with the `lowsrc`/`data-src` controls that keep a "
+        "longer attribute name from reading as `src`"),
+    "test_docs:_PAINT": (
+        SWEPT, "the paint values the README flow image may carry: an inlined "
+        "hex color, or none"),
     "test_docs:HOME_PLACEHOLDERS": (
         SWEPT, "names that are placeholders rather than people"),
     "test_docs:HOME_RE": (
@@ -905,6 +915,9 @@ SWEPT_ALTERNATIVES: dict[str, int] = {
     "test_config:_READ_CALLS": 3,
     "test_docs:_ADOPTING_ADAPTATIONS": 2,
     "test_docs:HOME_PATH_EXEMPT": 2,
+    "test_docs:IMG_TAG": 2,
+    "test_docs:IMG_ATTR": 9,
+    "test_docs:_PAINT": 4,
     "test_git_repo_binding:REPO_FREE_VERBS": 4,
     "test_git_repo_binding:_REPO_BINDING_GLOBALS": 2,
     # 5: the set is derived by probing the git on this machine rather than its
@@ -1861,7 +1874,7 @@ def test_the_ledger_states_the_harness_reach():
                        "test_toolchain", "toolchain"}, sorted(modules)
     # Exact, not a floor: moving a guard in or out of the sweep is a
     # deliberate edit of this number.
-    assert by_kind[SWEPT] == 48, (
+    assert by_kind[SWEPT] == 51, (
         f"{by_kind[SWEPT]} SWEPT rows — a floor let twelve rows leave the "
         "sweep in silence once; a guard moved in or out of the sweep is a "
         "deliberate edit of this number, not a drift under it")

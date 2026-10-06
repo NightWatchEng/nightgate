@@ -1,0 +1,79 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 440" width="1000" height="440" role="img" aria-label="One change through Nightgate. The agent writes on a branch; verify runs its tests and lint; two judges review, and the agent repairs confirmed findings, which are judged again; the attestation binds the verdict to the commit; the gate judges it in CI; and a person merges. People declare the policy the platform enforces, and memory feeds the judges and the rules.">
+  <title>One change through Nightgate. The agent writes on a branch; verify runs its tests and lint; two judges review, and the agent repairs confirmed findings, which are judged again; the attestation binds the verdict to the commit; the gate judges it in CI; and a person merges. People declare the policy the platform enforces, and memory feeds the judges and the rules.</title>
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#A3AEBE"/></marker>
+    <marker id="arrg" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#2DD4BF"/></marker>
+    <marker id="arra" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#F59E0B"/></marker>
+  </defs>
+
+  <rect x="0.5" y="0.5" width="999" height="439" rx="16" fill="#0F141B" stroke="#2A3441"/>
+
+  <g font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace" letter-spacing="1" fill="#A3AEBE">
+    <text x="24" y="30" font-size="12">AGENT</text>
+    <text x="24" y="196" font-size="12">PLATFORM</text>
+    <text x="24" y="318" font-size="12">HUMAN</text>
+  </g>
+  <line x1="24" y1="172" x2="976" y2="172" stroke="#2A3441" stroke-dasharray="3 5"/>
+  <line x1="24" y1="296" x2="976" y2="296" stroke="#2A3441" stroke-dasharray="3 5"/>
+
+  <g stroke-width="1.5">
+    <rect x="40" y="48" width="150" height="64" rx="8" fill="#161D27" stroke="#E6EBF2"/>
+    <rect x="216" y="48" width="190" height="64" rx="8" fill="#161D27" stroke="#E6EBF2"/>
+    <rect x="40" y="212" width="150" height="64" rx="8" fill="#0F2E2B" stroke="#2DD4BF"/>
+    <rect x="216" y="212" width="190" height="64" rx="8" fill="#161D27" stroke="#E6EBF2"/>
+    <rect x="432" y="212" width="160" height="64" rx="8" fill="#0F2E2B" stroke="#2DD4BF"/>
+    <rect x="618" y="212" width="150" height="64" rx="8" fill="#0F2E2B" stroke="#2DD4BF"/>
+    <rect x="794" y="212" width="166" height="64" rx="8" fill="#161D27" stroke="#E6EBF2"/>
+    <rect x="28" y="336" width="174" height="64" rx="8" fill="#0F2E2B" stroke="#2DD4BF"/>
+    <rect x="618" y="346" width="150" height="44" rx="22" fill="#F59E0B"/>
+  </g>
+
+  <g font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-weight="600" fill="#E6EBF2" text-anchor="middle">
+    <text x="115" y="76" font-size="15">agent writes</text>
+    <text x="311" y="76" font-size="15">agent repairs</text>
+    <text x="115" y="240" font-size="15">verify</text>
+    <text x="311" y="240" font-size="15">two judges</text>
+    <text x="512" y="240" font-size="15">attestation</text>
+    <text x="693" y="240" font-size="15">gate</text>
+    <text x="877" y="240" font-size="15">memory</text>
+    <text x="115" y="364" font-size="15">policy</text>
+    <text x="693" y="373" font-size="15" font-weight="700" fill="#0F141B">a person merges</text>
+  </g>
+
+  <g font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace" fill="#A3AEBE" text-anchor="middle">
+    <text x="115" y="98" font-size="11">on a branch</text>
+    <text x="311" y="98" font-size="11">confirmed findings only</text>
+    <text x="115" y="262" font-size="11">tests and lint</text>
+    <text x="311" y="262" font-size="11">reviewer, cross-examiner</text>
+    <text x="512" y="262" font-size="11">bound to the commit</text>
+    <text x="693" y="262" font-size="11">deterministic, in CI</text>
+    <text x="877" y="262" font-size="11">every finding, judged</text>
+    <text x="115" y="386" font-size="11">repo.yaml, rules, graph</text>
+  </g>
+
+  <g fill="none" stroke="#A3AEBE" stroke-width="1.5">
+    <path d="M190,244 L216,244" marker-end="url(#arr)"/>
+    <path d="M406,244 L432,244" marker-end="url(#arr)"/>
+    <path d="M592,244 L618,244" marker-end="url(#arr)"/>
+    <path d="M115,112 L115,212" marker-end="url(#arr)"/>
+    <path d="M350,212 L350,112" marker-end="url(#arr)"/>
+    <path d="M270,112 L270,212" marker-end="url(#arr)"/>
+  </g>
+  <g fill="none" stroke="#2DD4BF" stroke-width="1.5">
+    <path d="M115,336 L115,276" marker-end="url(#arrg)"/>
+    <path d="M794,244 L780,244 L780,196 L380,196 L380,212" marker-end="url(#arrg)"/>
+    <path d="M877,276 L877,412 L115,412 L115,400" marker-end="url(#arrg)"/>
+  </g>
+  <path d="M693,276 L693,346" fill="none" stroke="#F59E0B" stroke-width="2" marker-end="url(#arra)"/>
+
+  <g font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace">
+    <text x="360" y="166" font-size="13" fill="#A3AEBE">confirmed findings</text>
+    <text x="262" y="140" font-size="13" fill="#A3AEBE" text-anchor="end">repair,</text>
+    <text x="262" y="156" font-size="13" fill="#A3AEBE" text-anchor="end">judged again</text>
+    <text x="124" y="312" font-size="13" fill="#2DD4BF">declared, enforced</text>
+    <text x="683" y="312" font-size="13" fill="#F59E0B" text-anchor="end">the PR, with its evidence</text>
+    <text x="420" y="190" font-size="13" fill="#2DD4BF">patterns to the reviewer, precedents to the examiner</text>
+    <text x="496" y="429" font-size="13" fill="#2DD4BF" text-anchor="middle">findings become rules only when the evidence clears a bar</text>
+  </g>
+
+</svg>
