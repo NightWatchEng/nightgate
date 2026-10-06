@@ -32,6 +32,7 @@ from pathlib import Path
 
 import pytest
 import yaml
+from private_evidence import needs_receipts
 
 from warden import cli
 from warden import tags as tags_mod
@@ -624,6 +625,7 @@ def test_a_cannot_evaluate_verdict_leaves_an_artifact_too(tmp_path,
 # ── the platform under its own shipped surface ────────────────────────────
 
 
+@needs_receipts
 def test_this_repos_ceiling_holds_under_the_shipped_command(monkeypatch,
                                                             capsys):
     """Self-hosting: the obligation this repo enforces with a pytest guard

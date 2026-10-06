@@ -41,7 +41,7 @@ from warden import rules as rules_mod
 from warden import tags as tags_mod
 from warden import vocabulary as vocab_mod
 from warden.memory import _JUDGED_STATUSES, records_from_shards
-from private_evidence import needs_corpus
+from private_evidence import needs_corpus, needs_receipts
 
 ROOT = Path(__file__).parent.parent
 RULES_DIR = ROOT / ".warden" / "rules"
@@ -289,6 +289,7 @@ def test_no_corpus_tag_is_an_undeclared_rule_id():
         "is the shape tags.yaml declares on purpose")
 
 
+@needs_receipts
 def test_both_rule_ids_carry_a_recorded_reason_and_no_alias():
     """The disposition for rule ids used as tags, pinned so it cannot be
     quietly reversed into the fold that is mechanically refused.
@@ -356,6 +357,7 @@ def test_both_rule_ids_carry_a_recorded_reason_and_no_alias():
             "sentence saying which")
 
 
+@needs_receipts
 def test_the_evidence_attribution_fold_is_refused_by_the_rule_covering_it(
         tmp_path):
     """`unsupported-source-claim -> evidence-attribution` folded one judged
@@ -414,6 +416,7 @@ def test_the_evidence_attribution_fold_is_refused_by_the_rule_covering_it(
         f"the refusal does not name {covering!r}: {alias_problems}")
 
 
+@needs_receipts
 def test_the_membership_test_was_blind_on_exactly_one_receipt():
     """The comment above says WHICH receipt the retired `covered in reason`
     test could not distinguish, and this measures it: a receipt is
@@ -889,6 +892,7 @@ def test_an_unreadable_vocabulary_reports_and_never_reads_as_healthy(tmp_path):
 THIS_REPOS_CEILING = 0
 
 
+@needs_receipts
 def test_this_repos_tag_ceiling_is_declared_and_holds():
     """The live obligation, and the half that blocks a PR: pytest runs on
     `pull_request` as well as `push`, so a branch whose own review round coins
@@ -921,6 +925,7 @@ def test_this_repos_tag_ceiling_is_declared_and_holds():
         f"was seen. Recording decides nothing about the class")
 
 
+@needs_receipts
 def test_every_recorded_decision_is_readable_and_carries_an_argument():
     """The `left_undeclared:` block is what discharges undecided names. A
     malformed entry silently stops discharging its name, which
@@ -1025,6 +1030,7 @@ def test_a_receipt_is_held_to_the_re_read_trigger_it_states():
         "disposition it promised, or restate its `trigger:`")
 
 
+@needs_receipts
 def test_each_existing_receipt_round_trips_to_its_key():
     """Every receipt the refusal reads as stating a condition carries it as
     the key, with the meaning it had: each holds at the corpus state its

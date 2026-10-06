@@ -18,3 +18,9 @@ exclude: [.github/dependabot.yml, .warden/memory/, docs/design/retro-2*.md,
           docs/design/cost-per-pr-*.md, docs/design/patent-assessment-brief.md,
           docs/design/prior-art-positioning.md]
 keep: [.warden/memory/tags.yaml]
+
+# A path exported in a public form rather than as its bytes; one declared for a
+# path this manifest does not export, or that is not a file, refuses the export.
+# vocabulary-only: the tags: and aliases: mappings, without comments or receipts.
+transforms:
+  .warden/memory/tags.yaml: vocabulary-only

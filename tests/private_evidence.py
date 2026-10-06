@@ -38,6 +38,8 @@ def lacks(what: str):
 needs_corpus = lacks("the committed review corpus (.warden/memory/)")
 needs_tracker = lacks("the tracker (.beads/)")
 needs_design_records = lacks("the docs/design records (and corpus) this reads")
+# publish.yaml's vocabulary-only transform: the export's tags.yaml is its tags and aliases
+needs_receipts = lacks("tags.yaml's left_undeclared receipts and ceiling")
 
 
 def publish_excludes(rel: str) -> bool:

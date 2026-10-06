@@ -116,6 +116,27 @@ def test_first_run_imports_then_each_main_commit_lands_once_with_its_source(tmp_
     assert _git(public, "rev-parse", "main") == before
 
 
+def test_the_exported_tags_yaml_carries_only_tags_and_aliases(tmp_path):
+    """The public tags.yaml is the header and the two mappings, and parity, which
+    compares blob ids, holds over the transformed bytes."""
+    private, public, _ = _repos(tmp_path)
+    head = _commit(private, {
+        "publish.yaml": "top_level:\n  include: [.warden, README.md, publish.yaml]\n"
+                        "  exclude: [.beads]\nexclude: [.warden/memory/]\n"
+                        "keep: [.warden/memory/tags.yaml]\n"
+                        "transforms:\n  .warden/memory/tags.yaml: vocabulary-only\n",
+        ".warden/memory/tags.yaml": "# a retro's ruling (agentops-92z)\ntags:\n  # judged 3\n"
+                                    "  fail-open: errs toward passing\naliases:\n  old: fail-open\n"
+                                    "left_undeclared:\n  coined: why not\nceiling:\n  max_undecided: 0\n",
+        ".warden/memory/attest/s.json": "{}\n"}, "feat(x): vocabulary (agentops-ab2) (#2)")
+    assert _sync(private, public, tmp_path, head) == 0
+    assert "parity ok" in (tmp_path / "parity.txt").read_text()
+    assert _git(public, "show", "main:.warden/memory/tags.yaml").split("\n") == [
+        "# The declared defect-class vocabulary. The annotated copy, with each name's",
+        "# history and receipts, lives in the private repository.",
+        "tags:", "  fail-open: errs toward passing", "aliases:", "  old: fail-open"]
+
+
 def test_a_parity_failure_refuses_and_pushes_nothing(tmp_path, monkeypatch):
     private, public, first = _repos(tmp_path)
     real = sync.publish.export  # the export also writes a file the manifest did not select

@@ -10,6 +10,7 @@ import sys
 from pathlib import Path
 
 import pytest
+import yaml
 from private_evidence import needs_tracker
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -353,12 +354,66 @@ def test_rerun_on_same_sha_is_a_no_op(tmp_path):
     assert {rel: os.stat(out / rel).st_mtime_ns for rel in _files(out)} == stamps
 
 
+# A private tags.yaml in miniature: comments, receipts and a ceiling around the two
+# mappings the public tree carries.
+TAGS_YAML = """\
+# history the public tree does not carry (agentops-92z)
+tags:
+  fail-open: a check that errs toward passing
+  # adopted by a retro, 3 judged
+  docs-drift: "docs: behaviour the code no longer has"
+aliases:
+  test-determinism: wall-clock-dependence
+left_undeclared:
+  coined-once: one record, upheld; why it is neither
+ceiling:
+  max_undecided: 0
+"""
+TRANSFORM = "transforms:\n  .warden/memory/tags.yaml: vocabulary-only\n"
+
+
+def test_the_exported_tags_yaml_parses_and_matches_the_private_mappings(tmp_path):
+    repo = _fixture(tmp_path, {".warden/memory/tags.yaml": TAGS_YAML,
+                               "publish.yaml": FILES["publish.yaml"] + TRANSFORM})
+    out = tmp_path / "out"
+    assert _run(repo, out).returncode == 0
+    private = yaml.safe_load(TAGS_YAML)
+    public = yaml.safe_load((out / ".warden/memory/tags.yaml").read_text())
+    assert public == {"tags": private["tags"], "aliases": private["aliases"]}
+    assert list(public["tags"]) == ["fail-open", "docs-drift"]  # source order, not sorted
+    rerun = _run(repo, out)  # the transform is deterministic: a rerun writes nothing
+    assert rerun.returncode == 0 and "(no change)" in rerun.stderr, rerun.stderr
+    # an empty block declares nothing, as warden/tags.py reads it, and is no refusal
+    empty = _fixture(tmp_path / "e", {".warden/memory/tags.yaml": "tags:\n  x: y\naliases:\n",
+                                      "publish.yaml": FILES["publish.yaml"] + TRANSFORM})
+    assert _run(empty, out := tmp_path / "e-out").returncode == 0
+    assert yaml.safe_load((out / ".warden/memory/tags.yaml").read_text()) == {
+        "tags": {"x": "y"}, "aliases": {}}
+
+
+@pytest.mark.parametrize("path", ["docs/absent.yaml", "docs", "docs/",
+                                  ".warden/memory/attest/shard.json"])
+def test_a_transform_declared_for_an_absent_path_is_refused(tmp_path, path):
+    """Absent, not a file, or excluded: each would publish nothing for the transform."""
+    repo = _fixture(tmp_path, {"publish.yaml": FILES["publish.yaml"]
+                               + f"transforms:\n  {path}: vocabulary-only\n"})
+    result = _run(repo, tmp_path / "out")
+    assert result.returncode == 1 and path in result.stderr, result.stderr
+    assert not (tmp_path / "out").exists()
+    unknown = _fixture(tmp_path / "u", {"publish.yaml": FILES["publish.yaml"]
+                                        + "transforms:\n  README.md: strip\n"})
+    result = _run(unknown, tmp_path / "out")
+    assert result.returncode == 2 and "vocabulary-only" in result.stderr, result.stderr
+
+
 @needs_tracker
 def test_this_repos_head_exports_without_the_tracker_or_the_corpus(tmp_path):
     result = _run(ROOT, out := tmp_path / "public")
     assert result.returncode == 0, result.stderr
     assert not (out / ".beads").exists() and not (out / ".warden/memory/attest").exists()
-    assert (out / ".warden/memory/tags.yaml").is_file()
+    private = yaml.safe_load(_git(ROOT, "show", "HEAD:.warden/memory/tags.yaml"))
+    public = yaml.safe_load((out / ".warden/memory/tags.yaml").read_text())
+    assert public == {"tags": private["tags"], "aliases": private["aliases"]}
     assert result.stdout.endswith(f"Source: {_git(ROOT, 'rev-parse', 'HEAD')}\n")
 
 

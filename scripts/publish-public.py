@@ -3,7 +3,8 @@
 
 Usage: publish-public.py --out DIR [--sha REV] [--repo DIR]
 DIR ends up holding exactly the commit's tree filtered by its publish.yaml (a
-top-level `.git` aside), so a rerun changes nothing. The message loses bead ids
+top-level `.git` aside), each path its `transforms:` names in the declared public
+form, so a rerun changes nothing. The message loses bead ids
 and `(no-bead: ...)` asides, keeps `(#N)`, ends its header in the `(no-bead:
 private ...)` tag the public commit-lint accepts, trades Evidence paragraphs for
 one line carrying only the suite's test counts, and ends `Source: <sha>`.
@@ -51,6 +52,47 @@ def tree_entries(repo: Path, sha: str) -> dict[str, tuple[str, str]]:
     return entries
 
 
+VOCABULARY_HEADER = ("# The declared defect-class vocabulary. The annotated copy, with each name's\n"
+                     "# history and receipts, lives in the private repository.\n")
+
+
+def vocabulary_only(data: bytes) -> bytes:
+    """The `tags:` and `aliases:` mappings, values verbatim and in source order;
+    the comments, `left_undeclared:` receipts and every other key stay private.
+    An empty block is an empty mapping, as warden/tags.py reads one."""
+    import yaml
+    doc = yaml.safe_load(data)
+    if not isinstance(doc, dict):
+        raise CannotRun("vocabulary-only: the file is not a YAML mapping")
+    kept = {k: {} if v is None else v for k, v in doc.items() if k in ("tags", "aliases")}
+    for key in (k for k, v in kept.items() if not isinstance(v, dict)):
+        raise CannotRun(f"vocabulary-only: {key}: is not a mapping")
+    return (VOCABULARY_HEADER + yaml.safe_dump(kept, sort_keys=False, allow_unicode=True,
+                                               width=float("inf"))).encode()
+
+
+TRANSFORMS = {"vocabulary-only": vocabulary_only}
+
+
+def transformed(repo: Path, sha: str, manifest: dict, declared: object, where: str) -> dict:
+    """path -> (blob id, bytes) of each declared transform's public form. One on a
+    path the manifest keeps private, or on no file, is a typo the policy missed."""
+    if not isinstance(declared, dict) or not all(
+            isinstance(p, str) and t in TRANSFORMS for p, t in declared.items()):
+        raise CannotRun(f"{where}: transforms must map paths to one of {sorted(TRANSFORMS)}")
+    out = {}
+    for path, name in declared.items():
+        # `dir/` lists the directory's children: only one record naming `path` itself is a file
+        listed = [r.decode().replace("\t", " ").split(" ", 3) for r in
+                  git(repo, "ls-tree", "-z", "--full-tree", sha, "--", path).split(b"\0") if r]
+        if not exported(manifest, path) or [r[1::2] for r in listed] != [["blob", path]]:
+            raise Refused(f"{MANIFEST}: transform {name} is declared for {path}, "
+                          f"not a file it exports at {sha[:12]}")
+        data = TRANSFORMS[name](git(repo, "cat-file", "blob", listed[0][2]))
+        out[path] = (git(repo, "hash-object", "--stdin", stdin=data).decode().strip(), data)
+    return out
+
+
 def load_manifest(repo: Path, sha: str) -> dict:
     where = f"{MANIFEST} at {sha[:12]}"
     import yaml  # here, so a python without PyYAML is a could-not-run (exit 2)
@@ -68,9 +110,11 @@ def load_manifest(repo: Path, sha: str) -> dict:
         if not isinstance(value, list) or not all(isinstance(p, str) for p in value):
             raise CannotRun(f"{where}: {key} must be a list of paths")
     # a path in both top_level lists is excluded: the safe reading of a typo
-    return {"top_level": {**dict.fromkeys(lists["top_level.include"], "include"),
-                          **dict.fromkeys(lists["top_level.exclude"], "exclude")},
-            "exclude": lists["exclude"], "keep": lists["keep"]}
+    manifest = {"top_level": {**dict.fromkeys(lists["top_level.include"], "include"),
+                              **dict.fromkeys(lists["top_level.exclude"], "exclude")},
+                "exclude": lists["exclude"], "keep": lists["keep"]}
+    manifest["transforms"] = transformed(repo, sha, manifest, data.get("transforms", {}), where)
+    return manifest
 
 
 def matches(pattern: str, path: str) -> bool:
@@ -78,6 +122,12 @@ def matches(pattern: str, path: str) -> bool:
         return path.startswith(pattern)
     want, have = pattern.split("/"), path.split("/")
     return len(want) == len(have) and all(map(fnmatch.fnmatchcase, have, want))
+
+
+def exported(manifest: dict, path: str) -> bool:
+    return (manifest["top_level"].get(path.split("/", 1)[0]) == "include"
+            and (not any(matches(p, path) for p in manifest["exclude"])
+                 or any(matches(p, path) for p in manifest["keep"])))
 
 
 def selected(manifest: dict, entries: dict) -> dict:
@@ -88,10 +138,10 @@ def selected(manifest: dict, entries: dict) -> dict:
     if unclassified or stale:  # a stale entry is a typo or a rename the policy missed
         raise Refused(f"{MANIFEST} does not match the tree: unclassified "
                       f"{unclassified or 'none'}; matching nothing {stale or 'none'}")
-    return {path: entry for path, entry in entries.items()
-            if manifest["top_level"][path.split("/", 1)[0]] == "include"
-            and (not any(matches(p, path) for p in manifest["exclude"])
-                 or any(matches(p, path) for p in manifest["keep"]))}
+    wanted = {path: entry for path, entry in entries.items() if exported(manifest, path)}
+    for path, (obj, _) in manifest.get("transforms", {}).items():
+        wanted[path] = (wanted[path][0], obj)  # parity compares the public bytes' blob
+    return wanted
 
 
 def blobs(repo: Path, objs: list[str]) -> dict[str, bytes]:
@@ -231,8 +281,9 @@ def export(repo: Path, rev: str, out: Path) -> tuple[str, int, int, int]:
         if guarded.is_relative_to(target) or (guarded != work and target.is_relative_to(guarded)):
             raise CannotRun(f"--out {out} would overwrite the repository's {guarded}")
     sha = git(repo, "rev-parse", "--verify", f"{rev}^{{commit}}").decode().strip()
-    wanted = selected(load_manifest(repo, sha), tree_entries(repo, sha))
-    content = blobs(repo, sorted({obj for _, obj in wanted.values()}))
+    manifest = load_manifest(repo, sha)
+    wanted, public = selected(manifest, tree_entries(repo, sha)), dict(manifest["transforms"].values())
+    content = {**blobs(repo, sorted({obj for _, obj in wanted.values()} - set(public))), **public}
     message = scrub_message(git(repo, "log", "-1", "--format=%B", sha).decode(), sha)
     out.mkdir(parents=True, exist_ok=True)
     return message, len(wanted), *sync(out, wanted, content)
